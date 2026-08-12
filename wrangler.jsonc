@@ -9,6 +9,16 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
+  // ─── Hyperdrive ─────────────────────────────────────────────────────────────
+  // Connection pooling for Neon Postgres
+  "hyperdrive": [
+    {
+      "binding": "DB",
+      "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      "localConnectionString": "postgresql://neondb_owner:npg_KvLzsV2l1Zfc@ep-frosty-scene-acz4585p-pooler.sa-east-1.aws.neon.tech:5432/neondb?sslmode=require"
+    }
+  ],
+
   // ─── Assets (static files built by Next.js / OpenNext) ──────────────────────
   "assets": {
     "directory": ".open-next/assets",
@@ -30,7 +40,7 @@
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
+      "id": "f6180158d13447e0b8fe63ff62cfae33",
       "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
     }
   ],
@@ -78,7 +88,8 @@
   "vars": {
     "APP_ENV": "production",
     "APP_URL": "https://farm-fin.com",
-    "NEXT_PUBLIC_APP_NAME": "Farm-Fin"
+    "NEXT_PUBLIC_APP_NAME": "Farm-Fin",
+    "NEON_AUTH_URL": "https://ep-frosty-scene-acz4585p.neonauth.sa-east-1.aws.neon.tech/neondb/auth"
   },
 
   // ─── Observability ──────────────────────────────────────────────────────────
