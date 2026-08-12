@@ -1,0 +1,118 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ─── Identity ───────────────────────────────────────────────────────────────
+  "name": "farm-fin",
+  "main": ".open-next/worker.js",
+
+  // ─── Compatibility ──────────────────────────────────────────────────────────
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ─── Assets (static files built by Next.js / OpenNext) ──────────────────────
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // ─── R2 Buckets ─────────────────────────────────────────────────────────────
+  // Stores file attachments: NF-e PDFs, boletos, comprovantes de pagamento
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "farm-fin-attachments",
+      "preview_bucket_name": "farm-fin-attachments-preview"
+    }
+  ],
+
+  // ─── KV Namespaces ──────────────────────────────────────────────────────────
+  // Used for: rate limiting, session caching, short-lived report cache
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
+      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+    }
+  ],
+
+  // ─── Queues ─────────────────────────────────────────────────────────────────
+  // Async background jobs: due-date alerts, report generation, LCDPR export
+  "queues": {
+    "producers": [
+      {
+        "binding": "ALERT_QUEUE",
+        "queue": "farm-fin-alerts"
+      },
+      {
+        "binding": "REPORT_QUEUE",
+        "queue": "farm-fin-reports"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "farm-fin-alerts",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30,
+        "max_retries": 3
+      },
+      {
+        "queue": "farm-fin-reports",
+        "max_batch_size": 5,
+        "max_batch_timeout": 60,
+        "max_retries": 2
+      }
+    ]
+  },
+
+  // ─── Cron Triggers ──────────────────────────────────────────────────────────
+  // Scheduled jobs to check for upcoming/overdue payables and send alerts
+  "triggers": {
+    "crons": [
+      "0 8 * * *",   // Daily at 08:00 UTC — due-date alert sweep
+      "0 0 * * 1"    // Every Monday at 00:00 UTC — weekly cash flow summary
+    ]
+  },
+
+  // ─── Environment Variables ──────────────────────────────────────────────────
+  // Non-secret config. Secrets must be set via: wrangler secret put <KEY>
+  "vars": {
+    "APP_ENV": "production",
+    "APP_URL": "https://farm-fin.com",
+    "NEXT_PUBLIC_APP_NAME": "Farm-Fin"
+  },
+
+  // ─── Observability ──────────────────────────────────────────────────────────
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  // ─── Environments ───────────────────────────────────────────────────────────
+  "env": {
+    // Preview environment — used for PR branch deploys
+    "preview": {
+      "name": "farm-fin-preview",
+      "vars": {
+        "APP_ENV": "preview",
+        "APP_URL": "https://preview.farm-fin.com",
+        "NEXT_PUBLIC_APP_NAME": "Farm-Fin (Preview)"
+      },
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENTS",
+          "bucket_name": "farm-fin-attachments-preview"
+        }
+      ]
+    },
+
+    // Development environment — local wrangler dev
+    "development": {
+      "name": "farm-fin-dev",
+      "vars": {
+        "APP_ENV": "development",
+        "APP_URL": "http://localhost:3000",
+        "NEXT_PUBLIC_APP_NAME": "Farm-Fin (Dev)"
+      }
+    }
+  }
+}
