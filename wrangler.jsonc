@@ -14,7 +14,7 @@
   "hyperdrive": [
     {
       "binding": "DB",
-      "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      "id": "4ea091cc9f3c420f8979ab1098346833",
       "localConnectionString": "postgresql://neondb_owner:npg_KvLzsV2l1Zfc@ep-frosty-scene-acz4585p-pooler.sa-east-1.aws.neon.tech:5432/neondb?sslmode=require"
     }
   ],
