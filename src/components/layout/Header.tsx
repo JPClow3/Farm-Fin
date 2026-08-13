@@ -6,6 +6,18 @@ import { useFarm } from '../../context/FarmContext';
 import { ClayButton } from '../ui/ClayButton';
 import { User } from '../../lib/types';
 import { SEED_USERS } from '../../db/seed';
+import {
+  Menu,
+  Home,
+  Wheat,
+  Plus,
+  Bell,
+  Settings,
+  LogOut,
+  User as UserIcon,
+  AlertCircle,
+  Package,
+} from 'lucide-react';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -53,12 +65,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
           className="hide-desktop"
           aria-label="Abrir Menu"
         >
-          ☰
+          <Menu size={18} />
         </ClayButton>
 
         {/* Farm Selector */}
-        <div className="flex-row" style={{ gap: '6px' }}>
-          <span style={{ fontSize: '1.1rem' }}>🏡</span>
+        <div className="flex-row" style={{ gap: '6px', alignItems: 'center' }}>
+          <Home size={16} color="var(--color-primary-600)" />
           <select
             value={activeFarmId}
             onChange={(e) => setActiveFarmId(e.target.value)}
@@ -80,8 +92,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
         </div>
 
         {/* Safra Selector */}
-        <div className="flex-row hide-mobile" style={{ gap: '6px' }}>
-          <span style={{ fontSize: '1rem' }}>🌾</span>
+        <div className="flex-row hide-mobile" style={{ gap: '6px', alignItems: 'center' }}>
+          <Wheat size={16} color="var(--color-secondary-600)" />
           <select
             value={activeSeasonId}
             onChange={(e) => setActiveSeasonId(e.target.value)}
@@ -110,7 +122,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
           onClick={onOpenQuickNew}
           style={{ height: '36px', fontSize: 'var(--text-sm)' }}
         >
-          <span>＋</span> <span className="hide-mobile">Novo Lançamento</span>
+          <Plus size={16} style={{ marginRight: '4px' }} />
+          <span className="hide-mobile">Novo Lançamento</span>
         </ClayButton>
 
         {/* Notifications Button */}
@@ -123,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             aria-label="Notificações"
             style={{ position: 'relative' }}
           >
-            🔔
+            <Bell size={18} />
             {kpis.overduePayablesCount + kpis.lowStockCount > 0 && (
               <span
                 style={{
@@ -167,10 +180,16 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                       borderRadius: 'var(--radius-sm)',
                       fontSize: '12px',
                       color: 'var(--color-danger-dark)',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '6px',
                     }}
                   >
-                    ⚠️ <strong>{kpis.overduePayablesCount} conta(s) a pagar vencida(s)</strong> no
-                    total de R$ {kpis.totalOverduePayables.toLocaleString('pt-BR')}.
+                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <strong>{kpis.overduePayablesCount} conta(s) vencida(s)</strong> no total de
+                      R$ {kpis.totalOverduePayables.toLocaleString('pt-BR')}.
+                    </div>
                   </div>
                 )}
                 {kpis.lowStockCount > 0 && (
@@ -181,10 +200,16 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                       borderRadius: 'var(--radius-sm)',
                       fontSize: '12px',
                       color: 'var(--color-warning-dark)',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '6px',
                     }}
                   >
-                    📦 <strong>{kpis.lowStockCount} insumo(s)</strong> abaixo do estoque de
-                    segurança.
+                    <Package size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <strong>{kpis.lowStockCount} insumo(s)</strong> abaixo do estoque de
+                      segurança.
+                    </div>
                   </div>
                 )}
                 {kpis.overduePayablesCount === 0 && kpis.lowStockCount === 0 && (
@@ -220,13 +245,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             }}
           >
             <div className="avatar-initials avatar--sm">
-              {currentUser.role === 'Produtor'
-                ? '👨‍🌾'
-                : currentUser.role === 'Gestor'
-                  ? '🚜'
-                  : currentUser.role === 'Contador'
-                    ? '📑'
-                    : '💳'}
+              <UserIcon size={16} />
             </div>
             <div className="hide-mobile" style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold' }}>
@@ -271,20 +290,33 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
               <div className="dropdown__divider" />
               <button
                 className="dropdown__item"
-                style={{ fontSize: 'var(--text-xs)' }}
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
                 onClick={() => {
                   setShowUserMenu(false);
                   router.push('/configuracoes');
                 }}
               >
-                ⚙️ Configurações & RBAC
+                <Settings size={14} />
+                <span>Configurações & RBAC</span>
               </button>
               <button
                 className="dropdown__item"
-                style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-danger)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
                 onClick={handleLogout}
               >
-                🚪 Sair (Encerrar Sessão)
+                <LogOut size={14} />
+                <span>Sair (Encerrar Sessão)</span>
               </button>
             </div>
           )}

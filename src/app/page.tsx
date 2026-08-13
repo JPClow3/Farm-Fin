@@ -16,6 +16,14 @@ import { ClayInput } from '../components/ui/ClayInput';
 import { Payable } from '../lib/types';
 import { getDashboardKPIs } from '../actions/analytics';
 import { getTodayDateString } from '../lib/dateUtils';
+import {
+  TrendingUp,
+  CreditCard,
+  CircleDollarSign,
+  Building2,
+  Sprout,
+  ArrowRight,
+} from 'lucide-react';
 
 export default function DashboardPage() {
   const {
@@ -86,15 +94,17 @@ export default function DashboardPage() {
             Visão financeira e operacional consolidada para a {activeSeason?.name || 'Safra Atual'}
           </p>
         </div>
-        <div className="flex-row">
+        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
           <Link href="/fluxo-de-caixa">
             <ClayButton variant="ghost" size="sm">
-              📈 Ver Fluxo Completo
+              <TrendingUp size={15} style={{ marginRight: '6px' }} />
+              Ver Fluxo Completo
             </ClayButton>
           </Link>
           <Link href="/contas-a-pagar">
             <ClayButton variant="secondary" size="sm">
-              💳 Contas a Pagar
+              <CreditCard size={15} style={{ marginRight: '6px' }} />
+              Contas a Pagar
             </ClayButton>
           </Link>
         </div>
@@ -105,7 +115,7 @@ export default function DashboardPage() {
         <KpiCard
           label="Contas a Receber (Venc./Mês)"
           value={`R$ ${liveKpis.totalReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💰"
+          icon={<CircleDollarSign size={20} />}
           iconColor="green"
           trend={{
             value: `Receita no Mês: R$ ${liveKpis.totalReceitasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
@@ -115,7 +125,7 @@ export default function DashboardPage() {
         <KpiCard
           label="Contas a Pagar (Venc./Mês)"
           value={`R$ ${liveKpis.totalPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💳"
+          icon={<CreditCard size={20} />}
           iconColor="red"
           trend={{
             value: `Despesa no Mês: R$ ${liveKpis.totalDespesasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
@@ -125,14 +135,14 @@ export default function DashboardPage() {
         <KpiCard
           label="Saldo Consolidado em Caixa"
           value={`R$ ${kpis?.totalBankBalance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`}
-          icon="🏦"
+          icon={<Building2 size={20} />}
           iconColor="blue"
           subtext={`${bankAccounts?.length || 0} contas bancárias ativas`}
         />
         <KpiCard
           label="Margem Líquida da Safra"
           value={`${kpis?.estimatedCropMargin?.toFixed(1) || '0.0'}%`}
-          icon="🌱"
+          icon={<Sprout size={20} />}
           iconColor="amber"
           subtext={`Custo Médio: R$ ${kpis?.averageCostPerHectare?.toFixed(2) || '0.00'}/ha`}
         />

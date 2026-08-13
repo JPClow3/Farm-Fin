@@ -3,7 +3,7 @@ import React from 'react';
 export interface KpiCardProps {
   label: string;
   value: string;
-  icon?: string;
+  icon?: React.ReactNode;
   iconColor?: 'green' | 'amber' | 'red' | 'blue' | 'terra';
   trend?: {
     value: string;
@@ -18,7 +18,7 @@ export interface KpiCardProps {
 export const KpiCard: React.FC<KpiCardProps> = ({
   label,
   value,
-  icon = '🌾',
+  icon,
   iconColor = 'green',
   trend,
   subtext,

@@ -4,6 +4,20 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useFarm } from '../../context/FarmContext';
+import {
+  LayoutDashboard,
+  TrendingUp,
+  CreditCard,
+  CircleDollarSign,
+  Building2,
+  Package,
+  Sprout,
+  FileSpreadsheet,
+  Landmark,
+  FolderKanban,
+  Settings,
+  Tractor,
+} from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -13,7 +27,7 @@ interface SidebarProps {
 interface NavItemConfig {
   href: string;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   badgeCount?: number;
 }
 
@@ -30,8 +44,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     {
       title: 'Principal',
       items: [
-        { href: '/', label: 'Dashboard', icon: '📊' },
-        { href: '/fluxo-de-caixa', label: 'Fluxo de Caixa', icon: '📈' },
+        {
+          href: '/',
+          label: 'Dashboard',
+          icon: <LayoutDashboard size={18} strokeWidth={2.2} />,
+        },
+        {
+          href: '/fluxo-de-caixa',
+          label: 'Fluxo de Caixa',
+          icon: <TrendingUp size={18} strokeWidth={2.2} />,
+        },
       ],
     },
     {
@@ -40,11 +62,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {
           href: '/contas-a-pagar',
           label: 'Contas a Pagar',
-          icon: '💳',
+          icon: <CreditCard size={18} strokeWidth={2.2} />,
           badgeCount: kpis.overduePayablesCount > 0 ? kpis.overduePayablesCount : undefined,
         },
-        { href: '/contas-a-receber', label: 'Contas a Receber', icon: '💰' },
-        { href: '/conciliacao', label: 'Conciliação Bancária', icon: '🏦' },
+        {
+          href: '/contas-a-receber',
+          label: 'Contas a Receber',
+          icon: <CircleDollarSign size={18} strokeWidth={2.2} />,
+        },
+        {
+          href: '/conciliacao',
+          label: 'Conciliação Bancária',
+          icon: <Building2 size={18} strokeWidth={2.2} />,
+        },
       ],
     },
     {
@@ -53,24 +83,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {
           href: '/estoque',
           label: 'Estoque de Insumos',
-          icon: '📦',
+          icon: <Package size={18} strokeWidth={2.2} />,
           badgeCount: kpis.lowStockCount > 0 ? kpis.lowStockCount : undefined,
         },
-        { href: '/custos', label: 'Custo por Talhão', icon: '🌱' },
+        {
+          href: '/custos',
+          label: 'Custo por Talhão',
+          icon: <Sprout size={18} strokeWidth={2.2} />,
+        },
       ],
     },
     {
       title: 'Contábil & Fiscal',
       items: [
-        { href: '/dre', label: 'DRE Agrícola', icon: '📑' },
-        { href: '/lcdpr', label: 'LCDPR (Receita Federal)', icon: '🏛️' },
+        {
+          href: '/dre',
+          label: 'DRE Agrícola',
+          icon: <FileSpreadsheet size={18} strokeWidth={2.2} />,
+        },
+        {
+          href: '/lcdpr',
+          label: 'LCDPR (Receita Federal)',
+          icon: <Landmark size={18} strokeWidth={2.2} />,
+        },
       ],
     },
     {
       title: 'Sistema',
       items: [
-        { href: '/cadastros', label: 'Cadastros Base', icon: '📁' },
-        { href: '/configuracoes', label: 'Configurações', icon: '⚙️' },
+        {
+          href: '/cadastros',
+          label: 'Cadastros Base',
+          icon: <FolderKanban size={18} strokeWidth={2.2} />,
+        },
+        {
+          href: '/configuracoes',
+          label: 'Configurações',
+          icon: <Settings size={18} strokeWidth={2.2} />,
+        },
       ],
     },
   ];
@@ -89,7 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         {/* Logo */}
         <div className="sidebar__logo">
-          <div className="sidebar__logo-icon">🚜</div>
+          <div className="sidebar__logo-icon">
+            <Tractor size={24} color="#ffffff" strokeWidth={2.2} />
+          </div>
           <div>
             <div className="sidebar__logo-text">Farm-Fin</div>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '500' }}>

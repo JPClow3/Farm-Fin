@@ -13,6 +13,17 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { Payable } from '../../lib/types';
 import { getTodayDateString, addMonthsToDate } from '../../lib/dateUtils';
+import {
+  Plus,
+  CreditCard,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  Paperclip,
+  Pencil,
+  Trash2,
+  FileText,
+} from 'lucide-react';
 
 export default function ContasAPagarPage() {
   const {
@@ -248,7 +259,7 @@ export default function ContasAPagarPage() {
               title="Ver Comprovante / NF"
               onClick={() => setViewingAttachment(row)}
             >
-              📎
+              <Paperclip size={15} />
             </ClayButton>
           )}
           <ClayButton
@@ -258,7 +269,7 @@ export default function ContasAPagarPage() {
             title="Editar Conta"
             onClick={() => handleOpenEdit(row)}
           >
-            ✏️
+            <Pencil size={15} />
           </ClayButton>
           {row.status !== 'pago' && (
             <ClayButton
@@ -288,7 +299,7 @@ export default function ContasAPagarPage() {
               }
             }}
           >
-            🗑️
+            <Trash2 size={15} />
           </ClayButton>
         </div>
       ),
@@ -307,7 +318,8 @@ export default function ContasAPagarPage() {
           </p>
         </div>
         <ClayButton variant="primary" onClick={() => setIsNewModalOpen(true)}>
-          ＋ Nova Conta a Pagar
+          <Plus size={16} style={{ marginRight: '6px' }} />
+          Nova Conta a Pagar
         </ClayButton>
       </div>
 
@@ -316,28 +328,28 @@ export default function ContasAPagarPage() {
         <KpiCard
           label="Total a Pagar (Aberto)"
           value={`R$ ${kpis.totalPendingPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💳"
+          icon={<CreditCard size={20} />}
           iconColor="amber"
           subtext="Contas pendentes na safra"
         />
         <KpiCard
           label="Contas Vencidas"
           value={`R$ ${kpis.totalOverduePayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="⚠️"
+          icon={<AlertTriangle size={20} />}
           iconColor="red"
           subtext={`${kpis.overduePayablesCount} conta(s) em atraso`}
         />
         <KpiCard
           label="Vencem Hoje"
           value={`R$ ${kpis.totalDueTodayPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="⏰"
+          icon={<Clock size={20} />}
           iconColor="terra"
           subtext="Atenção ao prazo limite"
         />
         <KpiCard
           label="Total Pago no Mês"
           value={`R$ ${kpis.totalPaidThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="✓"
+          icon={<CheckCircle2 size={20} />}
           iconColor="green"
           subtext="Baixas efetivadas"
         />
