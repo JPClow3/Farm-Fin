@@ -1,8 +1,331 @@
-export default function Home() {
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useFarm } from '../context/FarmContext';
+import { useToast } from '../context/ToastContext';
+import { KpiCard } from '../components/ui/KpiCard';
+import { ClayCard } from '../components/ui/ClayCard';
+import { ClayButton } from '../components/ui/ClayButton';
+import { StatusBadge } from '../components/ui/StatusBadge';
+import { CashFlowChart } from '../components/charts/CashFlowChart';
+import { CostBreakdownChart } from '../components/charts/CostBreakdownChart';
+import { ClayModal } from '../components/ui/ClayModal';
+import { ClaySelect } from '../components/ui/ClaySelect';
+import { ClayInput } from '../components/ui/ClayInput';
+import { Payable } from '../lib/mockData';
+
+export default function DashboardPage() {
+  const {
+    activeFarm,
+    activeSeason,
+    activePayables,
+    activeFields,
+    bankAccounts,
+    payPayable,
+    kpis,
+  } = useFarm();
+
+  const { addToast } = useToast();
+
+  // Payment Modal State
+  const [selectedPayable, setSelectedPayable] = useState<Payable | null>(null);
+  const [paymentAccount, setPaymentAccount] = useState<string>(bankAccounts[0]?.id || '');
+  const [paymentDate, setPaymentDate] = useState<string>('2026-08-14');
+
+  const upcomingPayables = activePayables
+    .filter((p) => p.status === 'pendente' || p.status === 'vencido')
+    .slice(0, 5);
+
+  const handleConfirmPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPayable) return;
+
+    payPayable(selectedPayable.id, paymentAccount, selectedPayable.amount, paymentDate);
+    addToast({
+      type: 'success',
+      title: 'Pagamento Realizado!',
+      message: `Baixa de R$ ${selectedPayable.amount.toLocaleString('pt-BR')} registrada com sucesso.`,
+    });
+    setSelectedPayable(null);
+  };
+
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>Farm-Fin</h1>
-      <p>Welcome to Farm-Fin Next.js Application.</p>
-    </main>
+    <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="page-title-group">
+          <h1 className="page-title">Painel Executivo — {activeFarm.name}</h1>
+          <p className="page-subtitle">
+            Visão financeira e operacional consolidada para a {activeSeason.name}
+          </p>
+        </div>
+        <div className="flex-row">
+          <Link href="/fluxo-de-caixa">
+            <ClayButton variant="ghost" size="sm">
+              📈 Ver Fluxo Completo
+            </ClayButton>
+          </Link>
+          <Link href="/contas-a-pagar">
+            <ClayButton variant="secondary" size="sm">
+              💳 Contas a Pagar
+            </ClayButton>
+          </Link>
+        </div>
+      </div>
+
+      {/* Primary KPI Grid (4 Cards) */}
+      <div className="grid-4">
+        <KpiCard
+          label="Saldo Consolidado em Caixa"
+          value={`R$ ${kpis.totalBankBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon="🏦"
+          iconColor="blue"
+          subtext={`${bankAccounts.length} contas bancárias ativas`}
+        />
+        <KpiCard
+          label="Contas a Pagar (Próx. 30d)"
+          value={`R$ ${kpis.totalPendingPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon="💳"
+          iconColor="red"
+          trend={{
+            value: `${kpis.overduePayablesCount} vencida(s)`,
+            direction: 'down',
+          }}
+          subtext={kpis.totalOverduePayables > 0 ? `R$ ${kpis.totalOverduePayables.toLocaleString('pt-BR')} vencido` : 'Em dia'}
+        />
+        <KpiCard
+          label="Contas a Receber (Vendas)"
+          value={`R$ ${kpis.totalPendingReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon="💰"
+          iconColor="green"
+          trend={{
+            value: '+12%',
+            direction: 'up',
+            label: 'vs safra anterior',
+          }}
+        />
+        <KpiCard
+          label="Margem Líquida da Safra"
+          value={`${kpis.estimatedCropMargin.toFixed(1)}%`}
+          icon="🌱"
+          iconColor="amber"
+          subtext={`Custo Médio: R$ ${kpis.averageCostPerHectare.toFixed(2)}/ha`}
+        />
+      </div>
+
+      {/* Main Charts & Allocation Section */}
+      <div className="grid-2-1">
+        {/* Cash Flow Evolution */}
+        <ClayCard>
+          <div className="card-header">
+            <div>
+              <h2 className="card-title">Fluxo de Caixa Mensal</h2>
+              <p className="card-subtitle">
+                Comparativo de Entradas vs Saídas e Projeção de Liquidez
+              </p>
+            </div>
+            <Link href="/fluxo-de-caixa">
+              <ClayButton variant="ghost" size="sm">
+                Detalhes →
+              </ClayButton>
+            </Link>
+          </div>
+          <CashFlowChart />
+        </ClayCard>
+
+        {/* Cost Breakdown */}
+        <ClayCard>
+          <div className="card-header">
+            <div>
+              <h2 className="card-title">Alocação de Custos</h2>
+              <p className="card-subtitle">Despesas por Categoria na Safra</p>
+            </div>
+            <Link href="/custos">
+              <ClayButton variant="ghost" size="sm">
+                Ver Custos →
+              </ClayButton>
+            </Link>
+          </div>
+          <CostBreakdownChart />
+        </ClayCard>
+      </div>
+
+      {/* Upcoming Bills & Farm Fields Section */}
+      <div className="grid-2">
+        {/* Próximos Vencimentos */}
+        <ClayCard>
+          <div className="card-header">
+            <div>
+              <h2 className="card-title">Próximos Vencimentos</h2>
+              <p className="card-subtitle">Contas com vencimento imediato</p>
+            </div>
+            <Link href="/contas-a-pagar">
+              <ClayButton variant="ghost" size="sm">
+                Ver Todas ({activePayables.length})
+              </ClayButton>
+            </Link>
+          </div>
+
+          <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
+            {upcomingPayables.length === 0 ? (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-6)' }}>
+                Nenhuma conta pendente para este período.
+              </p>
+            ) : (
+              upcomingPayables.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex-between"
+                  style={{
+                    padding: 'var(--space-3) var(--space-4)',
+                    background: 'var(--bg-surface-2)',
+                    borderRadius: 'var(--radius-lg)',
+                  }}
+                >
+                  <div className="flex-col" style={{ gap: '2px' }}>
+                    <span style={{ fontWeight: '600', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                      {item.description}
+                    </span>
+                    <div className="flex-row" style={{ gap: '8px', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                      <span>{item.supplierName}</span>
+                      <span>•</span>
+                      <span>Vence em: {item.dueDate}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-row" style={{ gap: '12px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="td-money" style={{ color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>
+                        R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </div>
+                    <ClayButton
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setSelectedPayable(item)}
+                    >
+                      Pagar
+                    </ClayButton>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ClayCard>
+
+        {/* Resumo dos Talhões */}
+        <ClayCard>
+          <div className="card-header">
+            <div>
+              <h2 className="card-title">Talhões da Propriedade</h2>
+              <p className="card-subtitle">Área total: {activeFarm.totalArea} hectares</p>
+            </div>
+            <Link href="/cadastros">
+              <ClayButton variant="ghost" size="sm">
+                Gerenciar →
+              </ClayButton>
+            </Link>
+          </div>
+
+          <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
+            {activeFields.map((field) => (
+              <div
+                key={field.id}
+                className="flex-between"
+                style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  background: 'var(--bg-surface-2)',
+                  borderRadius: 'var(--radius-lg)',
+                }}
+              >
+                <div className="flex-col" style={{ gap: '2px' }}>
+                  <span style={{ fontWeight: '600', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                    {field.name}
+                  </span>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                    Solo: {field.soilType}
+                  </span>
+                </div>
+                <div className="flex-row" style={{ gap: '12px' }}>
+                  <span className="badge badge--primary">
+                    {field.currentCrop}
+                  </span>
+                  <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>
+                    {field.area} ha
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ClayCard>
+      </div>
+
+      {/* Pay Modal */}
+      {selectedPayable && (
+        <ClayModal
+          isOpen={true}
+          onClose={() => setSelectedPayable(null)}
+          title="Baixa de Pagamento"
+          subtitle={`Confirmar quitação de "${selectedPayable.description}"`}
+        >
+          <form onSubmit={handleConfirmPayment} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+            <div
+              style={{
+                padding: 'var(--space-4)',
+                background: 'var(--bg-surface-2)',
+                borderRadius: 'var(--radius-lg)',
+              }}
+            >
+              <div className="flex-between" style={{ marginBottom: '8px' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                  Fornecedor:
+                </span>
+                <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>
+                  {selectedPayable.supplierName}
+                </span>
+              </div>
+              <div className="flex-between">
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                  Valor da Parcela:
+                </span>
+                <span className="td-money" style={{ fontSize: 'var(--text-lg)', color: 'var(--color-primary-700)' }}>
+                  R$ {selectedPayable.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            <ClaySelect
+              label="Conta Bancária de Débito"
+              options={bankAccounts.map((b) => ({
+                value: b.id,
+                label: `${b.bankName} (Saldo: R$ ${b.balance.toLocaleString('pt-BR')})`,
+              }))}
+              value={paymentAccount}
+              onChange={(e) => setPaymentAccount(e.target.value)}
+              required
+            />
+
+            <ClayInput
+              label="Data Efetiva do Pagamento"
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              required
+            />
+
+            <div className="modal__footer">
+              <ClayButton type="button" variant="ghost" onClick={() => setSelectedPayable(null)}>
+                Cancelar
+              </ClayButton>
+              <ClayButton type="submit" variant="primary">
+                Confirmar Quitação
+              </ClayButton>
+            </div>
+          </form>
+        </ClayModal>
+      )}
+    </div>
   );
 }
