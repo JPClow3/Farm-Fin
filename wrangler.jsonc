@@ -57,20 +57,6 @@
         "binding": "REPORT_QUEUE",
         "queue": "farm-fin-reports"
       }
-    ],
-    "consumers": [
-      {
-        "queue": "farm-fin-alerts",
-        "max_batch_size": 10,
-        "max_batch_timeout": 30,
-        "max_retries": 3
-      },
-      {
-        "queue": "farm-fin-reports",
-        "max_batch_size": 5,
-        "max_batch_timeout": 60,
-        "max_retries": 2
-      }
     ]
   },
 
