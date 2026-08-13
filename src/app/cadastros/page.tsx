@@ -11,16 +11,7 @@ import { ClayModal } from '../../components/ui/ClayModal';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
 import { Farm, Field, Supplier, Machinery, BankAccount } from '../../lib/types';
-import {
-  Home,
-  Sprout,
-  Wheat,
-  Users,
-  Tractor,
-  Building2,
-  Plus,
-  MapPin,
-} from 'lucide-react';
+import { Home, Sprout, Wheat, Users, Tractor, Building2, Plus, MapPin } from 'lucide-react';
 
 export default function CadastrosPage() {
   const {
@@ -332,13 +323,13 @@ export default function CadastrosPage() {
                     borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>{s.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       CNPJ: {s.document} • Tel: {s.contact}
                     </div>
                   </div>
-                  <span className="badge badge--primary" style={{ fontSize: '10px' }}>
+                  <span className="badge badge--primary" style={{ fontSize: '10px', flexShrink: 0 }}>
                     {s.category}
                   </span>
                 </div>
@@ -361,13 +352,13 @@ export default function CadastrosPage() {
                     borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>{c.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       CNPJ: {c.document} • Tel: {c.contact}
                     </div>
                   </div>
-                  <span className="badge badge--success" style={{ fontSize: '10px' }}>
+                  <span className="badge badge--success" style={{ fontSize: '10px', flexShrink: 0 }}>
                     {c.segment}
                   </span>
                 </div>

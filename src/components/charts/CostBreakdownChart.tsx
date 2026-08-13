@@ -66,7 +66,7 @@ export const CostBreakdownChart: React.FC<CostBreakdownChartProps> = ({
       <div className="flex-col" style={{ gap: 'var(--space-2)' }}>
         {categories.map((cat) => (
           <div key={cat.label} className="flex-between" style={{ fontSize: 'var(--text-xs)' }}>
-            <div className="flex-row" style={{ gap: '8px' }}>
+            <div className="flex-row" style={{ gap: '8px', minWidth: 0, flex: 1 }}>
               <span
                 style={{
                   width: '10px',
@@ -76,7 +76,7 @@ export const CostBreakdownChart: React.FC<CostBreakdownChartProps> = ({
                   flexShrink: 0,
                 }}
               />
-              <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{cat.label}</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.label}</span>
             </div>
             <div className="flex-row" style={{ gap: '12px' }}>
               <span style={{ color: 'var(--text-secondary)' }}>

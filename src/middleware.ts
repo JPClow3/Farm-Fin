@@ -18,6 +18,8 @@ export function middleware(request: NextRequest) {
   const betterAuthToken =
     request.cookies.get('better-auth.session_token')?.value ||
     request.cookies.get('__Secure-better-auth.session_token')?.value ||
+    request.cookies.get('neon_auth.session_token')?.value ||
+    request.cookies.get('__Secure-neon_auth.session_token')?.value ||
     request.cookies.get('farmfin_session')?.value;
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');

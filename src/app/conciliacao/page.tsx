@@ -334,7 +334,11 @@ NEWFILEUID:NONE
         }}
         onClick={() => fileInputRef.current?.click()}
       >
-        <FolderOpen size={40} color="var(--color-primary-600)" style={{ margin: '0 auto var(--space-2)' }} />
+        <FolderOpen
+          size={40}
+          color="var(--color-primary-600)"
+          style={{ margin: '0 auto var(--space-2)' }}
+        />
         <h3
           style={{
             fontSize: 'var(--text-md)',
@@ -388,7 +392,7 @@ NEWFILEUID:NONE
               {bankItems.map((item) => (
                 <tr key={item.id}>
                   <td className="td-date">{item.date}</td>
-                  <td style={{ fontWeight: '600', maxWidth: '240px' }}>{item.description}</td>
+                  <td style={{ fontWeight: '600', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</td>
                   <td
                     className="td-money"
                     style={{

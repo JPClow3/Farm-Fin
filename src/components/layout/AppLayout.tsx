@@ -119,12 +119,21 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
         subtitle="Adicione rapidamente uma conta a pagar ou a receber na safra ativa"
       >
         <form onSubmit={handleSaveQuick} className="flex-col" style={{ gap: 'var(--space-4)' }}>
-          <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
+          <div className="flex-row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <ClayButton
               type="button"
               variant={quickType === 'pagar' ? 'primary' : 'ghost'}
               size="sm"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{
+                flex: '1 1 auto',
+                minWidth: '180px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                whiteSpace: 'normal',
+                height: 'auto',
+              }}
               onClick={() => setQuickType('pagar')}
             >
               <CreditCard size={15} />
@@ -134,7 +143,16 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
               type="button"
               variant={quickType === 'receber' ? 'primary' : 'ghost'}
               size="sm"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{
+                flex: '1 1 auto',
+                minWidth: '180px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                whiteSpace: 'normal',
+                height: 'auto',
+              }}
               onClick={() => setQuickType('receber')}
             >
               <CircleDollarSign size={15} />

@@ -6,12 +6,7 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { CashFlowChart } from '../../components/charts/CashFlowChart';
 import { ClayTabs } from '../../components/ui/ClayTabs';
 import { getCashFlowReport, CashFlowRow } from '../../actions/finance';
-import {
-  TrendingUp,
-  Sparkles,
-  AlertTriangle,
-  Building2,
-} from 'lucide-react';
+import { TrendingUp, Sparkles, AlertTriangle, Building2 } from 'lucide-react';
 
 export default function FluxoDeCaixaPage() {
   const { bankAccounts, activeFarmId } = useFarm();

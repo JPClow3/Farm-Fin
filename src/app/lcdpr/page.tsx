@@ -234,7 +234,7 @@ export default function LcdprPage() {
                       {item.tipoDoc}
                     </div>
                   </td>
-                  <td style={{ maxWidth: '280px' }}>{item.historico}</td>
+                  <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.historico}</td>
                   <td>
                     <div style={{ fontWeight: '500', fontSize: 'var(--text-xs)' }}>
                       {item.participante}

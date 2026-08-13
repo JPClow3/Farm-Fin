@@ -19,6 +19,8 @@ import {
   Package,
 } from 'lucide-react';
 
+import { authClient } from '../../lib/auth-client';
+
 interface HeaderProps {
   onToggleSidebar: () => void;
   onOpenQuickNew: () => void;
@@ -42,7 +44,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
     } catch {}
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authClient.signOut();
+    } catch (e) {
+      console.warn('Neon Auth signOut error:', e);
+    }
     // Clear cookies & session
     document.cookie = 'farmfin_session=; path=/; max-age=0';
     document.cookie = 'better-auth.session_token=; path=/; max-age=0';
@@ -156,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
           {showNotifications && (
             <div
               className="dropdown__menu"
-              style={{ width: '300px', right: 0, padding: 'var(--space-4)' }}
+              style={{ width: 'min(300px, 90vw)', right: 0, padding: 'var(--space-4)' }}
             >
               <div className="flex-between" style={{ marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>Notificações</span>
@@ -247,11 +254,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             <div className="avatar-initials avatar--sm">
               <UserIcon size={16} />
             </div>
-            <div className="hide-mobile" style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold' }}>
+            <div className="hide-mobile" style={{ textAlign: 'left', minWidth: 0 }}>
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
                 {currentUser.name}
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
                 {currentUser.role} • Grupo Santa Fé
               </div>
             </div>

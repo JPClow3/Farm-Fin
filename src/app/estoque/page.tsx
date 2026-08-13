@@ -302,7 +302,7 @@ export default function EstoquePage() {
             placeholder="Buscar insumo no galpão..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '260px', height: '38px', fontSize: 'var(--text-xs)' }}
+            style={{ width: '100%', maxWidth: '260px', height: '38px', fontSize: 'var(--text-xs)' }}
           />
         </div>
       </ClayCard>
@@ -332,6 +332,9 @@ export default function EstoquePage() {
                   fontWeight: 'bold',
                   color: 'var(--text-primary)',
                   marginBottom: '4px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
               >
                 {item.name}

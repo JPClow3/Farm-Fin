@@ -120,7 +120,7 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({
                   style={{
                     position: 'absolute',
                     top: '-65px',
-                    left: '50%',
+                    left: 'clamp(0px, 50%, calc(100% - 0px))',
                     transform: 'translateX(-50%)',
                     background: 'var(--text-primary)',
                     color: 'white',

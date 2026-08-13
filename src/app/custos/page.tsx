@@ -9,13 +9,7 @@ import { FieldComparisonChart } from '../../components/charts/FieldComparisonCha
 import { ClayModal } from '../../components/ui/ClayModal';
 import { Field } from '../../lib/types';
 import { getFieldCostsSummary, CalculatedFieldCost } from '../../actions/farm';
-import {
-  Sprout,
-  BarChart3,
-  Wheat,
-  MapPin,
-  Eye,
-} from 'lucide-react';
+import { Sprout, BarChart3, Wheat, MapPin, Eye } from 'lucide-react';
 
 export default function CustosPage() {
   const { activeFarm, activeFields, activeFarmId, activeSeasonId, activeStockMovements } =

@@ -223,6 +223,7 @@ a:hover {
     transform var(--transition-spring);
   position: relative;
   overflow: hidden;
+  min-height: 100px;
 }
 
 .kpi-card:hover {
@@ -336,6 +337,9 @@ a:hover {
     background-color var(--transition-fast);
   user-select: none;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .btn:focus-visible {
@@ -834,7 +838,7 @@ textarea.input {
    ────────────────────────────────────────────────────────── */
 
 .header {
-  height: var(--header-height);
+  min-height: var(--header-height);
   background: rgba(250, 248, 245, 0.85);
   backdrop-filter: blur(12px);
   border-bottom: var(--border-light);
@@ -883,7 +887,7 @@ textarea.input {
   border-radius: var(--radius-2xl);
   box-shadow: var(--clay-shadow-xl);
   padding: var(--space-8);
-  width: 100%;
+  width: calc(100% - 2rem);
   max-width: 580px;
   max-height: 90vh;
   overflow-y: auto;
@@ -901,6 +905,7 @@ textarea.input {
   font-size: var(--text-xl);
   font-weight: var(--font-bold);
   color: var(--text-primary);
+  word-break: break-word;
 }
 
 .modal__body {
@@ -968,6 +973,8 @@ textarea.input {
   border-radius: var(--radius-lg);
   box-shadow: var(--clay-shadow-inset);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
 
 .tab {

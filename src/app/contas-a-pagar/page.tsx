@@ -387,13 +387,13 @@ export default function ContasAPagarPage() {
               ]}
               value={supplierFilter}
               onChange={(e) => setSupplierFilter(e.target.value)}
-              style={{ width: '220px', height: '38px', fontSize: 'var(--text-xs)' }}
+              style={{ width: '100%', maxWidth: '220px', height: '38px', fontSize: 'var(--text-xs)' }}
             />
             <ClayInput
               placeholder="Buscar conta ou fornecedor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '240px', height: '38px', fontSize: 'var(--text-xs)' }}
+              style={{ width: '100%', maxWidth: '240px', height: '38px', fontSize: 'var(--text-xs)' }}
             />
           </div>
         </div>

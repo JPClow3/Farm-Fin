@@ -7,14 +7,7 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
-import {
-  Settings,
-  Smartphone,
-  Mail,
-  Package,
-  RotateCcw,
-  ShieldCheck,
-} from 'lucide-react';
+import { Settings, Smartphone, Mail, Package, RotateCcw, ShieldCheck } from 'lucide-react';
 
 export default function ConfiguracoesPage() {
   const { resetToDefaults } = useFarm();
@@ -148,11 +141,25 @@ export default function ConfiguracoesPage() {
             <div className="flex-col" style={{ gap: 'var(--space-4)' }}>
               <div className="flex-between">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div
+                    style={{
+                      fontWeight: '600',
+                      fontSize: 'var(--text-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
                     <Smartphone size={16} color="var(--color-primary-600)" />
                     Alertas de Vencimento via WhatsApp
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--text-tertiary)',
+                      marginTop: '2px',
+                    }}
+                  >
                     Avisos 2 dias antes e no dia do vencimento de boletos de insumos
                   </div>
                 </div>
@@ -164,11 +171,25 @@ export default function ConfiguracoesPage() {
 
               <div className="flex-between">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div
+                    style={{
+                      fontWeight: '600',
+                      fontSize: 'var(--text-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
                     <Mail size={16} color="var(--color-primary-600)" />
                     Resumo Financeiro Semanal por E-mail
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--text-tertiary)',
+                      marginTop: '2px',
+                    }}
+                  >
                     Relatório consolidado de fluxo de caixa toda segunda-feira
                   </div>
                 </div>
@@ -180,11 +201,25 @@ export default function ConfiguracoesPage() {
 
               <div className="flex-between">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div
+                    style={{
+                      fontWeight: '600',
+                      fontSize: 'var(--text-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
                     <Package size={16} color="var(--color-primary-600)" />
                     Aviso de Estoque Mínimo no Galpão
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--text-tertiary)',
+                      marginTop: '2px',
+                    }}
+                  >
                     Notificação quando diesel, sementes ou defensivos atingirem nível de alerta
                   </div>
                 </div>
@@ -248,7 +283,8 @@ export default function ConfiguracoesPage() {
               >
                 <ShieldCheck size={18} color="var(--color-primary-700)" style={{ flexShrink: 0 }} />
                 <span>
-                  Autenticado via <strong>Better Auth / Neon</strong> com controle RBAC e suporte multi-tenant.
+                  Autenticado via <strong>Better Auth / Neon</strong> com controle RBAC e suporte
+                  multi-tenant.
                 </span>
               </div>
             </div>

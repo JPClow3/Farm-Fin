@@ -224,12 +224,15 @@ export default function DashboardPage() {
                     borderRadius: 'var(--radius-lg)',
                   }}
                 >
-                  <div className="flex-col" style={{ gap: '2px' }}>
+                  <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
                     <span
                       style={{
                         fontWeight: '600',
                         fontSize: 'var(--text-sm)',
                         color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {item.description}
@@ -242,13 +245,13 @@ export default function DashboardPage() {
                         color: 'var(--text-tertiary)',
                       }}
                     >
-                      <span>{item.supplierName}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.supplierName}</span>
                       <span>•</span>
-                      <span>Vence em: {item.dueDate}</span>
+                      <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Vence em: {item.dueDate}</span>
                     </div>
                   </div>
 
-                  <div className="flex-row" style={{ gap: '12px' }}>
+                  <div className="flex-row" style={{ gap: '12px', flexShrink: 0 }}>
                     <div style={{ textAlign: 'right' }}>
                       <div
                         className="td-money"
@@ -302,12 +305,15 @@ export default function DashboardPage() {
                   borderRadius: 'var(--radius-lg)',
                 }}
               >
-                <div className="flex-col" style={{ gap: '2px' }}>
+                <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
                   <span
                     style={{
                       fontWeight: '600',
                       fontSize: 'var(--text-sm)',
                       color: 'var(--text-primary)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
                   >
                     {field.name}
@@ -316,7 +322,7 @@ export default function DashboardPage() {
                     Solo: {field.soilType}
                   </span>
                 </div>
-                <div className="flex-row" style={{ gap: '12px' }}>
+                <div className="flex-row" style={{ gap: '12px', flexShrink: 0 }}>
                   <span className="badge badge--primary">{field.currentCrop}</span>
                   <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>
                     {field.area} ha

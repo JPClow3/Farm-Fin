@@ -378,13 +378,13 @@ export default function ContasAReceberPage() {
               ]}
               value={customerFilter}
               onChange={(e) => setCustomerFilter(e.target.value)}
-              style={{ width: '220px', height: '38px', fontSize: 'var(--text-xs)' }}
+              style={{ width: '100%', maxWidth: '220px', height: '38px', fontSize: 'var(--text-xs)' }}
             />
             <ClayInput
               placeholder="Buscar contrato ou cultura..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '240px', height: '38px', fontSize: 'var(--text-xs)' }}
+              style={{ width: '100%', maxWidth: '240px', height: '38px', fontSize: 'var(--text-xs)' }}
             />
           </div>
         </div>

@@ -166,9 +166,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     onClick={onClose}
                   >
                     <span className="nav-item__icon">{item.icon}</span>
-                    <span>{item.label}</span>
+                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
                     {item.badgeCount !== undefined && (
-                      <span className="nav-item__badge">{item.badgeCount}</span>
+                      <span className="nav-item__badge" style={{ flexShrink: 0 }}>{item.badgeCount}</span>
                     )}
                   </Link>
                 );

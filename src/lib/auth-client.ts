@@ -6,3 +6,5 @@ export const authClient = createAuthClient({
       ? window.location.origin
       : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 });
+
+export const { signIn, signUp, signOut, useSession, getSession } = authClient;

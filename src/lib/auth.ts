@@ -16,8 +16,25 @@ export const auth = betterAuth({
       verification: schema.verifications,
     },
   }),
+  user: {
+    additionalFields: {
+      role: {
+        type: 'string',
+        required: false,
+        defaultValue: 'Produtor',
+        input: true,
+      },
+      organizationId: {
+        type: 'string',
+        required: false,
+        input: true,
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
+    minPasswordLength: 6,
+    autoSignIn: true,
   },
   session: {
     cookieCache: {
