@@ -6,6 +6,16 @@
   "directories": {
     "doc": "docs"
   },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.2",
+    "@cloudflare/workers-types": "latest",
+    "typescript": "latest"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "npx @opennextjs/cloudflare build",
