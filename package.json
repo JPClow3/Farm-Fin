@@ -14,7 +14,10 @@
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.2",
     "@cloudflare/workers-types": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/node": "latest"
   },
   "scripts": {
     "dev": "next dev",
