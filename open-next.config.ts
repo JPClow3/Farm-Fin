@@ -1,6 +1,4 @@
-import { defineConfig } from "@opennextjs/cloudflare";
-
-export default defineConfig({
+const config = {
   default: {
     override: {
       wrapper: "cloudflare-node",
@@ -15,4 +13,6 @@ export default defineConfig({
       proxyExternalRequest: "fetch",
     },
   },
-});
+};
+
+export default config;
