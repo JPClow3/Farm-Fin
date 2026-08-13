@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { ClayModal } from '../ui/ClayModal';
@@ -9,20 +10,34 @@ import { ClaySelect } from '../ui/ClaySelect';
 import { ClayButton } from '../ui/ClayButton';
 import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
+import { getTodayDateString } from '../../lib/dateUtils';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isQuickNewOpen, setIsQuickNewOpen] = useState(false);
   const [quickType, setQuickType] = useState<'pagar' | 'receber'>('pagar');
 
-  const { activeFarmId, activeSeasonId, suppliers, customers, activeFields, addPayable, addReceivable } =
-    useFarm();
+  const {
+    activeFarmId,
+    activeSeasonId,
+    suppliers,
+    customers,
+    activeFields,
+    addPayable,
+    addReceivable,
+  } = useFarm();
   const { addToast } = useToast();
+
+  // If on auth page (login/register), render children cleanly without dashboard layout
+  if (pathname?.startsWith('/login') || pathname?.startsWith('/register')) {
+    return <>{children}</>;
+  }
 
   // Quick form state
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('2026-08-25');
+  const [dueDate, setDueDate] = useState(() => getTodayDateString());
   const [entityId, setEntityId] = useState('');
   const [fieldId, setFieldId] = useState('');
   const [category, setCategory] = useState('Insumos > Fertilizantes');
@@ -126,7 +141,11 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
           <ClayInput
             label="Descrição do Lançamento"
-            placeholder={quickType === 'pagar' ? 'Ex: Fertilizante Yara NPK Talhão 01' : 'Ex: Venda de Soja Lote Bunge'}
+            placeholder={
+              quickType === 'pagar'
+                ? 'Ex: Fertilizante Yara NPK Talhão 01'
+                : 'Ex: Venda de Soja Lote Bunge'
+            }
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
@@ -166,7 +185,10 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
                     { value: 'Insumos > Fertilizantes', label: 'Insumos > Fertilizantes' },
                     { value: 'Insumos > Defensivos', label: 'Insumos > Defensivos' },
                     { value: 'Insumos > Sementes', label: 'Insumos > Sementes' },
-                    { value: 'Combustíveis e Lubrificantes', label: 'Combustíveis e Lubrificantes' },
+                    {
+                      value: 'Combustíveis e Lubrificantes',
+                      label: 'Combustíveis e Lubrificantes',
+                    },
                     { value: 'Manutenção de Maquinário', label: 'Manutenção de Maquinário' },
                     { value: 'Despesas Administrativas', label: 'Despesas Administrativas' },
                   ]}

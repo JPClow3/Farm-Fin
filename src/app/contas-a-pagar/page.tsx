@@ -11,7 +11,8 @@ import { ClaySelect } from '../../components/ui/ClaySelect';
 import { ClayTable, Column } from '../../components/ui/ClayTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { ClayModal } from '../../components/ui/ClayModal';
-import { Payable } from '../../lib/mockData';
+import { Payable } from '../../lib/types';
+import { getTodayDateString, addMonthsToDate } from '../../lib/dateUtils';
 
 export default function ContasAPagarPage() {
   const {
@@ -22,6 +23,7 @@ export default function ContasAPagarPage() {
     activeFields,
     bankAccounts,
     addPayable,
+    updatePayable,
     payPayable,
     deletePayable,
     kpis,
@@ -29,28 +31,40 @@ export default function ContasAPagarPage() {
 
   const { addToast } = useToast();
 
+  const todayStr = useMemo(() => getTodayDateString(), []);
+
   // Filters State
-  const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'vencido' | 'pago'>('todos');
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'vencido' | 'pago'>(
+    'todos'
+  );
   const [supplierFilter, setSupplierFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Modals State
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [editingPayable, setEditingPayable] = useState<Payable | null>(null);
   const [payingPayable, setPayingPayable] = useState<Payable | null>(null);
   const [viewingAttachment, setViewingAttachment] = useState<Payable | null>(null);
 
   // New Payable Form State
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('2026-08-25');
+  const [dueDate, setDueDate] = useState(() => addMonthsToDate(todayStr, 0));
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [category, setCategory] = useState('Insumos > Fertilizantes');
   const [fieldId, setFieldId] = useState('');
   const [installmentsCount, setInstallmentsCount] = useState('1');
 
+  // Edit Form State
+  const [editDescription, setEditDescription] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editFieldId, setEditFieldId] = useState('');
+
   // Payment Form State
   const [selectedBankAccountId, setSelectedBankAccountId] = useState(bankAccounts[0]?.id || '');
-  const [paymentDate, setPaymentDate] = useState('2026-08-14');
+  const [paymentDate, setPaymentDate] = useState(todayStr);
   const [discountInterest, setDiscountInterest] = useState('0');
 
   // Filtered List
@@ -60,8 +74,8 @@ export default function ContasAPagarPage() {
         statusFilter === 'todos'
           ? true
           : statusFilter === 'vencido'
-          ? p.status === 'vencido'
-          : p.status === statusFilter;
+            ? p.status === 'vencido' || (p.status === 'pendente' && p.dueDate < todayStr)
+            : p.status === statusFilter;
 
       const matchSupplier = !supplierFilter || p.supplierId === supplierFilter;
       const matchSearch =
@@ -71,47 +85,43 @@ export default function ContasAPagarPage() {
 
       return matchStatus && matchSupplier && matchSearch;
     });
-  }, [activePayables, statusFilter, supplierFilter, searchTerm]);
+  }, [activePayables, statusFilter, supplierFilter, searchTerm, todayStr]);
 
   // Handlers
-  const handleCreatePayable = (e: React.FormEvent) => {
+  const handleCreatePayable = async (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0;
     if (!description || numAmount <= 0) {
-      addToast({ type: 'warning', title: 'Erro', message: 'Preencha a descrição e valor válidos.' });
+      addToast({
+        type: 'warning',
+        title: 'Erro',
+        message: 'Preencha a descrição e valor válidos.',
+      });
       return;
     }
 
     const selectedSup = suppliers.find((s) => s.id === supplierId) || suppliers[0];
     const totalInst = parseInt(installmentsCount, 10) || 1;
-    const instAmount = numAmount / totalInst;
 
-    for (let i = 1; i <= totalInst; i++) {
-      // Calculate due date for installment
-      const d = new Date(dueDate);
-      d.setMonth(d.getMonth() + (i - 1));
-      const instDueDate = d.toISOString().split('T')[0];
-
-      addPayable({
-        farmId: activeFarmId,
-        cropSeasonId: activeSeasonId,
-        fieldId: fieldId || undefined,
-        supplierId: selectedSup.id,
-        supplierName: selectedSup.name,
-        category,
-        description: totalInst > 1 ? `${description} (${i}/${totalInst})` : description,
-        amount: instAmount,
-        dueDate: instDueDate,
-        status: 'pendente',
-        installments: `${i}/${totalInst}`,
-        hasAttachment: true,
-      });
-    }
+    await addPayable({
+      farmId: activeFarmId,
+      cropSeasonId: activeSeasonId,
+      fieldId: fieldId || undefined,
+      supplierId: selectedSup?.id || '',
+      supplierName: selectedSup?.name || 'Fornecedor',
+      category,
+      description,
+      amount: numAmount,
+      dueDate,
+      status: 'pendente',
+      installmentsCount: totalInst,
+      hasAttachment: true,
+    });
 
     addToast({
       type: 'success',
       title: 'Lançamento Criado!',
-      message: `${totalInst} parcela(s) lançada(s) para ${selectedSup.name}.`,
+      message: `${totalInst} parcela(s) lançada(s) para ${selectedSup?.name || 'Fornecedor'}.`,
     });
 
     setIsNewModalOpen(false);
@@ -119,19 +129,53 @@ export default function ContasAPagarPage() {
     setAmount('');
   };
 
-  const handleConfirmPay = (e: React.FormEvent) => {
+  const handleOpenEdit = (p: Payable) => {
+    setEditingPayable(p);
+    setEditDescription(p.description);
+    setEditAmount(String(p.amount));
+    setEditDueDate(p.dueDate);
+    setEditCategory(p.category);
+    setEditFieldId(p.fieldId || '');
+  };
+
+  const handleConfirmEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPayable) return;
+
+    const numAmount =
+      parseFloat(editAmount.replace(/\./g, '').replace(',', '.')) || editingPayable.amount;
+
+    await updatePayable(editingPayable.id, {
+      description: editDescription,
+      amount: numAmount,
+      dueDate: editDueDate,
+      category: editCategory,
+      fieldId: editFieldId || undefined,
+    });
+
+    addToast({
+      type: 'success',
+      title: 'Conta Atualizada!',
+      message: `Alterações em "${editDescription}" salvas com sucesso.`,
+    });
+
+    setEditingPayable(null);
+  };
+
+  const handleConfirmPay = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingPayable) return;
 
     const diff = parseFloat(discountInterest.replace(/\./g, '').replace(',', '.')) || 0;
     const finalAmount = Math.max(0, payingPayable.amount + diff);
+    const bankId = selectedBankAccountId || bankAccounts[0]?.id;
 
-    payPayable(payingPayable.id, selectedBankAccountId, finalAmount, paymentDate);
+    await payPayable(payingPayable.id, bankId, finalAmount, paymentDate);
 
     addToast({
       type: 'success',
       title: 'Pagamento Concluído!',
-      message: `Baixa de R$ ${finalAmount.toLocaleString('pt-BR')} realizada com sucesso.`,
+      message: `Baixa de R$ ${finalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} realizada com sucesso.`,
     });
 
     setPayingPayable(null);
@@ -158,11 +202,21 @@ export default function ContasAPagarPage() {
     {
       key: 'dueDate',
       header: 'Vencimento',
-      render: (row) => (
-        <span className="td-date" style={{ fontWeight: row.status === 'vencido' ? 'bold' : 'normal', color: row.status === 'vencido' ? 'var(--color-danger)' : undefined }}>
-          {row.dueDate}
-        </span>
-      ),
+      render: (row) => {
+        const isOverdue =
+          row.status === 'vencido' || (row.status === 'pendente' && row.dueDate < todayStr);
+        return (
+          <span
+            className="td-date"
+            style={{
+              fontWeight: isOverdue ? 'bold' : 'normal',
+              color: isOverdue ? 'var(--color-danger)' : undefined,
+            }}
+          >
+            {row.dueDate}
+          </span>
+        );
+      },
     },
     {
       key: 'amount',
@@ -197,11 +251,23 @@ export default function ContasAPagarPage() {
               📎
             </ClayButton>
           )}
+          <ClayButton
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title="Editar Conta"
+            onClick={() => handleOpenEdit(row)}
+          >
+            ✏️
+          </ClayButton>
           {row.status !== 'pago' && (
             <ClayButton
               variant="primary"
               size="sm"
-              onClick={() => setPayingPayable(row)}
+              onClick={() => {
+                setPayingPayable(row);
+                setSelectedBankAccountId(bankAccounts[0]?.id || '');
+              }}
             >
               Baixar
             </ClayButton>
@@ -211,10 +277,14 @@ export default function ContasAPagarPage() {
             size="sm"
             iconOnly
             title="Excluir Lançamento"
-            onClick={() => {
+            onClick={async () => {
               if (confirm('Tem certeza que deseja excluir esta conta?')) {
-                deletePayable(row.id);
-                addToast({ type: 'info', title: 'Excluído', message: 'Lançamento removido.' });
+                await deletePayable(row.id);
+                addToast({
+                  type: 'info',
+                  title: 'Excluído',
+                  message: 'Lançamento removido do banco de dados.',
+                });
               }
             }}
           >
@@ -232,7 +302,8 @@ export default function ContasAPagarPage() {
         <div className="page-title-group">
           <h1 className="page-title">Contas a Pagar</h1>
           <p className="page-subtitle">
-            Controle de compromissos, parcelamentos, vencimentos e baixas financeiras
+            Controle de compromissos, parcelamentos automáticos, vencimentos e baixas financeiras
+            integradas
           </p>
         </div>
         <ClayButton variant="primary" onClick={() => setIsNewModalOpen(true)}>
@@ -287,10 +358,10 @@ export default function ContasAPagarPage() {
                 {st === 'todos'
                   ? 'Todas as Contas'
                   : st === 'pendente'
-                  ? 'Pendentes'
-                  : st === 'vencido'
-                  ? 'Vencidas'
-                  : 'Pagas'}
+                    ? 'Pendentes'
+                    : st === 'vencido'
+                      ? 'Vencidas'
+                      : 'Pagas'}
               </button>
             ))}
           </div>
@@ -329,7 +400,7 @@ export default function ContasAPagarPage() {
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         title="Nova Conta a Pagar"
-        subtitle="Cadastre uma nova obrigação financeira com suporte a parcelamento e rateio"
+        subtitle="Cadastre uma obrigação financeira com parcelamento automático no banco de dados"
       >
         <form onSubmit={handleCreatePayable} className="flex-col" style={{ gap: 'var(--space-4)' }}>
           <ClayInput
@@ -412,11 +483,80 @@ export default function ContasAPagarPage() {
               Cancelar
             </ClayButton>
             <ClayButton type="submit" variant="primary">
-              Salvar Conta
+              Salvar Conta no Banco de Dados
             </ClayButton>
           </div>
         </form>
       </ClayModal>
+
+      {/* Modal: Editar Conta */}
+      {editingPayable && (
+        <ClayModal
+          isOpen={true}
+          onClose={() => setEditingPayable(null)}
+          title="Editar Conta a Pagar"
+          subtitle={`Atualizar dados de ${editingPayable.description}`}
+        >
+          <form onSubmit={handleConfirmEdit} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+            <ClayInput
+              label="Descrição"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              required
+            />
+            <div className="form-grid-2">
+              <ClayInput
+                label="Valor (R$)"
+                type="number"
+                step="0.01"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+                required
+              />
+              <ClayInput
+                label="Data de Vencimento"
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-grid-2">
+              <ClaySelect
+                label="Categoria"
+                options={[
+                  { value: 'Insumos > Fertilizantes', label: 'Insumos > Fertilizantes' },
+                  { value: 'Insumos > Defensivos', label: 'Insumos > Defensivos' },
+                  { value: 'Insumos > Sementes', label: 'Insumos > Sementes' },
+                  { value: 'Combustíveis e Lubrificantes', label: 'Combustíveis e Lubrificantes' },
+                  { value: 'Manutenção de Maquinário', label: 'Manutenção de Maquinário' },
+                  { value: 'Arrendamento de Terras', label: 'Arrendamento de Terras' },
+                  { value: 'Despesas Administrativas', label: 'Despesas Administrativas' },
+                ]}
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+              />
+              <ClaySelect
+                label="Talhão"
+                options={[
+                  { value: '', label: 'Rateio Geral' },
+                  ...activeFields.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                value={editFieldId}
+                onChange={(e) => setEditFieldId(e.target.value)}
+              />
+            </div>
+            <div className="modal__footer">
+              <ClayButton type="button" variant="ghost" onClick={() => setEditingPayable(null)}>
+                Cancelar
+              </ClayButton>
+              <ClayButton type="submit" variant="primary">
+                Salvar Alterações
+              </ClayButton>
+            </div>
+          </form>
+        </ClayModal>
+      )}
 
       {/* Modal: Baixa de Pagamento */}
       {payingPayable && (
@@ -446,26 +586,29 @@ export default function ContasAPagarPage() {
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                   Valor Original:
                 </span>
-                <span className="td-money" style={{ fontSize: 'var(--text-lg)', color: 'var(--color-primary-700)' }}>
+                <span
+                  className="td-money"
+                  style={{ fontSize: 'var(--text-lg)', color: 'var(--color-primary-700)' }}
+                >
                   R$ {payingPayable.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
 
             <ClaySelect
-              label="Conta Bancária de Saída"
+              label="Conta Bancária de Saída (Débito)"
               options={bankAccounts.map((b) => ({
                 value: b.id,
-                label: `${b.bankName} (Saldo: R$ ${b.balance.toLocaleString('pt-BR')})`,
+                label: `${b.bankName} (Saldo: R$ ${b.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`,
               }))}
-              value={selectedBankAccountId}
+              value={selectedBankAccountId || (bankAccounts[0]?.id ?? '')}
               onChange={(e) => setSelectedBankAccountId(e.target.value)}
               required
             />
 
             <div className="form-grid-2">
               <ClayInput
-                label="Data Efetiva"
+                label="Data Efetiva do Pagamento"
                 type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
@@ -486,7 +629,7 @@ export default function ContasAPagarPage() {
                 Cancelar
               </ClayButton>
               <ClayButton type="submit" variant="primary">
-                Efetivar Pagamento
+                Efetivar Pagamento no Banco
               </ClayButton>
             </div>
           </form>
@@ -501,7 +644,10 @@ export default function ContasAPagarPage() {
           title="Documento Anexado"
           subtitle={`Comprovante vinculado a ${viewingAttachment.description}`}
         >
-          <div className="flex-col" style={{ alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4) 0' }}>
+          <div
+            className="flex-col"
+            style={{ alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4) 0' }}
+          >
             <div
               style={{
                 width: '100%',
@@ -516,8 +662,16 @@ export default function ContasAPagarPage() {
               <div style={{ fontWeight: 'bold', fontSize: 'var(--text-base)' }}>
                 NF-e_84920_{viewingAttachment.supplierName.replace(/\s+/g, '_')}.pdf
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                Valor: R$ {viewingAttachment.amount.toLocaleString('pt-BR')} • Vencimento: {viewingAttachment.dueDate}
+              <div
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--text-tertiary)',
+                  marginTop: '4px',
+                }}
+              >
+                Valor: R${' '}
+                {viewingAttachment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} •
+                Vencimento: {viewingAttachment.dueDate}
               </div>
             </div>
             <ClayButton variant="ghost" onClick={() => setViewingAttachment(null)}>

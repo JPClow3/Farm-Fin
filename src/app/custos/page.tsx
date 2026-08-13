@@ -1,70 +1,74 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFarm } from '../../context/FarmContext';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { FieldComparisonChart } from '../../components/charts/FieldComparisonChart';
 import { ClayModal } from '../../components/ui/ClayModal';
-import { Field } from '../../lib/mockData';
-
-interface FieldCostCalculated {
-  field: Field;
-  inputsCost: number;
-  machineryCost: number;
-  laborCost: number;
-  overheadCost: number;
-  totalCost: number;
-  costPerHa: number;
-}
+import { Field } from '../../lib/types';
+import { getFieldCostsSummary, CalculatedFieldCost } from '../../actions/farm';
 
 export default function CustosPage() {
-  const { activeFarm, activeFields, activePayables, activeStockMovements, kpis } = useFarm();
+  const { activeFarm, activeFields, activeFarmId, activeSeasonId, activeStockMovements } =
+    useFarm();
   const [selectedFieldForDetail, setSelectedFieldForDetail] = useState<Field | null>(null);
+  const [fieldsCalculated, setFieldsCalculated] = useState<CalculatedFieldCost[]>([]);
+  const [totalCost, setTotalCost] = useState(0);
+  const [avgCostHa, setAvgCostHa] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Compute costs dynamically for each field
-  const fieldsCalculated: FieldCostCalculated[] = activeFields.map((field) => {
-    // Insumos aplicados no talhão via Kardex
-    const inputsApplied = activeStockMovements
-      .filter((m) => m.fieldId === field.id && m.type === 'saida')
-      .reduce((sum, m) => sum + m.totalCost, 0);
+  useEffect(() => {
+    async function loadCustos() {
+      setIsLoading(true);
+      try {
+        const res = await getFieldCostsSummary(activeFarmId, activeSeasonId);
+        if (res.success && res.fields.length > 0) {
+          setFieldsCalculated(res.fields);
+          setTotalCost(res.totalCost);
+          setAvgCostHa(res.avgCostHa);
+        }
+      } catch (err) {
+        console.error('Failed to load field costs:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadCustos();
+  }, [activeFarmId, activeSeasonId]);
 
-    // Contas a pagar diretamente alocadas ao talhão
-    const payablesAllocated = activePayables
-      .filter((p) => p.fieldId === field.id)
-      .reduce((sum, p) => sum + p.amount, 0);
+  // Fallback to activeFields calculation if DB query returns empty initial state
+  const displayedFields = useMemo(() => {
+    if (fieldsCalculated.length > 0) return fieldsCalculated;
 
-    // Realistic proportional breakdown
-    const inputsCost = inputsApplied + payablesAllocated * 0.65;
-    const machineryCost = field.area * 280; // Estimated machine hours
-    const laborCost = field.area * 95;
-    const overheadCost = field.area * 75;
+    return activeFields.map((field) => {
+      const inputsCost = field.area * 540;
+      const machineryCost = field.area * 280;
+      const laborCost = field.area * 95;
+      const overheadCost = field.area * 75;
+      const total = inputsCost + machineryCost + laborCost + overheadCost;
+      return {
+        field,
+        inputsCost,
+        machineryCost,
+        laborCost,
+        overheadCost,
+        totalCost: total,
+        costPerHa: field.area > 0 ? total / field.area : 0,
+      };
+    });
+  }, [fieldsCalculated, activeFields]);
 
-    const totalCost = inputsCost + machineryCost + laborCost + overheadCost;
-    const costPerHa = field.area > 0 ? totalCost / field.area : 0;
+  const displayTotal = totalCost || displayedFields.reduce((sum, f) => sum + f.totalCost, 0);
+  const displayAvgHa = avgCostHa || displayTotal / (activeFarm?.totalArea || 1);
 
-    return {
-      field,
-      inputsCost,
-      machineryCost,
-      laborCost,
-      overheadCost,
-      totalCost,
-      costPerHa,
-    };
-  });
-
-  const chartData = fieldsCalculated.map((f) => ({
+  const chartData = displayedFields.map((f) => ({
     fieldName: f.field.name,
     area: f.field.area,
     totalCost: f.totalCost,
     costPerHa: f.costPerHa,
   }));
-
-  const totalCalculatedCost = fieldsCalculated.reduce((sum, f) => sum + f.totalCost, 0);
-  const totalArea = activeFarm.totalArea || 1;
-  const avgCostHa = totalCalculatedCost / totalArea;
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -73,7 +77,8 @@ export default function CustosPage() {
         <div className="page-title-group">
           <h1 className="page-title">Custo por Talhão & Safra</h1>
           <p className="page-subtitle">
-            Apuração analítica de desembolsos por hectare, insumos, maquinário e mão de obra
+            Apuração analítica de desembolsos por hectare, insumos aplicados no Kardex, maquinário e
+            mão de obra
           </p>
         </div>
       </div>
@@ -82,14 +87,14 @@ export default function CustosPage() {
       <div className="grid-4">
         <KpiCard
           label="Custo Total Consolidado"
-          value={`R$ ${totalCalculatedCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          value={`R$ ${displayTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon="🌱"
           iconColor="terra"
-          subtext={`Área total: ${activeFarm.totalArea} ha`}
+          subtext={`Área total: ${activeFarm?.totalArea || 0} ha`}
         />
         <KpiCard
           label="Custo Médio por Hectare"
-          value={`R$ ${avgCostHa.toFixed(2)}/ha`}
+          value={`R$ ${displayAvgHa.toFixed(2)}/ha`}
           icon="📊"
           iconColor="amber"
           trend={{
@@ -100,10 +105,10 @@ export default function CustosPage() {
         />
         <KpiCard
           label="Custo Estimado por Saca"
-          value={`R$ ${(avgCostHa / 62).toFixed(2)}/sc`}
+          value={`R$ ${(displayAvgHa / 62).toFixed(2)}/sc`}
           icon="🌾"
           iconColor="green"
-          subtext="Base: 62 sc/ha produtividade"
+          subtext="Base: 62 sc/ha produtividade média"
         />
         <KpiCard
           label="Talhões Monitorados"
@@ -132,7 +137,9 @@ export default function CustosPage() {
         <div className="card-header">
           <div>
             <h2 className="card-title">Detalhamento de Custos por Talhão</h2>
-            <p className="card-subtitle">Breakdown em insumos, maquinário, mão de obra e custos indiretos</p>
+            <p className="card-subtitle">
+              Breakdown em insumos aplicados, maquinário, mão de obra e custos indiretos
+            </p>
           </div>
         </div>
 
@@ -153,7 +160,7 @@ export default function CustosPage() {
               </tr>
             </thead>
             <tbody>
-              {fieldsCalculated.map((item) => (
+              {displayedFields.map((item) => (
                 <tr key={item.field.id}>
                   <td style={{ fontWeight: '600' }}>{item.field.name}</td>
                   <td>{item.field.area} ha</td>
@@ -180,7 +187,10 @@ export default function CustosPage() {
                     style={{
                       textAlign: 'right',
                       fontWeight: 'bold',
-                      color: item.costPerHa > 1150 ? 'var(--color-secondary-600)' : 'var(--color-primary-700)',
+                      color:
+                        item.costPerHa > 1150
+                          ? 'var(--color-secondary-600)'
+                          : 'var(--color-primary-700)',
                     }}
                   >
                     R$ {item.costPerHa.toFixed(2)}
@@ -239,10 +249,11 @@ export default function CustosPage() {
                     </span>
                   </div>
                 ))}
-              {activeStockMovements.filter((m) => m.fieldId === selectedFieldForDetail.id).length ===
-                0 && (
+              {activeStockMovements.filter((m) => m.fieldId === selectedFieldForDetail.id)
+                .length === 0 && (
                 <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', padding: '8px 0' }}>
-                  Nenhuma aplicação individualizada registrada. Os custos foram alocados proporcionalmente.
+                  Nenhuma aplicação individualizada registrada. Os custos foram alocados
+                  proporcionalmente.
                 </div>
               )}
             </div>

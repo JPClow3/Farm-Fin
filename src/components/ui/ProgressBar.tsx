@@ -24,7 +24,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
             Progresso
           </span>
-          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+          <span
+            style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--text-primary)' }}
+          >
             {clampedValue}%
           </span>
         </div>

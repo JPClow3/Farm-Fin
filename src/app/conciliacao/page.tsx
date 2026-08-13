@@ -1,83 +1,234 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
 import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { ClaySelect } from '../../components/ui/ClaySelect';
-import { StatusBadge } from '../../components/ui/StatusBadge';
+import {
+  uploadAndParseBankStatement,
+  autoMatchTransactions,
+  confirmStatementMatch,
+} from '../../actions/conciliacao';
 
 export default function ConciliacaoPage() {
-  const { bankAccounts, bankStatements, matchStatement } = useFarm();
+  const { bankAccounts, bankStatements, matchStatement, reloadFromDB } = useFarm();
   const { addToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [selectedBankId, setSelectedBankId] = useState<string>(bankAccounts[0]?.id || 'bank-1');
+  const [selectedBankId, setSelectedBankId] = useState<string>(
+    bankAccounts[0]?.id || 'bnk-00000000-0001'
+  );
   const [isUploading, setIsUploading] = useState(false);
+  const [isMatching, setIsMatching] = useState(false);
 
   const selectedBank = useMemo(() => {
     return bankAccounts.find((b) => b.id === selectedBankId) || bankAccounts[0];
   }, [bankAccounts, selectedBankId]);
 
   const bankItems = useMemo(() => {
-    return bankStatements.filter((stmt) => stmt.bankAccountId === selectedBankId);
+    return bankStatements.filter(
+      (stmt) => !stmt.bankAccountId || stmt.bankAccountId === selectedBankId
+    );
   }, [bankStatements, selectedBankId]);
 
   const matchedCount = bankItems.filter((item) => item.matched).length;
   const pendingCount = bankItems.filter((item) => !item.matched).length;
 
-  const handleSimulateOfxUpload = () => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
-      addToast({
-        type: 'success',
-        title: 'Extrato OFX Importado!',
-        message: `Extrato do ${selectedBank.bankName} carregado com sucesso (${bankItems.length} lançamentos encontrados).`,
+    try {
+      const text = await file.text();
+      const res = await uploadAndParseBankStatement({
+        bankAccountId: selectedBankId || bankAccounts[0]?.id,
+        fileContent: text,
+        fileName: file.name,
       });
-    }, 600);
-  };
 
-  const handleAutoMatchAll = () => {
-    bankItems.forEach((item) => {
-      if (!item.matched && item.matchedTransactionId) {
-        matchStatement(item.id, item.matchedTransactionId);
+      if (res.success) {
+        addToast({
+          type: 'success',
+          title: 'Extrato Importado!',
+          message: res.message || `${res.count} lançamentos importados com sucesso.`,
+        });
+        await reloadFromDB();
+      } else {
+        addToast({
+          type: 'danger',
+          title: 'Falha na Importação',
+          message: res.error || 'Não foi possível interpretar o arquivo de extrato.',
+        });
       }
-    });
-
-    addToast({
-      type: 'success',
-      title: 'Conciliação Automática Concluída!',
-      message: 'Todas as transações com correspondência confirmada foram conciliadas.',
-    });
+    } catch (err) {
+      console.error('Error reading file:', err);
+      addToast({ type: 'danger', title: 'Erro', message: 'Erro ao processar arquivo.' });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
-  const handleManualMatch = (statementId: string) => {
-    matchStatement(statementId, 'manual-match');
+  const handleSimulateOfxUpload = async () => {
+    setIsUploading(true);
+    const demoOfx = `
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+
+<OFX>
+<SIGNONMSGSRSV1>
+<SONRS>
+<STATUS><CODE>0<SEVERITY>INFO</STATUS>
+<DTSERVER>20260814120000
+<LANGUAGE>POR
+</SONRS>
+</SIGNONMSGSRSV1>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<TRNUID>1001
+<STATUS><CODE>0<SEVERITY>INFO</STATUS>
+<STMTRS>
+<CURDEF>BRL
+<BANKACCTFROM>
+<BANKID>001
+<ACCTID>28475-9
+<ACCTTYPE>CHECKING
+</BANKACCTFROM>
+<BANKTRANLIST>
+<DTSTART>20260701120000
+<DTEND>20260814120000
+<STMTTRN>
+<TRNTYPE>CREDIT
+<DTPOSTED>20260728120000
+<TRNAMT>480000.00
+<FITID>20260728001
+<MEMO>TED RECEBIDA AMAGGI EXPORTACAO
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260719120000
+<TRNAMT>-210000.00
+<FITID>20260719002
+<MEMO>PAGTO BOLETO SYNGENTA PROTECAO
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260810120000
+<TRNAMT>-88500.00
+<FITID>20260810003
+<MEMO>PIX ENVIADO BAYER CROPSCIENCE
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260812120000
+<TRNAMT>-92400.00
+<FITID>20260812004
+<MEMO>DEBITO TRR PETROLEO DIESEL
+</STMTTRN>
+</BANKTRANLIST>
+<LEDGERBAL>
+<BALAMT>845230.00
+<DTASOF>20260814120000
+</LEDGERBAL>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>`;
+
+    try {
+      const res = await uploadAndParseBankStatement({
+        bankAccountId: selectedBankId || bankAccounts[0]?.id,
+        fileContent: demoOfx,
+        fileName: 'extrato_agro_2026.ofx',
+      });
+
+      if (res.success) {
+        addToast({
+          type: 'success',
+          title: 'Extrato OFX Importado!',
+          message: `${res.count} lançamentos bancários carregados e salvos no banco.`,
+        });
+        await reloadFromDB();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleAutoMatchAll = async () => {
+    setIsMatching(true);
+    try {
+      const res = await autoMatchTransactions(selectedBankId);
+      if (res.success) {
+        addToast({
+          type: 'success',
+          title: 'Conciliação Automática Concluída!',
+          message: res.message || 'Lançamentos bancários conferidos com sucesso.',
+        });
+        await reloadFromDB();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsMatching(false);
+    }
+  };
+
+  const handleManualMatch = async (statementId: string) => {
+    await matchStatement(statementId, 'manual-match');
     addToast({
       type: 'info',
       title: 'Item Conciliado Manualmente',
-      message: 'Lançamento bancário conciliado com o extrato do sistema.',
+      message: 'Lançamento bancário conciliado no banco de dados.',
     });
   };
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".ofx,.csv,.txt"
+        style={{ display: 'none' }}
+      />
+
       {/* Header */}
       <div className="page-header">
         <div className="page-title-group">
           <h1 className="page-title">Conciliação Bancária</h1>
           <p className="page-subtitle">
-            Importação de arquivos OFX/CSV, match automático com lançamentos e conferência de saldo
+            Importação real de arquivos OFX/CSV, motor de auto-matching com lançamentos e
+            conferência de saldo
           </p>
         </div>
         <div className="flex-row">
-          <ClayButton variant="ghost" onClick={handleSimulateOfxUpload}>
+          <ClayButton variant="ghost" onClick={handleSimulateOfxUpload} disabled={isUploading}>
             {isUploading ? 'Importando...' : '📥 Carregar Extrato Demo (OFX)'}
           </ClayButton>
-          <ClayButton variant="primary" onClick={handleAutoMatchAll}>
-            ⚡ Conciliar Tudo (Auto-Match)
+          <ClayButton
+            variant="secondary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            📁 Importar OFX / CSV
+          </ClayButton>
+          <ClayButton variant="primary" onClick={handleAutoMatchAll} disabled={isMatching}>
+            {isMatching ? 'Processando...' : '⚡ Conciliar Tudo (Auto-Match)'}
           </ClayButton>
         </div>
       </div>
@@ -101,15 +252,30 @@ export default function ConciliacaoPage() {
 
           <div className="flex-row" style={{ gap: 'var(--space-6)' }}>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Saldo Registrado no Sistema</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                Saldo Registrado no Sistema
+              </div>
               <div className="td-money" style={{ fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>
-                R$ {selectedBank.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R${' '}
+                {selectedBank?.balance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ||
+                  '0,00'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Saldo no Extrato OFX</div>
-              <div className="td-money" style={{ fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-primary-700)' }}>
-                R$ {selectedBank.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                Saldo no Extrato OFX
+              </div>
+              <div
+                className="td-money"
+                style={{
+                  fontSize: 'var(--text-lg)',
+                  fontWeight: 'bold',
+                  color: 'var(--color-primary-700)',
+                }}
+              >
+                R${' '}
+                {selectedBank?.balance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ||
+                  '0,00'}
               </div>
             </div>
           </div>
@@ -152,13 +318,26 @@ export default function ConciliacaoPage() {
           textAlign: 'center',
           cursor: 'pointer',
         }}
-        onClick={handleSimulateOfxUpload}
+        onClick={() => fileInputRef.current?.click()}
       >
         <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-2)' }}>📂</div>
-        <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <h3
+          style={{
+            fontSize: 'var(--text-md)',
+            fontWeight: 'bold',
+            color: 'var(--text-primary)',
+            marginBottom: '4px',
+          }}
+        >
           Arraste e solte o arquivo de extrato bancário (.OFX ou .CSV)
         </h3>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-4)' }}>
+        <p
+          style={{
+            fontSize: 'var(--text-xs)',
+            color: 'var(--text-tertiary)',
+            marginBottom: 'var(--space-4)',
+          }}
+        >
           Suporte automático a Banco do Brasil, Sicredi, Sicoob, Bradesco, Santander e Itaú
         </p>
         <ClayButton variant="ghost" size="sm">
@@ -172,7 +351,8 @@ export default function ConciliacaoPage() {
           <div>
             <h2 className="card-title">Transações do Extrato vs Lançamentos do Sistema</h2>
             <p className="card-subtitle">
-              O motor de IA identifica automaticamente contas a pagar e receber correspondentes por valor e data
+              O motor de correspondência identifica automaticamente contas a pagar e receber por
+              valor e proximidade de data
             </p>
           </div>
         </div>
@@ -199,7 +379,10 @@ export default function ConciliacaoPage() {
                     className="td-money"
                     style={{
                       textAlign: 'right',
-                      color: item.amount >= 0 ? 'var(--color-primary-700)' : 'var(--color-secondary-700)',
+                      color:
+                        item.amount >= 0
+                          ? 'var(--color-primary-700)'
+                          : 'var(--color-secondary-700)',
                     }}
                   >
                     {item.amount >= 0 ? '+' : ''} R${' '}
@@ -208,11 +391,12 @@ export default function ConciliacaoPage() {
                   <td>
                     {item.matchedTransactionId ? (
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                        ✓ Lançamento #{item.matchedTransactionId} (Valor idêntico)
+                        ✓ Lançamento #{item.matchedTransactionId.slice(0, 8)}... (Correspondência
+                        encontrada)
                       </span>
                     ) : (
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                        Sem vínculo direto (Débito operacional)
+                        Sem vínculo direto
                       </span>
                     )}
                   </td>
@@ -247,6 +431,17 @@ export default function ConciliacaoPage() {
                   </td>
                 </tr>
               ))}
+              {bankItems.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: 'center', padding: '24px', color: 'var(--text-tertiary)' }}
+                  >
+                    Nenhum extrato importado para esta conta bancária. Importe um arquivo .OFX ou
+                    .CSV para iniciar.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

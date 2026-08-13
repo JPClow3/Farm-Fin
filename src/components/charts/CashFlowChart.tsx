@@ -160,9 +160,7 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({
                     width: '35%',
                     maxWidth: '22px',
                     height: `${Math.max(inflowHeight, 4)}px`,
-                    background: isHovered
-                      ? 'var(--color-primary-600)'
-                      : 'var(--color-primary-500)',
+                    background: isHovered ? 'var(--color-primary-600)' : 'var(--color-primary-500)',
                     borderRadius: '4px 4px 0 0',
                     transition: 'all var(--transition-fast)',
                     boxShadow: 'var(--clay-shadow-xs)',

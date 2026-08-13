@@ -33,24 +33,18 @@ export const KpiCard: React.FC<KpiCardProps> = ({
     >
       <div className="kpi-card__header">
         <span className="kpi-card__label">{label}</span>
-        <div className={`kpi-card__icon kpi-card__icon--${iconColor}`}>
-          {icon}
-        </div>
+        <div className={`kpi-card__icon kpi-card__icon--${iconColor}`}>{icon}</div>
       </div>
       <div className="kpi-card__value">{value}</div>
       {(trend || subtext) && (
         <div className="kpi-card__footer">
           {trend && (
-            <span
-              className={`kpi-card__trend kpi-card__trend--${trend.direction}`}
-            >
+            <span className={`kpi-card__trend kpi-card__trend--${trend.direction}`}>
               {trend.direction === 'up' ? '↑' : '↓'} {trend.value}
             </span>
           )}
           {subtext && <span className="kpi-card__subtext">{subtext}</span>}
-          {trend?.label && !subtext && (
-            <span className="kpi-card__subtext">{trend.label}</span>
-          )}
+          {trend?.label && !subtext && <span className="kpi-card__subtext">{trend.label}</span>}
         </div>
       )}
     </div>

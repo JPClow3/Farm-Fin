@@ -11,7 +11,8 @@ import { ClaySelect } from '../../components/ui/ClaySelect';
 import { ClayTable, Column } from '../../components/ui/ClayTable';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { ProgressBar } from '../../components/ui/ProgressBar';
-import { StockItem, StockMovement } from '../../lib/mockData';
+import { StockItem, StockMovement } from '../../lib/types';
+import { getTodayDateString } from '../../lib/dateUtils';
 
 export default function EstoquePage() {
   const {
@@ -27,6 +28,7 @@ export default function EstoquePage() {
   } = useFarm();
 
   const { addToast } = useToast();
+  const todayStr = useMemo(() => getTodayDateString(), []);
 
   // Category filter
   const [selectedCat, setSelectedCat] = useState<string>('todos');
@@ -38,13 +40,16 @@ export default function EstoquePage() {
 
   // New Item / Entry Form
   const [itemName, setItemName] = useState('');
-  const [itemCategory, setItemCategory] = useState<'Sementes' | 'Fertilizantes' | 'Defensivos' | 'Combustíveis'>('Fertilizantes');
+  const [itemCategory, setItemCategory] = useState<
+    'Sementes' | 'Fertilizantes' | 'Defensivos' | 'Combustíveis'
+  >('Fertilizantes');
   const [unit, setUnit] = useState<'kg' | 'L' | 'sc' | 'ton'>('ton');
   const [quantity, setQuantity] = useState('50');
   const [averageCost, setAverageCost] = useState('3200.00');
   const [minQuantity, setMinQuantity] = useState('20');
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [documentNumber, setDocumentNumber] = useState('NF-e ');
+  const [entryDate, setEntryDate] = useState(todayStr);
 
   // Exit / Application Form
   const [selectedStockId, setSelectedStockId] = useState(activeStockItems[0]?.id || '');
@@ -52,7 +57,7 @@ export default function EstoquePage() {
   const [fieldId, setFieldId] = useState(activeFields[0]?.id || '');
   const [selectedMachinery, setSelectedMachinery] = useState(machinery[0]?.name || '');
   const [operator, setOperator] = useState('Marcos Silva');
-  const [applicationDate, setApplicationDate] = useState('2026-08-14');
+  const [applicationDate, setApplicationDate] = useState(todayStr);
 
   // Total Imobilized Stock Value
   const totalStockValue = useMemo(() => {
@@ -61,17 +66,18 @@ export default function EstoquePage() {
 
   const filteredItems = useMemo(() => {
     return activeStockItems.filter((item) => {
-      const matchCat = selectedCat === 'todos' || item.category.toLowerCase() === selectedCat.toLowerCase();
+      const matchCat =
+        selectedCat === 'todos' || item.category.toLowerCase() === selectedCat.toLowerCase();
       const matchSearch =
         !searchTerm ||
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.lastSupplier.toLowerCase().includes(searchTerm.toLowerCase());
+        (item.lastSupplier || '').toLowerCase().includes(searchTerm.toLowerCase());
       return matchCat && matchSearch;
     });
   }, [activeStockItems, selectedCat, searchTerm]);
 
   // Handlers
-  const handleCreateEntry = (e: React.FormEvent) => {
+  const handleCreateEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     const qty = parseFloat(quantity) || 0;
     const cost = parseFloat(averageCost.replace(',', '.')) || 0;
@@ -79,76 +85,51 @@ export default function EstoquePage() {
     const selectedSup = suppliers.find((s) => s.id === supplierId) || suppliers[0];
 
     if (!itemName || qty <= 0) {
-      addToast({ type: 'warning', title: 'Erro', message: 'Preencha o nome e quantidade válidos.' });
+      addToast({
+        type: 'warning',
+        title: 'Erro',
+        message: 'Preencha o nome e quantidade válidos.',
+      });
       return;
     }
 
-    // Check if item already exists
-    const existing = activeStockItems.find(
-      (s) => s.name.toLowerCase() === itemName.toLowerCase()
-    );
-
-    let targetStockId = '';
-
-    if (existing) {
-      targetStockId = existing.id;
-      // Register movement
-      addStockMovement({
-        farmId: activeFarmId,
-        stockItemId: targetStockId,
-        itemName: existing.name,
-        type: 'entrada',
-        quantity: qty,
-        unit: existing.unit,
-        date: new Date().toISOString().split('T')[0],
-        documentNumber,
-        totalCost: qty * cost,
-      });
-    } else {
-      targetStockId = `stk-${Date.now()}`;
-      addStockItem({
-        farmId: activeFarmId,
-        name: itemName,
-        category: itemCategory,
-        unit,
-        quantity: qty,
-        minQuantity: minQ,
-        averageCost: cost,
-        lastSupplier: selectedSup.name,
-        expiryDate: '2027-12-31',
-      });
-
-      addStockMovement({
-        farmId: activeFarmId,
-        stockItemId: targetStockId,
-        itemName,
-        type: 'entrada',
-        quantity: qty,
-        unit,
-        date: new Date().toISOString().split('T')[0],
-        documentNumber,
-        totalCost: qty * cost,
-      });
-    }
+    await addStockItem({
+      farmId: activeFarmId,
+      name: itemName,
+      category: itemCategory,
+      unit,
+      quantity: qty,
+      minQuantity: minQ,
+      averageCost: cost,
+      unitPrice: cost,
+      lastSupplier: selectedSup?.name || 'Fornecedor',
+      expiryDate: '2027-12-31',
+      documentNumber,
+    });
 
     addToast({
       type: 'success',
       title: 'Entrada Registrada!',
-      message: `${qty} ${unit} de "${itemName}" adicionados ao galpão.`,
+      message: `${qty} ${unit} de "${itemName}" integrados ao estoque com Custo Médio Ponderado atualizado.`,
     });
 
     setIsEntryModalOpen(false);
     setItemName('');
   };
 
-  const handleCreateExit = (e: React.FormEvent) => {
+  const handleCreateExit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetItem = activeStockItems.find((s) => s.id === selectedStockId);
+    const targetItem =
+      activeStockItems.find((s) => s.id === selectedStockId) || activeStockItems[0];
     const targetField = activeFields.find((f) => f.id === fieldId) || activeFields[0];
     const qty = parseFloat(exitQuantity) || 0;
 
     if (!targetItem || qty <= 0) {
-      addToast({ type: 'warning', title: 'Erro', message: 'Selecione o insumo e a quantidade válida.' });
+      addToast({
+        type: 'warning',
+        title: 'Erro',
+        message: 'Selecione o insumo e a quantidade válida.',
+      });
       return;
     }
 
@@ -156,12 +137,12 @@ export default function EstoquePage() {
       addToast({
         type: 'danger',
         title: 'Estoque Insuficiente',
-        message: `Saldo disponível: ${targetItem.quantity} ${targetItem.unit}.`,
+        message: `Saldo disponível no galpão: ${targetItem.quantity} ${targetItem.unit}.`,
       });
       return;
     }
 
-    addStockMovement({
+    await addStockMovement({
       farmId: activeFarmId,
       stockItemId: targetItem.id,
       itemName: targetItem.name,
@@ -178,8 +159,8 @@ export default function EstoquePage() {
 
     addToast({
       type: 'success',
-      title: 'Aplicação Registrada!',
-      message: `Baixa de ${qty} ${targetItem.unit} no ${targetField?.name}. Custo: R$ ${(qty * targetItem.averageCost).toLocaleString('pt-BR')}.`,
+      title: 'Aplicação no Talhão Registrada!',
+      message: `Baixa de ${qty} ${targetItem.unit} no ${targetField?.name}. Custo alocado: R$ ${(qty * targetItem.averageCost).toLocaleString('pt-BR')}.`,
     });
 
     setIsExitModalOpen(false);
@@ -200,11 +181,7 @@ export default function EstoquePage() {
       key: 'type',
       header: 'Tipo',
       render: (row) => (
-        <span
-          className={`badge ${
-            row.type === 'entrada' ? 'badge--success' : 'badge--warning'
-          }`}
-        >
+        <span className={`badge ${row.type === 'entrada' ? 'badge--success' : 'badge--warning'}`}>
           {row.type === 'entrada' ? '📥 Entrada (NF)' : '📤 Aplicação no Talhão'}
         </span>
       ),
@@ -223,13 +200,15 @@ export default function EstoquePage() {
       header: 'Destino / Documento',
       render: (row) => (
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-          {row.fieldName ? `${row.fieldName} (${row.operator || 'Operador'})` : row.documentNumber || '-'}
+          {row.fieldName
+            ? `${row.fieldName} (${row.operator || 'Operador'})`
+            : row.documentNumber || '-'}
         </span>
       ),
     },
     {
       key: 'totalCost',
-      header: 'Custo Total',
+      header: 'Custo Total (CMP)',
       align: 'right',
       render: (row) => (
         <span className="td-money">
@@ -246,7 +225,8 @@ export default function EstoquePage() {
         <div className="page-title-group">
           <h1 className="page-title">Estoque de Insumos & Aplicações</h1>
           <p className="page-subtitle">
-            Controle de almoxarifado, custo médio ponderado, baixas para talhão e rastreabilidade
+            Controle de almoxarifado, custo médio ponderado (CMP), baixas para talhão e
+            rastreabilidade
           </p>
         </div>
         <div className="flex-row">
@@ -320,7 +300,7 @@ export default function EstoquePage() {
       <div className="grid-3">
         {filteredItems.map((item) => {
           const isLow = item.quantity <= item.minQuantity;
-          const percentage = Math.min(100, (item.quantity / (item.minQuantity * 2.5)) * 100);
+          const percentage = Math.min(100, (item.quantity / (item.minQuantity * 2.5 || 1)) * 100);
 
           return (
             <ClayCard key={item.id} className={isLow ? 'clay-card--secondary' : ''}>
@@ -335,34 +315,65 @@ export default function EstoquePage() {
                 )}
               </div>
 
-              <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '4px' }}>
+              <h3
+                style={{
+                  fontSize: 'var(--text-md)',
+                  fontWeight: 'bold',
+                  color: 'var(--text-primary)',
+                  marginBottom: '4px',
+                }}
+              >
                 {item.name}
               </h3>
 
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                Fornecedor: {item.lastSupplier}
+              <div
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--text-tertiary)',
+                  marginBottom: '12px',
+                }}
+              >
+                Fornecedor: {item.lastSupplier || 'Não informado'}
               </div>
 
               <div className="flex-between" style={{ marginBottom: '12px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Saldo Atual</div>
-                  <div style={{ fontSize: 'var(--text-xl)', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Saldo Atual
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--text-xl)',
+                      fontWeight: 'bold',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
                     {item.quantity.toLocaleString('pt-BR')} {item.unit}
                   </div>
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Custo Médio</div>
-                  <div className="td-money" style={{ fontSize: 'var(--text-md)', color: 'var(--color-primary-700)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Custo Médio Ponderado
+                  </div>
+                  <div
+                    className="td-money"
+                    style={{ fontSize: 'var(--text-md)', color: 'var(--color-primary-700)' }}
+                  >
                     R$ {item.averageCost.toFixed(2)}/{item.unit}
                   </div>
                 </div>
               </div>
 
               <div className="flex-col" style={{ gap: '4px', marginBottom: '12px' }}>
-                <div className="flex-between" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div
+                  className="flex-between"
+                  style={{ fontSize: '11px', color: 'var(--text-secondary)' }}
+                >
                   <span>Nível de Estoque</span>
-                  <span>Mínimo: {item.minQuantity} {item.unit}</span>
+                  <span>
+                    Mínimo: {item.minQuantity} {item.unit}
+                  </span>
                 </div>
                 <ProgressBar
                   value={percentage}
@@ -371,12 +382,21 @@ export default function EstoquePage() {
                 />
               </div>
 
-              <div className="flex-between" style={{ paddingTop: '8px', borderTop: '1px solid rgba(212, 201, 186, 0.4)' }}>
+              <div
+                className="flex-between"
+                style={{ paddingTop: '8px', borderTop: '1px solid rgba(212, 201, 186, 0.4)' }}
+              >
                 <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                   Total Imobilizado:
                 </span>
-                <span className="td-money" style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold' }}>
-                  R$ {(item.quantity * item.averageCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <span
+                  className="td-money"
+                  style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold' }}
+                >
+                  R${' '}
+                  {(item.quantity * item.averageCost).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             </ClayCard>
@@ -388,8 +408,10 @@ export default function EstoquePage() {
       <ClayCard>
         <div className="card-header">
           <div>
-            <h2 className="card-title">Histórico de Movimentações (Kardex)</h2>
-            <p className="card-subtitle">Entradas de notas fiscais e saídas para aplicação direta nos talhões</p>
+            <h2 className="card-title">Histórico de Movimentações (Kardex CMP)</h2>
+            <p className="card-subtitle">
+              Entradas de notas fiscais e saídas para aplicação direta nos talhões
+            </p>
           </div>
         </div>
 
@@ -406,7 +428,7 @@ export default function EstoquePage() {
         isOpen={isEntryModalOpen}
         onClose={() => setIsEntryModalOpen(false)}
         title="Entrada de Insumo no Galpão"
-        subtitle="Registre uma nota fiscal de compra de sementes, defensivos, fertilizantes ou combustível"
+        subtitle="Registre uma nota fiscal de compra com cálculo automático de Custo Médio Ponderado"
       >
         <form onSubmit={handleCreateEntry} className="flex-col" style={{ gap: 'var(--space-4)' }}>
           <ClayInput
@@ -455,7 +477,7 @@ export default function EstoquePage() {
               required
             />
             <ClayInput
-              label="Custo Unitário (R$)"
+              label="Preço Unitário da NF (R$)"
               type="number"
               step="0.01"
               value={averageCost}
@@ -479,19 +501,28 @@ export default function EstoquePage() {
             />
           </div>
 
-          <ClayInput
-            label="Número da NF-e / Documento"
-            placeholder="NF-e 84920"
-            value={documentNumber}
-            onChange={(e) => setDocumentNumber(e.target.value)}
-          />
+          <div className="form-grid-2">
+            <ClayInput
+              label="Número da NF-e / Documento"
+              placeholder="NF-e 84920"
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+            />
+            <ClayInput
+              label="Data da Entrada"
+              type="date"
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+              required
+            />
+          </div>
 
           <div className="modal__footer">
             <ClayButton type="button" variant="ghost" onClick={() => setIsEntryModalOpen(false)}>
               Cancelar
             </ClayButton>
             <ClayButton type="submit" variant="primary">
-              Salvar Entrada
+              Salvar Entrada no Galpão
             </ClayButton>
           </div>
         </form>
@@ -502,14 +533,14 @@ export default function EstoquePage() {
         isOpen={isExitModalOpen}
         onClose={() => setIsExitModalOpen(false)}
         title="Baixa / Aplicação de Insumo no Talhão"
-        subtitle="Aloque insumos diretamente em um talhão para cálculo de custo por hectare"
+        subtitle="Aloque insumos diretamente em um talhão com baixa automática no estoque"
       >
         <form onSubmit={handleCreateExit} className="flex-col" style={{ gap: 'var(--space-4)' }}>
           <ClaySelect
             label="Insumo a Aplicar"
             options={activeStockItems.map((s) => ({
               value: s.id,
-              label: `${s.name} (Disponível: ${s.quantity} ${s.unit})`,
+              label: `${s.name} (Disponível: ${s.quantity} ${s.unit} • Custo: R$ ${s.averageCost.toFixed(2)}/${s.unit})`,
             }))}
             value={selectedStockId || (activeStockItems[0]?.id ?? '')}
             onChange={(e) => setSelectedStockId(e.target.value)}
@@ -530,7 +561,7 @@ export default function EstoquePage() {
                 value: f.id,
                 label: `${f.name} (${f.area} ha)`,
               }))}
-              value={fieldId}
+              value={fieldId || (activeFields[0]?.id ?? '')}
               onChange={(e) => setFieldId(e.target.value)}
               required
             />
@@ -563,7 +594,7 @@ export default function EstoquePage() {
               Cancelar
             </ClayButton>
             <ClayButton type="submit" variant="primary">
-              Confirmar Aplicação
+              Confirmar Aplicação no Talhão
             </ClayButton>
           </div>
         </form>

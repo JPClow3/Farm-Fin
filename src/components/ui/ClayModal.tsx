@@ -42,11 +42,7 @@ export const ClayModal: React.FC<ClayModalProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal"
-        style={{ maxWidth }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="modal" style={{ maxWidth }} onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <div>
             <h3 className="modal__title">{title}</h3>

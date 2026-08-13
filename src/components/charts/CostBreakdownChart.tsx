@@ -14,8 +14,18 @@ interface CostBreakdownChartProps {
 }
 
 const DEFAULT_CATEGORIES: CostCategory[] = [
-  { label: 'Fertilizantes & Corretivos', amount: 480000, percentage: 42, color: 'var(--color-primary-500)' },
-  { label: 'Defensivos Químicos', amount: 260000, percentage: 23, color: 'var(--color-secondary-400)' },
+  {
+    label: 'Fertilizantes & Corretivos',
+    amount: 480000,
+    percentage: 42,
+    color: 'var(--color-primary-500)',
+  },
+  {
+    label: 'Defensivos Químicos',
+    amount: 260000,
+    percentage: 23,
+    color: 'var(--color-secondary-400)',
+  },
   { label: 'Sementes & Mudas', amount: 215000, percentage: 19, color: 'var(--color-accent-400)' },
   { label: 'Combustível & Lubrificantes', amount: 93750, percentage: 8, color: '#e07a5f' },
   { label: 'Manutenção & Horas-Máquina', amount: 56800, percentage: 5, color: '#3d405b' },
@@ -66,9 +76,7 @@ export const CostBreakdownChart: React.FC<CostBreakdownChartProps> = ({
                   flexShrink: 0,
                 }}
               />
-              <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                {cat.label}
-              </span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{cat.label}</span>
             </div>
             <div className="flex-row" style={{ gap: '12px' }}>
               <span style={{ color: 'var(--text-secondary)' }}>

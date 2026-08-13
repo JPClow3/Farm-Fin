@@ -45,7 +45,8 @@ export default function ConfiguracoesPage() {
       addToast({
         type: 'info',
         title: 'Dados Restaurados',
-        message: 'O ambiente foi restaurado com o cenário completo de demonstração da Fazenda Santa Fé.',
+        message:
+          'O ambiente foi restaurado com o cenário completo de demonstração da Fazenda Santa Fé.',
       });
     }
   };
@@ -70,11 +71,17 @@ export default function ConfiguracoesPage() {
             <div className="card-header">
               <div>
                 <h2 className="card-title">Dados Cadastrais do Produtor Rural</h2>
-                <p className="card-subtitle">Informações utilizadas para emissão de LCDPR e relatórios</p>
+                <p className="card-subtitle">
+                  Informações utilizadas para emissão de LCDPR e relatórios
+                </p>
               </div>
             </div>
 
-            <form onSubmit={handleSaveProfile} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+            <form
+              onSubmit={handleSaveProfile}
+              className="flex-col"
+              style={{ gap: 'var(--space-4)' }}
+            >
               <ClayInput
                 label="Nome Completo / Razão Social"
                 value={producerName}
@@ -124,7 +131,9 @@ export default function ConfiguracoesPage() {
             <div className="card-header">
               <div>
                 <h2 className="card-title">Canais de Notificação & Alertas</h2>
-                <p className="card-subtitle">Receba avisos automáticos de vencimento e estoque no campo</p>
+                <p className="card-subtitle">
+                  Receba avisos automáticos de vencimento e estoque no campo
+                </p>
               </div>
             </div>
 
@@ -196,11 +205,20 @@ export default function ConfiguracoesPage() {
                 ]}
                 value={activeRole}
                 onChange={(e) => {
-                  setActiveRole(e.target.value);
+                  const newRole = e.target.value;
+                  setActiveRole(newRole);
+                  try {
+                    const saved = localStorage.getItem('farmfin_active_user');
+                    const user = saved
+                      ? JSON.parse(saved)
+                      : { name: 'Usuário', email: 'user@agro.com' };
+                    user.role = newRole;
+                    localStorage.setItem('farmfin_active_user', JSON.stringify(user));
+                  } catch {}
                   addToast({
                     type: 'info',
-                    title: 'Perfil Alterado',
-                    message: `Visualização agora ajustada para: ${e.target.value}.`,
+                    title: 'Perfil RBAC Alterado',
+                    message: `Permissões e visualização agora ajustadas para: ${newRole}.`,
                   });
                 }}
               />
@@ -214,7 +232,8 @@ export default function ConfiguracoesPage() {
                   color: 'var(--text-secondary)',
                 }}
               >
-                Autenticado via <strong>Neon Auth</strong> com controle RBAC e suporte a multi-inquilino.
+                Autenticado via <strong>Neon Auth</strong> com controle RBAC e suporte a
+                multi-inquilino.
               </div>
             </div>
           </ClayCard>
@@ -230,7 +249,8 @@ export default function ConfiguracoesPage() {
 
             <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                Se você fez testes de lançamentos, baixas e estoque e deseja voltar ao cenário inicial pré-configurado de 2.400 ha, clique no botão abaixo.
+                Se você fez testes de lançamentos, baixas e estoque e deseja voltar ao cenário
+                inicial pré-configurado de 2.400 ha, clique no botão abaixo.
               </p>
 
               <ClayButton variant="danger" size="sm" onClick={handleReset}>

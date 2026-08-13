@@ -76,8 +76,8 @@ export function ClayTable<T>({
                     {col.render
                       ? col.render(row, idx)
                       : (row as Record<string, unknown>)[col.key] !== undefined
-                      ? String((row as Record<string, unknown>)[col.key])
-                      : '-'}
+                        ? String((row as Record<string, unknown>)[col.key])
+                        : '-'}
                   </td>
                 ))}
               </tr>

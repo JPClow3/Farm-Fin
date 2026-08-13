@@ -14,19 +14,42 @@ import {
   StockMovement,
   Machinery,
   BankStatementItem,
-  INITIAL_FARMS,
-  INITIAL_FIELDS,
-  INITIAL_SEASONS,
-  INITIAL_SUPPLIERS,
-  INITIAL_CUSTOMERS,
-  INITIAL_BANK_ACCOUNTS,
-  INITIAL_PAYABLES,
-  INITIAL_RECEIVABLES,
-  INITIAL_STOCK,
-  INITIAL_MOVEMENTS,
-  INITIAL_MACHINERY,
-  INITIAL_STATEMENTS,
-} from '../lib/mockData';
+  AgroKPIs,
+} from '../lib/types';
+
+import {
+  getFarms,
+  createFarm,
+  getFields,
+  createField,
+  getCropSeasons,
+  getSuppliers,
+  getCustomers,
+} from '../actions/farm';
+import {
+  getPayables,
+  createPayable,
+  updatePayable as updatePayableAction,
+  payPayableAction,
+  deletePayable as deletePayableAction,
+  getReceivables,
+  createReceivable,
+  updateReceivable as updateReceivableAction,
+  receiveReceivableAction,
+  deleteReceivable as deleteReceivableAction,
+} from '../actions/finance';
+import { getBankAccounts, getBankStatements, matchStatementAction } from '../actions/banking';
+import {
+  getStockItems,
+  createStockItem,
+  getStockMovements,
+  addStockMovementAction,
+} from '../actions/stock';
+import {
+  getMachinery,
+  createMachinery,
+  deleteMachinery as deleteMachineryAction,
+} from '../actions/machinery';
 
 interface FarmContextData {
   // Active Selection
@@ -36,6 +59,7 @@ interface FarmContextData {
   activeSeasonId: string;
   setActiveSeasonId: (id: string) => void;
   activeSeason: CropSeason;
+  isLoading: boolean;
 
   // Collections
   farms: Farm[];
@@ -58,136 +82,178 @@ interface FarmContextData {
   bankStatements: BankStatementItem[];
 
   // Mutators
-  addPayable: (data: Omit<Payable, 'id'>) => void;
-  payPayable: (id: string, bankAccountId: string, paidAmount: number, paymentDate: string) => void;
-  deletePayable: (id: string) => void;
-  addReceivable: (data: Omit<Receivable, 'id'>) => void;
-  receiveReceivable: (id: string, bankAccountId: string, receivedDate: string) => void;
-  deleteReceivable: (id: string) => void;
-  addStockItem: (item: Omit<StockItem, 'id'>) => void;
-  addStockMovement: (movement: Omit<StockMovement, 'id'>) => void;
-  matchStatement: (statementId: string, transactionId: string) => void;
-  addField: (field: Omit<Field, 'id'>) => void;
-  addFarm: (farm: Omit<Farm, 'id'>) => void;
-  addMachinery: (machinery: Omit<Machinery, 'id'>) => void;
-  resetToDefaults: () => void;
+  addPayable: (data: Omit<Payable, 'id'> & { installmentsCount?: number }) => Promise<void>;
+  updatePayable: (id: string, data: Partial<Payable>) => Promise<void>;
+  payPayable: (
+    id: string,
+    bankAccountId: string,
+    paidAmount: number,
+    paymentDate?: string
+  ) => Promise<void>;
+  deletePayable: (id: string) => Promise<void>;
+  addReceivable: (data: Omit<Receivable, 'id'> & { installmentsCount?: number }) => Promise<void>;
+  updateReceivable: (id: string, data: Partial<Receivable>) => Promise<void>;
+  receiveReceivable: (id: string, bankAccountId: string, receivedDate?: string) => Promise<void>;
+  deleteReceivable: (id: string) => Promise<void>;
+  addStockItem: (item: Omit<StockItem, 'id'>) => Promise<void>;
+  addStockMovement: (movement: Omit<StockMovement, 'id'>) => Promise<void>;
+  matchStatement: (statementId: string, transactionId: string) => Promise<void>;
+  addField: (field: Omit<Field, 'id'>) => Promise<void>;
+  addFarm: (farm: Omit<Farm, 'id'>) => Promise<void>;
+  addMachinery: (machinery: Omit<Machinery, 'id'>) => Promise<void>;
+  resetToDefaults: () => Promise<void>;
+  reloadFromDB: () => Promise<void>;
 
   // Calculated Agro KPIs
-  kpis: {
-    totalBankBalance: number;
-    totalPendingPayables: number;
-    totalOverduePayables: number;
-    totalDueTodayPayables: number;
-    totalPendingReceivables: number;
-    totalReceivedThisMonth: number;
-    totalPaidThisMonth: number;
-    estimatedCropRevenue: number;
-    estimatedCropCost: number;
-    estimatedCropMargin: number;
-    averageCostPerHectare: number;
-    lowStockCount: number;
-    overduePayablesCount: number;
-  };
+  kpis: AgroKPIs;
 }
 
-const STORAGE_KEY = 'farmfin_data_v1';
+const PREF_FARM_KEY = 'farmfin_pref_farm_id';
+const PREF_SEASON_KEY = 'farmfin_pref_season_id';
 
 const FarmContext = createContext<FarmContextData>({} as FarmContextData);
 
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [farms, setFarms] = useState<Farm[]>(INITIAL_FARMS);
-  const [fields, setFields] = useState<Field[]>(INITIAL_FIELDS);
-  const [seasons, setSeasons] = useState<CropSeason[]>(INITIAL_SEASONS);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANK_ACCOUNTS);
-  const [payables, setPayables] = useState<Payable[]>(INITIAL_PAYABLES);
-  const [receivables, setReceivables] = useState<Receivable[]>(INITIAL_RECEIVABLES);
-  const [stockItems, setStockItems] = useState<StockItem[]>(INITIAL_STOCK);
-  const [stockMovements, setStockMovements] = useState<StockMovement[]>(INITIAL_MOVEMENTS);
-  const [machinery, setMachinery] = useState<Machinery[]>(INITIAL_MACHINERY);
-  const [bankStatements, setBankStatements] = useState<BankStatementItem[]>(INITIAL_STATEMENTS);
+  const [farms, setFarms] = useState<Farm[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
+  const [seasons, setSeasons] = useState<CropSeason[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [payables, setPayables] = useState<Payable[]>([]);
+  const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [machinery, setMachinery] = useState<Machinery[]>([]);
+  const [bankStatements, setBankStatements] = useState<BankStatementItem[]>([]);
 
-  const [activeFarmId, setActiveFarmId] = useState<string>('farm-1');
-  const [activeSeasonId, setActiveSeasonId] = useState<string>('season-25-26');
-  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const [activeFarmId, setActiveFarmIdState] = useState<string>('');
+  const [activeSeasonId, setActiveSeasonIdState] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Load from LocalStorage
-  useEffect(() => {
+  // Preference persistence helpers
+  const setActiveFarmId = useCallback((id: string) => {
+    setActiveFarmIdState(id);
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.farms) setFarms(parsed.farms);
-        if (parsed.fields) setFields(parsed.fields);
-        if (parsed.seasons) setSeasons(parsed.seasons);
-        if (parsed.suppliers) setSuppliers(parsed.suppliers);
-        if (parsed.customers) setCustomers(parsed.customers);
-        if (parsed.bankAccounts) setBankAccounts(parsed.bankAccounts);
-        if (parsed.payables) setPayables(parsed.payables);
-        if (parsed.receivables) setReceivables(parsed.receivables);
-        if (parsed.stockItems) setStockItems(parsed.stockItems);
-        if (parsed.stockMovements) setStockMovements(parsed.stockMovements);
-        if (parsed.machinery) setMachinery(parsed.machinery);
-        if (parsed.bankStatements) setBankStatements(parsed.bankStatements);
-        if (parsed.activeFarmId) setActiveFarmId(parsed.activeFarmId);
-        if (parsed.activeSeasonId) setActiveSeasonId(parsed.activeSeasonId);
-      }
-    } catch (e) {
-      console.error('Error loading Farm-Fin state from storage', e);
-    }
-    setIsLoaded(true);
+      localStorage.setItem(PREF_FARM_KEY, id);
+    } catch {}
   }, []);
 
-  // Save to LocalStorage
-  useEffect(() => {
-    if (!isLoaded) return;
+  const setActiveSeasonId = useCallback((id: string) => {
+    setActiveSeasonIdState(id);
     try {
-      const stateToSave = {
-        farms,
-        fields,
-        seasons,
-        suppliers,
-        customers,
-        bankAccounts,
-        payables,
-        receivables,
-        stockItems,
-        stockMovements,
-        machinery,
-        bankStatements,
-        activeFarmId,
-        activeSeasonId,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-    } catch (e) {
-      console.error('Error saving Farm-Fin state to storage', e);
+      localStorage.setItem(PREF_SEASON_KEY, id);
+    } catch {}
+  }, []);
+
+  // Initial Load from DB via Server Actions (Single Source of Truth)
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [
+        fetchedFarms,
+        fetchedFields,
+        fetchedSeasons,
+        fetchedSuppliers,
+        fetchedCustomers,
+        fetchedBankAccounts,
+        fetchedPayables,
+        fetchedReceivables,
+        fetchedStockItems,
+        fetchedStockMovements,
+        fetchedMachinery,
+        fetchedBankStatements,
+      ] = await Promise.all([
+        getFarms(),
+        getFields(),
+        getCropSeasons(),
+        getSuppliers(),
+        getCustomers(),
+        getBankAccounts(),
+        getPayables(),
+        getReceivables(),
+        getStockItems(),
+        getStockMovements(),
+        getMachinery(),
+        getBankStatements(),
+      ]);
+
+      setFarms(fetchedFarms);
+      setFields(fetchedFields);
+      setSeasons(fetchedSeasons);
+      setSuppliers(fetchedSuppliers);
+      setCustomers(fetchedCustomers);
+      setBankAccounts(fetchedBankAccounts);
+      setPayables(fetchedPayables);
+      setReceivables(fetchedReceivables);
+      setStockItems(fetchedStockItems);
+      setStockMovements(fetchedStockMovements);
+      setMachinery(fetchedMachinery);
+      setBankStatements(fetchedBankStatements);
+
+      // Determine active farm dynamically
+      let initialFarmId = '';
+      try {
+        const savedFarmId = localStorage.getItem(PREF_FARM_KEY);
+        if (savedFarmId && fetchedFarms.some((f) => f.id === savedFarmId)) {
+          initialFarmId = savedFarmId;
+        }
+      } catch {}
+      if (!initialFarmId && fetchedFarms.length > 0) {
+        initialFarmId = fetchedFarms[0].id;
+      }
+      setActiveFarmIdState(initialFarmId);
+
+      // Determine active season dynamically
+      let initialSeasonId = '';
+      try {
+        const savedSeasonId = localStorage.getItem(PREF_SEASON_KEY);
+        if (savedSeasonId && fetchedSeasons.some((s) => s.id === savedSeasonId)) {
+          initialSeasonId = savedSeasonId;
+        }
+      } catch {}
+      if (!initialSeasonId && fetchedSeasons.length > 0) {
+        const currentSeason = fetchedSeasons.find((s) => s.isCurrent) || fetchedSeasons[0];
+        initialSeasonId = currentSeason.id;
+      }
+      setActiveSeasonIdState(initialSeasonId);
+    } catch (error) {
+      console.error('[FarmContext] Error loading initial state from DB:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [
-    farms,
-    fields,
-    seasons,
-    suppliers,
-    customers,
-    bankAccounts,
-    payables,
-    receivables,
-    stockItems,
-    stockMovements,
-    machinery,
-    bankStatements,
-    activeFarmId,
-    activeSeasonId,
-    isLoaded,
-  ]);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Derived Active Entities
   const activeFarm = useMemo(() => {
-    return farms.find((f) => f.id === activeFarmId) || farms[0];
+    return (
+      farms.find((f) => f.id === activeFarmId) ||
+      farms[0] || {
+        id: 'default-farm',
+        name: 'Fazenda Santa Fé',
+        location: 'Sorriso - MT',
+        totalArea: 2400,
+        carNumber: 'MT-5107909-ABCD.1234',
+        active: true,
+      }
+    );
   }, [farms, activeFarmId]);
 
   const activeSeason = useMemo(() => {
-    return seasons.find((s) => s.id === activeSeasonId) || seasons[0];
+    return (
+      seasons.find((s) => s.id === activeSeasonId) ||
+      seasons[0] || {
+        id: 'default-season',
+        name: 'Safra 2025/2026',
+        startDate: '2025-09-15',
+        endDate: '2026-06-30',
+        isCurrent: true,
+      }
+    );
   }, [seasons, activeSeasonId]);
 
   const activeFields = useMemo(() => {
@@ -218,12 +284,14 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const kpis = useMemo(() => {
     const totalBankBalance = bankAccounts.reduce((sum, b) => sum + b.balance, 0);
 
-    const pendingPayables = activePayables.filter((p) => p.status === 'pendente' || p.status === 'vencido');
+    const pendingPayables = activePayables.filter(
+      (p) => p.status === 'pendente' || p.status === 'vencido'
+    );
     const totalPendingPayables = pendingPayables.reduce((sum, p) => sum + p.amount, 0);
 
-    const todayStr = '2026-08-14'; // Simulated current context date
+    const todayStr = new Date().toISOString().split('T')[0];
     const overduePayables = activePayables.filter(
-      (p) => (p.status === 'vencido' || (p.status === 'pendente' && p.dueDate < todayStr))
+      (p) => p.status === 'vencido' || (p.status === 'pendente' && p.dueDate < todayStr)
     );
     const totalOverduePayables = overduePayables.reduce((sum, p) => sum + p.amount, 0);
 
@@ -245,9 +313,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const estimatedCropRevenue = activeReceivables.reduce((sum, r) => sum + r.totalAmount, 0);
     const estimatedCropCost = activePayables.reduce((sum, p) => sum + p.amount, 0);
-    const estimatedCropMargin = estimatedCropRevenue > 0
-      ? ((estimatedCropRevenue - estimatedCropCost) / estimatedCropRevenue) * 100
-      : 0;
+    const estimatedCropMargin =
+      estimatedCropRevenue > 0
+        ? ((estimatedCropRevenue - estimatedCropCost) / estimatedCropRevenue) * 100
+        : 0;
 
     const totalArea = activeFarm ? activeFarm.totalArea : 1;
     const averageCostPerHectare = estimatedCropCost / (totalArea || 1);
@@ -271,15 +340,25 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [bankAccounts, activePayables, activeReceivables, activeStockItems, activeFarm]);
 
-  // Actions
-  const addPayable = useCallback((data: Omit<Payable, 'id'>) => {
-    const newId = `pay-${Date.now()}`;
-    const newPayable: Payable = { id: newId, ...data };
-    setPayables((prev) => [newPayable, ...prev]);
+  // Mutators with direct Server Action persistence (Single Source of Truth)
+
+  const addPayable = useCallback(
+    async (data: Omit<Payable, 'id'> & { installmentsCount?: number }) => {
+      const created = await createPayable(data);
+      setPayables((prev) => [created, ...prev]);
+    },
+    []
+  );
+
+  const updatePayable = useCallback(async (id: string, data: Partial<Payable>) => {
+    setPayables((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
+    await updatePayableAction(id, data);
   }, []);
 
   const payPayable = useCallback(
-    (id: string, bankAccountId: string, paidAmount: number, paymentDate: string) => {
+    async (id: string, bankAccountId: string, paidAmount: number, paymentDate?: string) => {
+      const pDate = paymentDate || new Date().toISOString().split('T')[0];
+      // Optimistic update
       setPayables((prev) =>
         prev.map((p) =>
           p.id === id
@@ -287,46 +366,54 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...p,
                 status: 'pago',
                 paidAmount,
-                paymentDate,
+                paymentDate: pDate,
                 bankAccountId,
               }
             : p
         )
       );
 
-      // Deduct from bank account balance
       setBankAccounts((prev) =>
-        prev.map((b) =>
-          b.id === bankAccountId
-            ? { ...b, balance: b.balance - paidAmount }
-            : b
-        )
+        prev.map((b) => (b.id === bankAccountId ? { ...b, balance: b.balance - paidAmount } : b))
       );
+
+      // Persist to server
+      await payPayableAction(id, bankAccountId, paidAmount, pDate);
     },
     []
   );
 
-  const deletePayable = useCallback((id: string) => {
+  const deletePayable = useCallback(async (id: string) => {
     setPayables((prev) => prev.filter((p) => p.id !== id));
+    await deletePayableAction(id);
   }, []);
 
-  const addReceivable = useCallback((data: Omit<Receivable, 'id'>) => {
-    const newId = `rec-${Date.now()}`;
-    const newReceivable: Receivable = { id: newId, ...data };
-    setReceivables((prev) => [newReceivable, ...prev]);
+  const addReceivable = useCallback(
+    async (data: Omit<Receivable, 'id'> & { installmentsCount?: number }) => {
+      const created = await createReceivable(data);
+      setReceivables((prev) => [created, ...prev]);
+    },
+    []
+  );
+
+  const updateReceivable = useCallback(async (id: string, data: Partial<Receivable>) => {
+    setReceivables((prev) => prev.map((r) => (r.id === id ? { ...r, ...data } : r)));
+    await updateReceivableAction(id, data);
   }, []);
 
   const receiveReceivable = useCallback(
-    (id: string, bankAccountId: string, receivedDate: string) => {
-      let amountReceived = 0;
+    async (id: string, bankAccountId: string, receivedDate?: string) => {
+      const rDate = receivedDate || new Date().toISOString().split('T')[0];
+      const target = receivables.find((r) => r.id === id);
+      const amountReceived = target ? target.totalAmount : 0;
+
       setReceivables((prev) =>
         prev.map((r) => {
           if (r.id === id) {
-            amountReceived = r.totalAmount;
             return {
               ...r,
               status: 'pago',
-              receivedDate,
+              receivedDate: rDate,
               bankAccountId,
             };
           }
@@ -337,31 +424,30 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (amountReceived > 0) {
         setBankAccounts((prev) =>
           prev.map((b) =>
-            b.id === bankAccountId
-              ? { ...b, balance: b.balance + amountReceived }
-              : b
+            b.id === bankAccountId ? { ...b, balance: b.balance + amountReceived } : b
           )
         );
       }
+
+      await receiveReceivableAction(id, bankAccountId, rDate, amountReceived);
     },
-    []
+    [receivables]
   );
 
-  const deleteReceivable = useCallback((id: string) => {
+  const deleteReceivable = useCallback(async (id: string) => {
     setReceivables((prev) => prev.filter((r) => r.id !== id));
+    await deleteReceivableAction(id);
   }, []);
 
-  const addStockItem = useCallback((item: Omit<StockItem, 'id'>) => {
-    const newId = `stk-${Date.now()}`;
-    setStockItems((prev) => [{ id: newId, ...item }, ...prev]);
+  const addStockItem = useCallback(async (item: Omit<StockItem, 'id'>) => {
+    const created = await createStockItem(item);
+    setStockItems((prev) => [created, ...prev]);
   }, []);
 
-  const addStockMovement = useCallback((movement: Omit<StockMovement, 'id'>) => {
-    const newId = `mov-${Date.now()}`;
-    const newMovement: StockMovement = { id: newId, ...movement };
-    setStockMovements((prev) => [newMovement, ...prev]);
+  const addStockMovement = useCallback(async (movement: Omit<StockMovement, 'id'>) => {
+    const created = await addStockMovementAction(movement);
+    setStockMovements((prev) => [created, ...prev]);
 
-    // Update stock quantity and cost
     setStockItems((prev) =>
       prev.map((item) => {
         if (item.id === movement.stockItemId) {
@@ -377,7 +463,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, []);
 
-  const matchStatement = useCallback((statementId: string, transactionId: string) => {
+  const matchStatement = useCallback(async (statementId: string, transactionId: string) => {
     setBankStatements((prev) =>
       prev.map((stmt) =>
         stmt.id === statementId
@@ -390,40 +476,38 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : stmt
       )
     );
+    await matchStatementAction(statementId, transactionId);
   }, []);
 
-  const addField = useCallback((field: Omit<Field, 'id'>) => {
-    const newId = `field-${Date.now()}`;
-    setFields((prev) => [...prev, { id: newId, ...field }]);
+  const addField = useCallback(async (field: Omit<Field, 'id'>) => {
+    const created = await createField(field);
+    setFields((prev) => [...prev, created]);
   }, []);
 
-  const addFarm = useCallback((farm: Omit<Farm, 'id'>) => {
-    const newId = `farm-${Date.now()}`;
-    setFarms((prev) => [...prev, { id: newId, ...farm }]);
+  const addFarm = useCallback(
+    async (farm: Omit<Farm, 'id'>) => {
+      const created = await createFarm(farm);
+      setFarms((prev) => [...prev, created]);
+      if (!activeFarmId) {
+        setActiveFarmId(created.id);
+      }
+    },
+    [activeFarmId, setActiveFarmId]
+  );
+
+  const addMachinery = useCallback(async (item: Omit<Machinery, 'id'>) => {
+    const created = await createMachinery(item);
+    setMachinery((prev) => [...prev, created]);
   }, []);
 
-  const addMachinery = useCallback((item: Omit<Machinery, 'id'>) => {
-    const newId = `mac-${Date.now()}`;
-    setMachinery((prev) => [...prev, { id: newId, ...item }]);
-  }, []);
-
-  const resetToDefaults = useCallback(() => {
-    setFarms(INITIAL_FARMS);
-    setFields(INITIAL_FIELDS);
-    setSeasons(INITIAL_SEASONS);
-    setSuppliers(INITIAL_SUPPLIERS);
-    setCustomers(INITIAL_CUSTOMERS);
-    setBankAccounts(INITIAL_BANK_ACCOUNTS);
-    setPayables(INITIAL_PAYABLES);
-    setReceivables(INITIAL_RECEIVABLES);
-    setStockItems(INITIAL_STOCK);
-    setStockMovements(INITIAL_MOVEMENTS);
-    setMachinery(INITIAL_MACHINERY);
-    setBankStatements(INITIAL_STATEMENTS);
-    setActiveFarmId('farm-1');
-    setActiveSeasonId('season-25-26');
-    localStorage.removeItem(STORAGE_KEY);
-  }, []);
+  const resetToDefaults = useCallback(async () => {
+    try {
+      localStorage.removeItem(PREF_FARM_KEY);
+      localStorage.removeItem(PREF_SEASON_KEY);
+      localStorage.removeItem('farmfin_data_v1');
+    } catch {}
+    await loadData();
+  }, [loadData]);
 
   return (
     <FarmContext.Provider
@@ -434,6 +518,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeSeasonId,
         setActiveSeasonId,
         activeSeason,
+        isLoading,
         farms,
         fields,
         activeFields,
@@ -453,9 +538,11 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeMachinery,
         bankStatements,
         addPayable,
+        updatePayable,
         payPayable,
         deletePayable,
         addReceivable,
+        updateReceivable,
         receiveReceivable,
         deleteReceivable,
         addStockItem,
@@ -465,6 +552,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addFarm,
         addMachinery,
         resetToDefaults,
+        reloadFromDB: loadData,
         kpis,
       }}
     >

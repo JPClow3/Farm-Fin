@@ -1,54 +1,70 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFarm } from '../../context/FarmContext';
 import { ClayCard } from '../../components/ui/ClayCard';
-import { KpiCard } from '../../components/ui/KpiCard';
 import { CashFlowChart } from '../../components/charts/CashFlowChart';
 import { ClayTabs } from '../../components/ui/ClayTabs';
-
-interface FlowRow {
-  period: string;
-  initialBalance: number;
-  inflows: number;
-  outflows: number;
-  netFlow: number;
-  finalBalance: number;
-}
+import { getCashFlowReport, CashFlowRow } from '../../actions/finance';
 
 export default function FluxoDeCaixaPage() {
-  const { bankAccounts, kpis } = useFarm();
+  const { bankAccounts, activeFarmId } = useFarm();
 
   const [periodTab, setPeriodTab] = useState<string>('mensal');
   const [scenario, setScenario] = useState<'realista' | 'otimista' | 'pessimista'>('realista');
+  const [reportRows, setReportRows] = useState<CashFlowRow[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Simulated Monthly Cash Flow Ledger
-  const monthlyData: FlowRow[] = [
-    { period: 'Março 2026', initialBalance: 1420000, inflows: 350000, outflows: 480000, netFlow: -130000, finalBalance: 1290000 },
-    { period: 'Abril 2026', initialBalance: 1290000, inflows: 920000, outflows: 320000, netFlow: 600000, finalBalance: 1890000 },
-    { period: 'Maio 2026', initialBalance: 1890000, inflows: 2150000, outflows: 560000, netFlow: 1590000, finalBalance: 3480000 },
-    { period: 'Junho 2026', initialBalance: 3480000, inflows: 1450000, outflows: 610000, netFlow: 840000, finalBalance: 4320000 },
-    { period: 'Julho 2026', initialBalance: 4320000, inflows: 880000, outflows: 420000, netFlow: 460000, finalBalance: 4780000 },
-    { period: 'Agosto 2026 (Atual)', initialBalance: 4780000, inflows: 1350000, outflows: 649000, netFlow: 701000, finalBalance: 5481000 },
-    { period: 'Setembro 2026 (Proj)', initialBalance: 5481000, inflows: 1870000, outflows: 750000, netFlow: 1120000, finalBalance: 6601000 },
-    { period: 'Outubro 2026 (Proj)', initialBalance: 6601000, inflows: 950000, outflows: 890000, netFlow: 60000, finalBalance: 6661000 },
-  ];
+  useEffect(() => {
+    async function loadCashFlow() {
+      setIsLoading(true);
+      try {
+        const res = await getCashFlowReport(undefined, activeFarmId);
+        if (res.success && res.data && res.data.length > 0) {
+          setReportRows(res.data);
+        }
+      } catch (e) {
+        console.error('Failed to load cash flow from DB:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadCashFlow();
+  }, [activeFarmId]);
 
-  // Adjust for active scenario
+  // Adjust for active scenario multiplier
   const mult = scenario === 'otimista' ? 1.15 : scenario === 'pessimista' ? 0.85 : 1.0;
+  const outMult = scenario === 'pessimista' ? 1.08 : 1.0;
 
-  const adjustedRows = monthlyData.map((row) => {
-    const adjIn = row.inflows * mult;
-    const adjOut = row.outflows * (scenario === 'pessimista' ? 1.08 : 1.0);
-    const adjNet = adjIn - adjOut;
-    return {
-      ...row,
-      inflows: adjIn,
-      outflows: adjOut,
-      netFlow: adjNet,
-      finalBalance: row.initialBalance + adjNet,
-    };
-  });
+  const adjustedRows = useMemo(() => {
+    let running = reportRows.length > 0 ? reportRows[0].initialBalance : 1420000;
+    return reportRows.map((row) => {
+      const adjIn = row.inflows * mult;
+      const adjOut = row.outflows * outMult;
+      const adjNet = adjIn - adjOut;
+      const finalBal = running + adjNet;
+      const r = {
+        ...row,
+        initialBalance: running,
+        inflows: adjIn,
+        outflows: adjOut,
+        netFlow: adjNet,
+        finalBalance: finalBal,
+      };
+      running = finalBal;
+      return r;
+    });
+  }, [reportRows, mult, outMult]);
+
+  // Transform for chart
+  const chartData = useMemo(() => {
+    return adjustedRows.map((r) => ({
+      month: r.period.split(' ')[0],
+      inflow: r.inflows,
+      outflow: r.outflows,
+      balance: r.finalBalance,
+    }));
+  }, [adjustedRows]);
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -57,13 +73,28 @@ export default function FluxoDeCaixaPage() {
         <div className="page-title-group">
           <h1 className="page-title">Fluxo de Caixa & Projeções</h1>
           <p className="page-subtitle">
-            Análise de liquidez, saldo projetado por conta e simulação de cenários de safra
+            Análise de liquidez em tempo real, saldo projetado por conta e simulação de cenários de
+            safra
           </p>
         </div>
 
         {/* Scenario Buttons */}
-        <div className="flex-row" style={{ background: 'var(--bg-surface-2)', padding: '4px', borderRadius: 'var(--radius-lg)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', padding: '0 8px', color: 'var(--text-secondary)' }}>
+        <div
+          className="flex-row"
+          style={{
+            background: 'var(--bg-surface-2)',
+            padding: '4px',
+            borderRadius: 'var(--radius-lg)',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'bold',
+              padding: '0 8px',
+              color: 'var(--text-secondary)',
+            }}
+          >
             Cenário:
           </span>
           <button
@@ -95,15 +126,24 @@ export default function FluxoDeCaixaPage() {
         {bankAccounts.map((b) => (
           <ClayCard key={b.id} size="sm">
             <div className="flex-between" style={{ marginBottom: '4px' }}>
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: '600', color: 'var(--text-secondary)' }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: '600',
+                  color: 'var(--text-secondary)',
+                }}
+              >
                 {b.bankName}
               </span>
               <span className="badge badge--primary" style={{ fontSize: '10px' }}>
                 {b.type}
               </span>
             </div>
-            <div className="td-money" style={{ fontSize: 'var(--text-xl)', color: 'var(--text-primary)' }}>
-              R$ {b.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div
+              className="td-money"
+              style={{ fontSize: 'var(--text-xl)', color: 'var(--text-primary)' }}
+            >
+              R$ {Number(b.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
               Ag: {b.agency} • CC: {b.accountNumber}
@@ -118,7 +158,7 @@ export default function FluxoDeCaixaPage() {
           <div>
             <h2 className="card-title">Evolução do Fluxo de Caixa (Safra 2025/2026)</h2>
             <p className="card-subtitle">
-              Entradas vs Saídas com projeção de saldo até o encerramento do ciclo agrícola
+              Entradas vs Saídas com projeção de saldo apurada a partir de lançamentos e contratos
             </p>
           </div>
 
@@ -135,7 +175,7 @@ export default function FluxoDeCaixaPage() {
           />
         </div>
 
-        <CashFlowChart scenario={scenario} />
+        <CashFlowChart data={chartData.length > 0 ? chartData : undefined} scenario={scenario} />
       </ClayCard>
 
       {/* Detailed Cash Flow Ledger Table */}
@@ -143,7 +183,10 @@ export default function FluxoDeCaixaPage() {
         <div className="card-header">
           <div>
             <h2 className="card-title">Demonstrativo Detalhado de Fluxo de Caixa</h2>
-            <p className="card-subtitle">Valores expressos em Reais (R$)</p>
+            <p className="card-subtitle">
+              Valores expressos em Reais (R$) calculados a partir das contas bancárias e baixas do
+              sistema
+            </p>
           </div>
         </div>
 
@@ -162,14 +205,33 @@ export default function FluxoDeCaixaPage() {
             <tbody>
               {adjustedRows.map((row) => (
                 <tr key={row.period}>
-                  <td style={{ fontWeight: '600' }}>{row.period}</td>
-                  <td className="td-money" style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontWeight: '600' }}>
+                    {row.period}
+                    {row.isProjected && (
+                      <span
+                        className="badge badge--neutral"
+                        style={{ marginLeft: '8px', fontSize: '10px' }}
+                      >
+                        Projeção
+                      </span>
+                    )}
+                  </td>
+                  <td
+                    className="td-money"
+                    style={{ textAlign: 'right', color: 'var(--text-secondary)' }}
+                  >
                     R$ {row.initialBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="td-money" style={{ textAlign: 'right', color: 'var(--color-primary-700)' }}>
+                  <td
+                    className="td-money"
+                    style={{ textAlign: 'right', color: 'var(--color-primary-700)' }}
+                  >
                     + R$ {row.inflows.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="td-money" style={{ textAlign: 'right', color: 'var(--color-secondary-600)' }}>
+                  <td
+                    className="td-money"
+                    style={{ textAlign: 'right', color: 'var(--color-secondary-600)' }}
+                  >
                     - R$ {row.outflows.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                   <td
@@ -188,6 +250,16 @@ export default function FluxoDeCaixaPage() {
                   </td>
                 </tr>
               ))}
+              {adjustedRows.length === 0 && !isLoading && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: 'center', padding: '24px', color: 'var(--text-tertiary)' }}
+                  >
+                    Nenhum lançamento no período.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

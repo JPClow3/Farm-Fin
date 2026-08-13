@@ -10,7 +10,7 @@ import { ClayTable, Column } from '../../components/ui/ClayTable';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
-import { Farm, Field, Supplier, Machinery, BankAccount } from '../../lib/mockData';
+import { Farm, Field, Supplier, Machinery, BankAccount } from '../../lib/types';
 
 export default function CadastrosPage() {
   const {
@@ -64,7 +64,11 @@ export default function CadastrosPage() {
       carNumber: farmCar,
       active: true,
     });
-    addToast({ type: 'success', title: 'Fazenda Cadastrada!', message: `${farmName} adicionada com sucesso.` });
+    addToast({
+      type: 'success',
+      title: 'Fazenda Cadastrada!',
+      message: `${farmName} adicionada com sucesso.`,
+    });
     setIsNewFarmModal(false);
     setFarmName('');
   };
@@ -79,7 +83,11 @@ export default function CadastrosPage() {
       soilType: fieldSoil,
       currentCrop: fieldCrop,
     });
-    addToast({ type: 'success', title: 'Talhão Cadastrado!', message: `${fieldName} vinculado à fazenda ativa.` });
+    addToast({
+      type: 'success',
+      title: 'Talhão Cadastrado!',
+      message: `${fieldName} vinculado à fazenda ativa.`,
+    });
     setIsNewFieldModal(false);
     setFieldName('');
   };
@@ -95,7 +103,11 @@ export default function CadastrosPage() {
       hourCost: parseFloat(machineHourCost.replace(',', '.')) || 0,
       status: 'Operacional',
     });
-    addToast({ type: 'success', title: 'Máquina Cadastrada!', message: `${machineName} adicionada à frota.` });
+    addToast({
+      type: 'success',
+      title: 'Máquina Cadastrada!',
+      message: `${machineName} adicionada à frota.`,
+    });
     setIsNewMachineModal(false);
     setMachineName('');
   };
@@ -107,7 +119,8 @@ export default function CadastrosPage() {
         <div className="page-title-group">
           <h1 className="page-title">Cadastros Base do Sistema</h1>
           <p className="page-subtitle">
-            Gerenciamento de propriedades rurais, talhões, safras, fornecedores, frota e contas bancárias
+            Gerenciamento de propriedades rurais, talhões, safras, fornecedores, frota e contas
+            bancárias
           </p>
         </div>
         <div>
@@ -135,7 +148,12 @@ export default function CadastrosPage() {
           { id: 'fazendas', label: 'Fazendas & Propriedades', count: farms.length, icon: '🏡' },
           { id: 'talhoes', label: 'Talhões & Áreas', count: fields.length, icon: '🌱' },
           { id: 'safras', label: 'Safras & Culturas', count: seasons.length, icon: '🌾' },
-          { id: 'fornecedores', label: 'Fornecedores & Clientes', count: suppliers.length + customers.length, icon: '🤝' },
+          {
+            id: 'fornecedores',
+            label: 'Fornecedores & Clientes',
+            count: suppliers.length + customers.length,
+            icon: '🤝',
+          },
           { id: 'maquinas', label: 'Maquinário & Frota', count: machinery.length, icon: '🚜' },
           { id: 'bancos', label: 'Contas Bancárias', count: bankAccounts.length, icon: '🏦' },
         ]}
@@ -154,10 +172,23 @@ export default function CadastrosPage() {
                   {f.totalArea.toLocaleString('pt-BR')} ha
                 </span>
               </div>
-              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '4px' }}>
+              <h3
+                style={{
+                  fontSize: 'var(--text-lg)',
+                  fontWeight: 'bold',
+                  color: 'var(--text-primary)',
+                  marginBottom: '4px',
+                }}
+              >
                 {f.name}
               </h3>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+              <p
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '8px',
+                }}
+              >
                 📍 {f.location}
               </p>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
@@ -179,10 +210,18 @@ export default function CadastrosPage() {
           </div>
           <ClayTable
             columns={[
-              { key: 'name', header: 'Nome do Talhão', render: (r) => <span style={{ fontWeight: '600' }}>{r.name}</span> },
+              {
+                key: 'name',
+                header: 'Nome do Talhão',
+                render: (r) => <span style={{ fontWeight: '600' }}>{r.name}</span>,
+              },
               { key: 'area', header: 'Área', render: (r) => `${r.area} ha` },
               { key: 'soilType', header: 'Tipo de Solo' },
-              { key: 'currentCrop', header: 'Cultura Atual', render: (r) => <span className="badge badge--primary">{r.currentCrop}</span> },
+              {
+                key: 'currentCrop',
+                header: 'Cultura Atual',
+                render: (r) => <span className="badge badge--primary">{r.currentCrop}</span>,
+              },
             ]}
             data={fields}
             keyExtractor={(f) => f.id}
@@ -201,10 +240,31 @@ export default function CadastrosPage() {
           </div>
           <ClayTable
             columns={[
-              { key: 'name', header: 'Safra', render: (r) => <span style={{ fontWeight: '600' }}>{r.name}</span> },
-              { key: 'startDate', header: 'Início', render: (r) => <span className="td-date">{r.startDate}</span> },
-              { key: 'endDate', header: 'Término', render: (r) => <span className="td-date">{r.endDate}</span> },
-              { key: 'isCurrent', header: 'Status', render: (r) => r.isCurrent ? <span className="badge badge--success">Safra Vigente</span> : <span className="badge badge--neutral">Encerrada</span> },
+              {
+                key: 'name',
+                header: 'Safra',
+                render: (r) => <span style={{ fontWeight: '600' }}>{r.name}</span>,
+              },
+              {
+                key: 'startDate',
+                header: 'Início',
+                render: (r) => <span className="td-date">{r.startDate}</span>,
+              },
+              {
+                key: 'endDate',
+                header: 'Término',
+                render: (r) => <span className="td-date">{r.endDate}</span>,
+              },
+              {
+                key: 'isCurrent',
+                header: 'Status',
+                render: (r) =>
+                  r.isCurrent ? (
+                    <span className="badge badge--success">Safra Vigente</span>
+                  ) : (
+                    <span className="badge badge--neutral">Encerrada</span>
+                  ),
+              },
             ]}
             data={seasons}
             keyExtractor={(s) => s.id}
@@ -221,12 +281,24 @@ export default function CadastrosPage() {
             </div>
             <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
               {suppliers.map((s) => (
-                <div key={s.id} className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-surface-2)', borderRadius: 'var(--radius-md)' }}>
+                <div
+                  key={s.id}
+                  className="flex-between"
+                  style={{
+                    padding: '8px 12px',
+                    background: 'var(--bg-surface-2)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
                   <div>
                     <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>{s.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>CNPJ: {s.document} • Tel: {s.contact}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                      CNPJ: {s.document} • Tel: {s.contact}
+                    </div>
                   </div>
-                  <span className="badge badge--primary" style={{ fontSize: '10px' }}>{s.category}</span>
+                  <span className="badge badge--primary" style={{ fontSize: '10px' }}>
+                    {s.category}
+                  </span>
                 </div>
               ))}
             </div>
@@ -238,12 +310,24 @@ export default function CadastrosPage() {
             </div>
             <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
               {customers.map((c) => (
-                <div key={c.id} className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-surface-2)', borderRadius: 'var(--radius-md)' }}>
+                <div
+                  key={c.id}
+                  className="flex-between"
+                  style={{
+                    padding: '8px 12px',
+                    background: 'var(--bg-surface-2)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
                   <div>
                     <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>{c.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>CNPJ: {c.document} • Tel: {c.contact}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                      CNPJ: {c.document} • Tel: {c.contact}
+                    </div>
                   </div>
-                  <span className="badge badge--success" style={{ fontSize: '10px' }}>{c.segment}</span>
+                  <span className="badge badge--success" style={{ fontSize: '10px' }}>
+                    {c.segment}
+                  </span>
                 </div>
               ))}
             </div>
@@ -262,11 +346,25 @@ export default function CadastrosPage() {
           </div>
           <ClayTable
             columns={[
-              { key: 'name', header: 'Equipamento', render: (r) => <span style={{ fontWeight: '600' }}>{r.name}</span> },
+              {
+                key: 'name',
+                header: 'Equipamento',
+                render: (r) => <span style={{ fontWeight: '600' }}>{r.name}</span>,
+              },
               { key: 'type', header: 'Categoria' },
               { key: 'plate', header: 'Placa / Chassi' },
-              { key: 'hourCost', header: 'Custo / Hora', align: 'right', render: (r) => <span className="td-money">R$ {r.hourCost.toFixed(2)}/h</span> },
-              { key: 'status', header: 'Status', align: 'center', render: (r) => <span className="badge badge--success">{r.status}</span> },
+              {
+                key: 'hourCost',
+                header: 'Custo / Hora',
+                align: 'right',
+                render: (r) => <span className="td-money">R$ {r.hourCost.toFixed(2)}/h</span>,
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                align: 'center',
+                render: (r) => <span className="badge badge--success">{r.status}</span>,
+              },
             ]}
             data={machinery}
             keyExtractor={(m) => m.id}
@@ -286,11 +384,20 @@ export default function CadastrosPage() {
               <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 'bold', marginBottom: '4px' }}>
                 {b.bankName}
               </h3>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+              <div
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '12px',
+                }}
+              >
                 Agência: {b.agency} • Conta: {b.accountNumber}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Saldo Atual</div>
-              <div className="td-money" style={{ fontSize: 'var(--text-xl)', color: 'var(--color-primary-800)' }}>
+              <div
+                className="td-money"
+                style={{ fontSize: 'var(--text-xl)', color: 'var(--color-primary-800)' }}
+              >
                 R$ {b.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </ClayCard>

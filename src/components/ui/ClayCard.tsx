@@ -17,10 +17,7 @@ export const ClayCard: React.FC<ClayCardProps> = ({
   const variantClass = variant !== 'default' ? `clay-card--${variant}` : '';
 
   return (
-    <div
-      className={`clay-card ${sizeClass} ${variantClass} ${className}`.trim()}
-      {...props}
-    >
+    <div className={`clay-card ${sizeClass} ${variantClass} ${className}`.trim()} {...props}>
       {children}
     </div>
   );
