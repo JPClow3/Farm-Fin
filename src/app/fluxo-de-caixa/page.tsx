@@ -6,6 +6,12 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { CashFlowChart } from '../../components/charts/CashFlowChart';
 import { ClayTabs } from '../../components/ui/ClayTabs';
 import { getCashFlowReport, CashFlowRow } from '../../actions/finance';
+import {
+  TrendingUp,
+  Sparkles,
+  AlertTriangle,
+  Building2,
+} from 'lucide-react';
 
 export default function FluxoDeCaixaPage() {
   const { bankAccounts, activeFarmId } = useFarm();
@@ -108,15 +114,19 @@ export default function FluxoDeCaixaPage() {
             type="button"
             className={`filter-pill ${scenario === 'otimista' ? 'active' : ''}`}
             onClick={() => setScenario('otimista')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            🌱 Otimista (+15%)
+            <Sparkles size={13} />
+            Otimista (+15%)
           </button>
           <button
             type="button"
             className={`filter-pill ${scenario === 'pessimista' ? 'active' : ''}`}
             onClick={() => setScenario('pessimista')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            ⚠️ Pessimista (-15%)
+            <AlertTriangle size={13} />
+            Pessimista (-15%)
           </button>
         </div>
       </div>

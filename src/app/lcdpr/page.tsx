@@ -8,6 +8,14 @@ import { ClayButton } from '../../components/ui/ClayButton';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { getLCDPREntries, generateLCDPR, LCDPREntry } from '../../actions/lcdpr';
+import {
+  Landmark,
+  FileCode2,
+  Download,
+  CircleDollarSign,
+  CreditCard,
+  BarChart3,
+} from 'lucide-react';
 
 export default function LcdprPage() {
   const { activeFarm, activeFarmId } = useFarm();
@@ -82,12 +90,14 @@ export default function LcdprPage() {
             apuração direta do banco de dados
           </p>
         </div>
-        <div className="flex-row">
+        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="ghost" onClick={() => setIsPreviewModalOpen(true)}>
-            🔍 Visualizar Layout .TXT
+            <FileCode2 size={15} style={{ marginRight: '6px' }} />
+            Visualizar Layout .TXT
           </ClayButton>
           <ClayButton variant="primary" onClick={handleDownloadTxt}>
-            📥 Baixar Arquivo LCDPR (.txt)
+            <Download size={15} style={{ marginRight: '6px' }} />
+            Baixar Arquivo LCDPR (.txt)
           </ClayButton>
         </div>
       </div>
@@ -104,7 +114,7 @@ export default function LcdprPage() {
           gap: 'var(--space-4)',
         }}
       >
-        <span style={{ fontSize: '2rem' }}>🏛️</span>
+        <Landmark size={28} color="var(--color-primary-800)" style={{ flexShrink: 0 }} />
         <div>
           <div
             style={{
@@ -133,21 +143,21 @@ export default function LcdprPage() {
         <KpiCard
           label="Total de Receitas da Atividade Rural"
           value={`R$ ${totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💰"
+          icon={<CircleDollarSign size={20} />}
           iconColor="green"
           subtext="Entradas tributáveis"
         />
         <KpiCard
           label="Total de Despesas (Custeio e Investimento)"
           value={`R$ ${totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💳"
+          icon={<CreditCard size={20} />}
           iconColor="red"
           subtext="Deduções autorizadas pela RFB"
         />
         <KpiCard
           label="Resultado Líquido Apurado no Livro Caixa"
           value={`R$ ${saldoFiscal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="📊"
+          icon={<BarChart3 size={20} />}
           iconColor="blue"
           subtext="Base de apuração do IRPF"
         />

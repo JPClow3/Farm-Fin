@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 
 export type ToastType = 'success' | 'warning' | 'danger' | 'info';
 
@@ -49,13 +50,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             key={t.id}
             className={`toast toast--${t.type}`}
             onClick={() => removeToast(t.id)}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }}
           >
-            <div style={{ fontSize: '1.25rem', lineHeight: 1 }}>
-              {t.type === 'success' && '✓'}
-              {t.type === 'warning' && '⚠'}
-              {t.type === 'danger' && '✕'}
-              {t.type === 'info' && 'ℹ'}
+            <div style={{ flexShrink: 0, marginTop: '2px' }}>
+              {t.type === 'success' && <CheckCircle2 size={18} />}
+              {t.type === 'warning' && <AlertTriangle size={18} />}
+              {t.type === 'danger' && <XCircle size={18} />}
+              {t.type === 'info' && <Info size={18} />}
             </div>
             <div>
               <div className="toast__title">{t.title}</div>

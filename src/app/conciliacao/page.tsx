@@ -12,6 +12,17 @@ import {
   autoMatchTransactions,
   confirmStatementMatch,
 } from '../../actions/conciliacao';
+import {
+  Download,
+  UploadCloud,
+  Zap,
+  Building2,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  FolderOpen,
+  Check,
+} from 'lucide-react';
 
 export default function ConciliacaoPage() {
   const { bankAccounts, bankStatements, matchStatement, reloadFromDB } = useFarm();
@@ -216,19 +227,22 @@ NEWFILEUID:NONE
             conferência de saldo
           </p>
         </div>
-        <div className="flex-row">
+        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="ghost" onClick={handleSimulateOfxUpload} disabled={isUploading}>
-            {isUploading ? 'Importando...' : '📥 Carregar Extrato Demo (OFX)'}
+            <Download size={15} style={{ marginRight: '6px' }} />
+            {isUploading ? 'Importando...' : 'Carregar Extrato Demo (OFX)'}
           </ClayButton>
           <ClayButton
             variant="secondary"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
           >
-            📁 Importar OFX / CSV
+            <UploadCloud size={15} style={{ marginRight: '6px' }} />
+            Importar OFX / CSV
           </ClayButton>
           <ClayButton variant="primary" onClick={handleAutoMatchAll} disabled={isMatching}>
-            {isMatching ? 'Processando...' : '⚡ Conciliar Tudo (Auto-Match)'}
+            <Zap size={15} style={{ marginRight: '6px' }} />
+            {isMatching ? 'Processando...' : 'Conciliar Tudo (Auto-Match)'}
           </ClayButton>
         </div>
       </div>
@@ -236,8 +250,8 @@ NEWFILEUID:NONE
       {/* Bank Selector Bar */}
       <ClayCard size="sm">
         <div className="flex-between flex-wrap" style={{ gap: 'var(--space-4)' }}>
-          <div className="flex-row" style={{ gap: 'var(--space-3)' }}>
-            <span style={{ fontSize: '1.25rem' }}>🏦</span>
+          <div className="flex-row" style={{ gap: 'var(--space-3)', alignItems: 'center' }}>
+            <Building2 size={22} color="var(--color-primary-600)" />
             <ClaySelect
               label="Conta Bancária Selecionada"
               options={bankAccounts.map((b) => ({
@@ -287,21 +301,21 @@ NEWFILEUID:NONE
         <KpiCard
           label="Itens no Extrato Importado"
           value={`${bankItems.length} transações`}
-          icon="📄"
+          icon={<FileText size={20} />}
           iconColor="blue"
           subtext="Último período bancário"
         />
         <KpiCard
           label="Transações Conciliadas"
           value={`${matchedCount} itens`}
-          icon="✓"
+          icon={<CheckCircle2 size={20} />}
           iconColor="green"
           subtext="Saldos conferidos e validados"
         />
         <KpiCard
           label="Pendências de Match"
           value={`${pendingCount} itens`}
-          icon="⚠️"
+          icon={<AlertTriangle size={20} />}
           iconColor="amber"
           subtext={pendingCount > 0 ? 'Aguardando revisão manual' : '100% conciliado'}
         />
@@ -320,7 +334,7 @@ NEWFILEUID:NONE
         }}
         onClick={() => fileInputRef.current?.click()}
       >
-        <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-2)' }}>📂</div>
+        <FolderOpen size={40} color="var(--color-primary-600)" style={{ margin: '0 auto var(--space-2)' }} />
         <h3
           style={{
             fontSize: 'var(--text-md)',

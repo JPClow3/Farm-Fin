@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ClayButton } from '../components/ui/ClayButton';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 
 export default function Error({
   error,
@@ -23,7 +24,7 @@ export default function Error({
         gap: '16px',
       }}
     >
-      <div style={{ fontSize: '4rem' }}>⚠️</div>
+      <AlertTriangle size={56} color="var(--color-danger)" strokeWidth={1.8} />
       <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>
         Ocorreu um erro no sistema
       </h1>
@@ -31,6 +32,7 @@ export default function Error({
         {error?.message || 'Não foi possível processar a requisição atual.'}
       </p>
       <ClayButton variant="primary" onClick={() => reset()}>
+        <RotateCcw size={16} style={{ marginRight: '6px' }} />
         Tentar Novamente
       </ClayButton>
     </div>

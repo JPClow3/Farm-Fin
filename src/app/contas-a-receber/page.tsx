@@ -13,6 +13,15 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { Receivable } from '../../lib/types';
 import { getTodayDateString, addMonthsToDate } from '../../lib/dateUtils';
+import {
+  Plus,
+  CircleDollarSign,
+  CheckCircle2,
+  Wheat,
+  BarChart3,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 
 export default function ContasAReceberPage() {
   const {
@@ -254,7 +263,7 @@ export default function ContasAReceberPage() {
             title="Editar Venda"
             onClick={() => handleOpenEdit(row)}
           >
-            ✏️
+            <Pencil size={15} />
           </ClayButton>
           {row.status !== 'pago' && (
             <ClayButton
@@ -280,7 +289,7 @@ export default function ContasAReceberPage() {
               }
             }}
           >
-            🗑️
+            <Trash2 size={15} />
           </ClayButton>
         </div>
       ),
@@ -298,7 +307,8 @@ export default function ContasAReceberPage() {
           </p>
         </div>
         <ClayButton variant="primary" onClick={() => setIsNewModalOpen(true)}>
-          ＋ Nova Venda / Contrato
+          <Plus size={16} style={{ marginRight: '6px' }} />
+          Nova Venda / Contrato
         </ClayButton>
       </div>
 
@@ -307,21 +317,21 @@ export default function ContasAReceberPage() {
         <KpiCard
           label="Total a Receber (Safra)"
           value={`R$ ${kpis.totalPendingReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💰"
+          icon={<CircleDollarSign size={20} />}
           iconColor="green"
           subtext="Contratos em aberto"
         />
         <KpiCard
           label="Recebido Efetivamente"
           value={`R$ ${kpis.totalReceivedThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="✓"
+          icon={<CheckCircle2 size={20} />}
           iconColor="blue"
           subtext="Liquidações creditadas"
         />
         <KpiCard
           label="Volume Total Comercializado"
           value={`${totalBags.toLocaleString('pt-BR')} sc`}
-          icon="🌾"
+          icon={<Wheat size={20} />}
           iconColor="amber"
           subtext="Sacas de 60kg compromissadas"
         />
@@ -332,7 +342,7 @@ export default function ContasAReceberPage() {
               ? `R$ ${(kpis.estimatedCropRevenue / totalBags).toFixed(2)}/sc`
               : 'R$ 0,00/sc'
           }
-          icon="📊"
+          icon={<BarChart3 size={20} />}
           iconColor="terra"
           subtext="Média das fixações"
         />

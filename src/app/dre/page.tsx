@@ -7,6 +7,14 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { calculateDRE, DREResult } from '../../actions/dre';
+import {
+  FileSpreadsheet,
+  Printer,
+  CircleDollarSign,
+  Sprout,
+  TrendingUp,
+  Trophy,
+} from 'lucide-react';
 
 export default function DrePage() {
   const { activeFarm, activeSeason, activeFarmId, activeSeasonId } = useFarm();
@@ -78,12 +86,14 @@ export default function DrePage() {
             partir dos dados do banco
           </p>
         </div>
-        <div className="flex-row">
+        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="ghost" onClick={() => handleExport('CSV / Excel')}>
-            📊 Exportar Planilha (CSV)
+            <FileSpreadsheet size={15} style={{ marginRight: '6px' }} />
+            Exportar Planilha (CSV)
           </ClayButton>
           <ClayButton variant="primary" onClick={() => handleExport('PDF')}>
-            🖨️ Imprimir DRE
+            <Printer size={15} style={{ marginRight: '6px' }} />
+            Imprimir DRE
           </ClayButton>
         </div>
       </div>
@@ -93,28 +103,28 @@ export default function DrePage() {
         <KpiCard
           label="Receita Líquida Operacional"
           value={`R$ ${netRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="💰"
+          icon={<CircleDollarSign size={20} />}
           iconColor="blue"
           subtext="Venda de grãos deduzida de impostos"
         />
         <KpiCard
           label="Margem Bruta Agro"
           value={`${grossMarginPct.toFixed(1)}%`}
-          icon="🌱"
+          icon={<Sprout size={20} />}
           iconColor="green"
           subtext={`R$ ${grossMargin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
         />
         <KpiCard
           label="EBITDA Agrícola"
           value={`${ebitdaPct.toFixed(1)}%`}
-          icon="📈"
+          icon={<TrendingUp size={20} />}
           iconColor="amber"
           subtext={`R$ ${ebitda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
         />
         <KpiCard
           label="Lucro Líquido da Safra"
           value={`R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="🏆"
+          icon={<Trophy size={20} />}
           iconColor="terra"
           subtext={`${netProfitPct.toFixed(1)}% de margem líquida final`}
         />

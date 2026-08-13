@@ -9,6 +9,13 @@ import { FieldComparisonChart } from '../../components/charts/FieldComparisonCha
 import { ClayModal } from '../../components/ui/ClayModal';
 import { Field } from '../../lib/types';
 import { getFieldCostsSummary, CalculatedFieldCost } from '../../actions/farm';
+import {
+  Sprout,
+  BarChart3,
+  Wheat,
+  MapPin,
+  Eye,
+} from 'lucide-react';
 
 export default function CustosPage() {
   const { activeFarm, activeFields, activeFarmId, activeSeasonId, activeStockMovements } =
@@ -88,14 +95,14 @@ export default function CustosPage() {
         <KpiCard
           label="Custo Total Consolidado"
           value={`R$ ${displayTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="🌱"
+          icon={<Sprout size={20} />}
           iconColor="terra"
           subtext={`Área total: ${activeFarm?.totalArea || 0} ha`}
         />
         <KpiCard
           label="Custo Médio por Hectare"
           value={`R$ ${displayAvgHa.toFixed(2)}/ha`}
-          icon="📊"
+          icon={<BarChart3 size={20} />}
           iconColor="amber"
           trend={{
             value: '-4.2%',
@@ -106,14 +113,14 @@ export default function CustosPage() {
         <KpiCard
           label="Custo Estimado por Saca"
           value={`R$ ${(displayAvgHa / 62).toFixed(2)}/sc`}
-          icon="🌾"
+          icon={<Wheat size={20} />}
           iconColor="green"
           subtext="Base: 62 sc/ha produtividade média"
         />
         <KpiCard
           label="Talhões Monitorados"
           value={`${activeFields.length} unidades`}
-          icon="📍"
+          icon={<MapPin size={20} />}
           iconColor="blue"
           subtext="100% da área coberta"
         />

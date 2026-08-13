@@ -13,6 +13,15 @@ import { ClayModal } from '../../components/ui/ClayModal';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { StockItem, StockMovement } from '../../lib/types';
 import { getTodayDateString } from '../../lib/dateUtils';
+import {
+  Package,
+  Sprout,
+  AlertTriangle,
+  ClipboardList,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Plus,
+} from 'lucide-react';
 
 export default function EstoquePage() {
   const {
@@ -182,7 +191,7 @@ export default function EstoquePage() {
       header: 'Tipo',
       render: (row) => (
         <span className={`badge ${row.type === 'entrada' ? 'badge--success' : 'badge--warning'}`}>
-          {row.type === 'entrada' ? '📥 Entrada (NF)' : '📤 Aplicação no Talhão'}
+          {row.type === 'entrada' ? 'Entrada (NF)' : 'Aplicação Talhão'}
         </span>
       ),
     },
@@ -229,12 +238,14 @@ export default function EstoquePage() {
             rastreabilidade
           </p>
         </div>
-        <div className="flex-row">
+        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="secondary" onClick={() => setIsExitModalOpen(true)}>
-            📤 Baixa / Aplicação no Talhão
+            <ArrowUpFromLine size={15} style={{ marginRight: '6px' }} />
+            Baixa / Aplicação no Talhão
           </ClayButton>
           <ClayButton variant="primary" onClick={() => setIsEntryModalOpen(true)}>
-            📥 Nova Entrada (Compra)
+            <ArrowDownToLine size={15} style={{ marginRight: '6px' }} />
+            Nova Entrada (Compra)
           </ClayButton>
         </div>
       </div>
@@ -244,28 +255,28 @@ export default function EstoquePage() {
         <KpiCard
           label="Valor Total em Estoque"
           value={`R$ ${totalStockValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          icon="📦"
+          icon={<Package size={20} />}
           iconColor="blue"
           subtext="Patrimônio imobilizado no galpão"
         />
         <KpiCard
           label="Itens Cadastrados"
           value={`${activeStockItems.length} produtos`}
-          icon="🌾"
+          icon={<Sprout size={20} />}
           iconColor="green"
           subtext="Fertilizantes, sementes, defensivos"
         />
         <KpiCard
           label="Alertas de Estoque Mínimo"
           value={`${kpis.lowStockCount} item(ns)`}
-          icon="⚠️"
+          icon={<AlertTriangle size={20} />}
           iconColor="red"
           subtext="Necessitam de reposição imediata"
         />
         <KpiCard
           label="Movimentações no Mês"
           value={`${activeStockMovements.length} lançamentos`}
-          icon="📋"
+          icon={<ClipboardList size={20} />}
           iconColor="amber"
           subtext="Kardex atualizado"
         />

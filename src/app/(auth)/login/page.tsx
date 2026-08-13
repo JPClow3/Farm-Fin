@@ -4,6 +4,15 @@ import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SEED_USERS } from '../../../db/seed';
 import { UserRoleType } from '../../../lib/types';
+import {
+  Sprout,
+  Tractor,
+  FileSpreadsheet,
+  CreditCard,
+  UserCheck,
+  LogIn,
+  AlertCircle,
+} from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -78,11 +87,10 @@ function LoginForm() {
             height: '56px',
             background: '#EAF3ED',
             borderRadius: '14px',
-            fontSize: '28px',
             marginBottom: '12px',
           }}
         >
-          🌱
+          <Sprout size={30} color="#2A7A4C" strokeWidth={2.2} />
         </div>
         <h1
           style={{
@@ -110,9 +118,13 @@ function LoginForm() {
             fontSize: '13px',
             marginBottom: '16px',
             border: '1px solid #FECDCA',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          ⚠️ {errorMessage}
+          <AlertCircle size={16} />
+          <span>{errorMessage}</span>
         </div>
       )}
 
@@ -194,9 +206,14 @@ function LoginForm() {
             cursor: 'pointer',
             marginTop: '6px',
             transition: 'background 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
           }}
         >
-          {isLoading ? 'Entrando...' : 'Entrar no Sistema'}
+          <LogIn size={16} />
+          <span>{isLoading ? 'Entrando...' : 'Entrar no Sistema'}</span>
         </button>
       </form>
 
@@ -246,14 +263,16 @@ function LoginForm() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
-              <span style={{ fontSize: '16px' }}>
-                {user.role === 'Produtor'
-                  ? '👨‍🌾'
-                  : user.role === 'Gestor'
-                    ? '🚜'
-                    : user.role === 'Contador'
-                      ? '📑'
-                      : '💳'}
+              <span style={{ display: 'inline-flex', color: '#2A7A4C' }}>
+                {user.role === 'Produtor' ? (
+                  <UserCheck size={16} />
+                ) : user.role === 'Gestor' ? (
+                  <Tractor size={16} />
+                ) : user.role === 'Contador' ? (
+                  <FileSpreadsheet size={16} />
+                ) : (
+                  <CreditCard size={16} />
+                )}
               </span>
               <span style={{ fontSize: '12px', fontWeight: '700', color: '#1B382B' }}>
                 {user.role}
@@ -270,7 +289,7 @@ function LoginForm() {
 
       {/* Footer info */}
       <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '11px', color: '#98A2B3' }}>
-        Neon Auth & Better Auth • Multi-tenancy Ativo • RBAC 100% Integrado
+        Better Auth & Neon • Multi-tenant Ativo • RBAC 100% Integrado
       </div>
     </div>
   );

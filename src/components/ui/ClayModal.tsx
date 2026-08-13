@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { ClayButton } from './ClayButton';
+import { X } from 'lucide-react';
 
 export interface ClayModalProps {
   isOpen: boolean;
@@ -66,7 +67,7 @@ export const ClayModal: React.FC<ClayModalProps> = ({
             aria-label="Fechar"
             style={{ borderRadius: 'var(--radius-full)' }}
           >
-            ✕
+            <X size={16} />
           </ClayButton>
         </div>
 

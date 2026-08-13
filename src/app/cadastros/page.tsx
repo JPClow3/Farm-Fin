@@ -11,6 +11,16 @@ import { ClayModal } from '../../components/ui/ClayModal';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
 import { Farm, Field, Supplier, Machinery, BankAccount } from '../../lib/types';
+import {
+  Home,
+  Sprout,
+  Wheat,
+  Users,
+  Tractor,
+  Building2,
+  Plus,
+  MapPin,
+} from 'lucide-react';
 
 export default function CadastrosPage() {
   const {
@@ -126,17 +136,20 @@ export default function CadastrosPage() {
         <div>
           {activeTab === 'fazendas' && (
             <ClayButton variant="primary" onClick={() => setIsNewFarmModal(true)}>
-              ＋ Nova Fazenda
+              <Plus size={16} style={{ marginRight: '6px' }} />
+              Nova Fazenda
             </ClayButton>
           )}
           {activeTab === 'talhoes' && (
             <ClayButton variant="primary" onClick={() => setIsNewFieldModal(true)}>
-              ＋ Novo Talhão
+              <Plus size={16} style={{ marginRight: '6px' }} />
+              Novo Talhão
             </ClayButton>
           )}
           {activeTab === 'maquinas' && (
             <ClayButton variant="primary" onClick={() => setIsNewMachineModal(true)}>
-              ＋ Nova Máquina
+              <Plus size={16} style={{ marginRight: '6px' }} />
+              Nova Máquina
             </ClayButton>
           )}
         </div>
@@ -145,17 +158,42 @@ export default function CadastrosPage() {
       {/* Tabs Navigation */}
       <ClayTabs
         tabs={[
-          { id: 'fazendas', label: 'Fazendas & Propriedades', count: farms.length, icon: '🏡' },
-          { id: 'talhoes', label: 'Talhões & Áreas', count: fields.length, icon: '🌱' },
-          { id: 'safras', label: 'Safras & Culturas', count: seasons.length, icon: '🌾' },
+          {
+            id: 'fazendas',
+            label: 'Fazendas & Propriedades',
+            count: farms.length,
+            icon: <Home size={15} />,
+          },
+          {
+            id: 'talhoes',
+            label: 'Talhões & Áreas',
+            count: fields.length,
+            icon: <Sprout size={15} />,
+          },
+          {
+            id: 'safras',
+            label: 'Safras & Culturas',
+            count: seasons.length,
+            icon: <Wheat size={15} />,
+          },
           {
             id: 'fornecedores',
             label: 'Fornecedores & Clientes',
             count: suppliers.length + customers.length,
-            icon: '🤝',
+            icon: <Users size={15} />,
           },
-          { id: 'maquinas', label: 'Maquinário & Frota', count: machinery.length, icon: '🚜' },
-          { id: 'bancos', label: 'Contas Bancárias', count: bankAccounts.length, icon: '🏦' },
+          {
+            id: 'maquinas',
+            label: 'Maquinário & Frota',
+            count: machinery.length,
+            icon: <Tractor size={15} />,
+          },
+          {
+            id: 'bancos',
+            label: 'Contas Bancárias',
+            count: bankAccounts.length,
+            icon: <Building2 size={15} />,
+          },
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -187,9 +225,13 @@ export default function CadastrosPage() {
                   fontSize: 'var(--text-xs)',
                   color: 'var(--text-secondary)',
                   marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
-                📍 {f.location}
+                <MapPin size={13} />
+                {f.location}
               </p>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                 CAR: {f.carNumber}
@@ -379,7 +421,7 @@ export default function CadastrosPage() {
             <ClayCard key={b.id}>
               <div className="flex-between" style={{ marginBottom: '8px' }}>
                 <span className="badge badge--primary">{b.type}</span>
-                <span style={{ fontSize: '1.25rem' }}>🏦</span>
+                <Building2 size={18} color="var(--color-primary-600)" />
               </div>
               <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 'bold', marginBottom: '4px' }}>
                 {b.bankName}

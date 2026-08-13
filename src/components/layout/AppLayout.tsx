@@ -11,6 +11,7 @@ import { ClayButton } from '../ui/ClayButton';
 import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
 import { getTodayDateString } from '../../lib/dateUtils';
+import { CreditCard, CircleDollarSign } from 'lucide-react';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
@@ -123,19 +124,21 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
               type="button"
               variant={quickType === 'pagar' ? 'primary' : 'ghost'}
               size="sm"
-              style={{ flex: 1 }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               onClick={() => setQuickType('pagar')}
             >
-              💳 Conta a Pagar (Despesa)
+              <CreditCard size={15} />
+              <span>Conta a Pagar (Despesa)</span>
             </ClayButton>
             <ClayButton
               type="button"
               variant={quickType === 'receber' ? 'primary' : 'ghost'}
               size="sm"
-              style={{ flex: 1 }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               onClick={() => setQuickType('receber')}
             >
-              💰 Conta a Receber (Receita)
+              <CircleDollarSign size={15} />
+              <span>Conta a Receber (Receita)</span>
             </ClayButton>
           </div>
 

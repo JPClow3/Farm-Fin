@@ -7,6 +7,14 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
+import {
+  Settings,
+  Smartphone,
+  Mail,
+  Package,
+  RotateCcw,
+  ShieldCheck,
+} from 'lucide-react';
 
 export default function ConfiguracoesPage() {
   const { resetToDefaults } = useFarm();
@@ -140,10 +148,11 @@ export default function ConfiguracoesPage() {
             <div className="flex-col" style={{ gap: 'var(--space-4)' }}>
               <div className="flex-between">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>
-                    📲 Alertas de Vencimento via WhatsApp
+                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Smartphone size={16} color="var(--color-primary-600)" />
+                    Alertas de Vencimento via WhatsApp
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
                     Avisos 2 dias antes e no dia do vencimento de boletos de insumos
                   </div>
                 </div>
@@ -155,10 +164,11 @@ export default function ConfiguracoesPage() {
 
               <div className="flex-between">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>
-                    📧 Resumo Financeiro Semanal por E-mail
+                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Mail size={16} color="var(--color-primary-600)" />
+                    Resumo Financeiro Semanal por E-mail
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
                     Relatório consolidado de fluxo de caixa toda segunda-feira
                   </div>
                 </div>
@@ -170,10 +180,11 @@ export default function ConfiguracoesPage() {
 
               <div className="flex-between">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>
-                    📦 Aviso de Estoque Mínimo no Galpão
+                  <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Package size={16} color="var(--color-primary-600)" />
+                    Aviso de Estoque Mínimo no Galpão
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
                     Notificação quando diesel, sementes ou defensivos atingirem nível de alerta
                   </div>
                 </div>
@@ -191,17 +202,17 @@ export default function ConfiguracoesPage() {
           {/* Perfil Ativo */}
           <ClayCard>
             <div className="card-header">
-              <h2 className="card-title">Perfil de Acesso</h2>
+              <h2 className="card-title">Perfil de Acesso (RBAC)</h2>
             </div>
 
             <div className="flex-col" style={{ gap: 'var(--space-4)' }}>
               <ClaySelect
                 label="Simular Papel no Sistema"
                 options={[
-                  { value: 'Produtor', label: '👨‍🌾 Produtor Rural (Acesso Total)' },
-                  { value: 'Gestor', label: '🚜 Gestor de Fazenda (Operacional)' },
-                  { value: 'Financeiro', label: '💳 Assistente Financeiro (Lançamentos)' },
-                  { value: 'Contador', label: '📑 Contador Rural (DRE / LCDPR)' },
+                  { value: 'Produtor', label: 'Produtor Rural (Acesso Total)' },
+                  { value: 'Gestor', label: 'Gestor de Fazenda (Operacional)' },
+                  { value: 'Financeiro', label: 'Assistente Financeiro (Lançamentos)' },
+                  { value: 'Contador', label: 'Contador Rural (DRE / LCDPR)' },
                 ]}
                 value={activeRole}
                 onChange={(e) => {
@@ -230,10 +241,15 @@ export default function ConfiguracoesPage() {
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--text-xs)',
                   color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                 }}
               >
-                Autenticado via <strong>Neon Auth</strong> com controle RBAC e suporte a
-                multi-inquilino.
+                <ShieldCheck size={18} color="var(--color-primary-700)" style={{ flexShrink: 0 }} />
+                <span>
+                  Autenticado via <strong>Better Auth / Neon</strong> com controle RBAC e suporte multi-tenant.
+                </span>
               </div>
             </div>
           </ClayCard>
@@ -254,7 +270,8 @@ export default function ConfiguracoesPage() {
               </p>
 
               <ClayButton variant="danger" size="sm" onClick={handleReset}>
-                🔄 Restaurar Cenário Demo
+                <RotateCcw size={14} style={{ marginRight: '6px' }} />
+                Restaurar Cenário Demo
               </ClayButton>
             </div>
           </ClayCard>
