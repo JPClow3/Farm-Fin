@@ -1,0 +1,29 @@
+{
+  "name": "farm-fin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "npx @opennextjs/cloudflare build",
+    "start": "next start",
+    "lint": "next lint",
+    "deploy": "npx wrangler deploy",
+    "version-upload": "npx wrangler versions upload"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JPClow3/Farm-Fin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JPClow3/Farm-Fin/issues"
+  },
+  "homepage": "https://github.com/JPClow3/Farm-Fin#readme"
+}
