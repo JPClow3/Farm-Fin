@@ -8,11 +8,21 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
-import { Settings, Smartphone, Mail, Package, RotateCcw, ShieldCheck } from 'lucide-react';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import {
+  Settings,
+  Smartphone,
+  Mail,
+  Package,
+  RotateCcw,
+  ShieldCheck,
+  Construction,
+} from 'lucide-react';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 
 export default function ConfiguracoesPage() {
-  useModuleGuard('configuracoes');
+  const moduleAllowed = useModuleGuard('configuracoes');
   const { resetToDefaults } = useFarm();
   const { addToast } = useToast();
   const router = useRouter();
@@ -31,30 +41,22 @@ export default function ConfiguracoesPage() {
   // Active Role
   const [activeRole, setActiveRole] = useState('Produtor');
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    addToast({
-      type: 'success',
-      title: 'Configurações Salvas!',
-      message: 'Dados cadastrais e preferências de notificação atualizados.',
-    });
-  };
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   const handleReset = () => {
-    if (
-      confirm(
-        'Tem certeza que deseja restaurar os dados de demonstração da safra 2025/2026? Todas as edições locais serão restauradas.'
-      )
-    ) {
-      resetToDefaults();
-      addToast({
-        type: 'info',
-        title: 'Dados Restaurados',
-        message:
-          'O ambiente foi restaurado com o cenário completo de demonstração da Fazenda Santa Fé.',
-      });
-    }
+    resetToDefaults();
+    addToast({
+      type: 'info',
+      title: 'Dados Restaurados',
+      message:
+        'O ambiente foi restaurado com o cenário completo de demonstração da Fazenda Santa Fé.',
+    });
+    setIsResetConfirmOpen(false);
   };
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -80,18 +82,33 @@ export default function ConfiguracoesPage() {
                   Informações utilizadas para emissão de LCDPR e relatórios
                 </p>
               </div>
+              <span
+                className="badge badge--neutral"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Construction size={12} />
+                Em desenvolvimento
+              </span>
             </div>
 
-            <form
-              onSubmit={handleSaveProfile}
-              className="flex-col"
-              style={{ gap: 'var(--space-4)' }}
+            <p
+              style={{
+                fontSize: 'var(--text-xs)',
+                color: 'var(--text-tertiary)',
+                marginTop: '-8px',
+                marginBottom: 'var(--space-4)',
+              }}
             >
+              Este formulário ainda não está conectado ao backend — os campos abaixo são somente
+              leitura e não podem ser salvos nesta versão.
+            </p>
+
+            <form className="flex-col" style={{ gap: 'var(--space-4)' }}>
               <ClayInput
                 label="Nome Completo / Razão Social"
                 value={producerName}
                 onChange={(e) => setProducerName(e.target.value)}
-                required
+                disabled
               />
 
               <div className="form-grid-2">
@@ -99,12 +116,13 @@ export default function ConfiguracoesPage() {
                   label="CPF / CNPJ"
                   value={document}
                   onChange={(e) => setDocument(e.target.value)}
-                  required
+                  disabled
                 />
                 <ClayInput
                   label="Inscrição Estadual (IE Produtor)"
                   value={stateReg}
                   onChange={(e) => setStateReg(e.target.value)}
+                  disabled
                 />
               </div>
 
@@ -114,17 +132,18 @@ export default function ConfiguracoesPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
+                  disabled
                 />
                 <ClayInput
                   label="Telefone / WhatsApp"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled
                 />
               </div>
 
               <div style={{ marginTop: 'var(--space-2)' }}>
-                <ClayButton type="submit" variant="primary">
+                <ClayButton type="button" variant="primary" disabled title="Ainda não disponível">
                   Salvar Alterações
                 </ClayButton>
               </div>
@@ -140,9 +159,30 @@ export default function ConfiguracoesPage() {
                   Receba avisos automáticos de vencimento e estoque no campo
                 </p>
               </div>
+              <span
+                className="badge badge--neutral"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Construction size={12} />
+                Em desenvolvimento
+              </span>
             </div>
 
-            <div className="flex-col" style={{ gap: 'var(--space-4)' }}>
+            <p
+              style={{
+                fontSize: 'var(--text-xs)',
+                color: 'var(--text-tertiary)',
+                marginTop: '-8px',
+                marginBottom: 'var(--space-4)',
+              }}
+            >
+              Estas preferências ainda não são persistidas — os controles abaixo são ilustrativos.
+            </p>
+
+            <div
+              className="flex-col"
+              style={{ gap: 'var(--space-4)', opacity: 0.6, pointerEvents: 'none' }}
+            >
               <div className="flex-between">
                 <div>
                   <div
@@ -312,7 +352,7 @@ export default function ConfiguracoesPage() {
                 inicial pré-configurado de 2.400 ha, clique no botão abaixo.
               </p>
 
-              <ClayButton variant="danger" size="sm" onClick={handleReset}>
+              <ClayButton variant="danger" size="sm" onClick={() => setIsResetConfirmOpen(true)}>
                 <RotateCcw size={14} style={{ marginRight: '6px' }} />
                 Restaurar Cenário Demo
               </ClayButton>
@@ -320,6 +360,16 @@ export default function ConfiguracoesPage() {
           </ClayCard>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={isResetConfirmOpen}
+        onClose={() => setIsResetConfirmOpen(false)}
+        onConfirm={handleReset}
+        title="Restaurar Cenário Demo"
+        description="Tem certeza que deseja restaurar os dados de demonstração da safra 2025/2026? Todas as edições locais feitas nesta sessão serão perdidas e substituídas pelo cenário inicial da Fazenda Santa Fé."
+        confirmLabel="Restaurar Dados"
+        variant="danger"
+      />
     </div>
   );
 }

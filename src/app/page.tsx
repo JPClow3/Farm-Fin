@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useFarm, GlobalPeriodFilterType } from '../context/FarmContext';
 import { useToast } from '../context/ToastContext';
 import { KpiCard } from '../components/ui/KpiCard';
 import { ClayCard } from '../components/ui/ClayCard';
 import { ClayButton } from '../components/ui/ClayButton';
 import { StatusBadge } from '../components/ui/StatusBadge';
-import { CashFlowChart } from '../components/charts/CashFlowChart';
-import { CostBreakdownChart } from '../components/charts/CostBreakdownChart';
+import { Skeleton } from '../components/ui/Skeleton';
 import { ClayModal } from '../components/ui/ClayModal';
 import { ClaySelect } from '../components/ui/ClaySelect';
 import { ClayInput } from '../components/ui/ClayInput';
@@ -42,6 +42,15 @@ import {
   Wheat,
   RotateCcw,
 } from 'lucide-react';
+
+const CashFlowChart = dynamic(
+  () => import('../components/charts/CashFlowChart').then((m) => m.CashFlowChart),
+  { loading: () => <Skeleton variant="card" height={280} />, ssr: false }
+);
+const CostBreakdownChart = dynamic(
+  () => import('../components/charts/CostBreakdownChart').then((m) => m.CostBreakdownChart),
+  { loading: () => <Skeleton variant="card" height={280} />, ssr: false }
+);
 
 export default function DashboardPage() {
   const {

@@ -27,9 +27,39 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleLogin = async (userEmail: string, userRole?: UserRoleType, userPassword?: string) => {
+  // isDemoPersona: true only for the explicit "quick persona" buttons below —
+  // those are known seed accounts and are allowed to fall back to a local-only
+  // demo session if Neon Auth is unreachable. A real email/password submission
+  // must NOT silently succeed on a network/service failure — the user needs to
+  // know their login didn't actually go through.
+  const handleLogin = async (
+    userEmail: string,
+    userRole?: UserRoleType,
+    userPassword?: string,
+    isDemoPersona: boolean = false
+  ) => {
     setIsLoading(true);
     setErrorMessage('');
+
+    const startDemoSession = () => {
+      const token = `farmfin-token-${Date.now()}`;
+      document.cookie = `farmfin_session=${token}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `better-auth.session_token=${token}; path=/; max-age=604800; SameSite=Lax`;
+
+      const matchedUser = SEED_USERS.find(
+        (u) => u.email.toLowerCase() === userEmail.toLowerCase()
+      ) || {
+        id: `u-${Date.now()}`,
+        name: userEmail.split('@')[0],
+        email: userEmail,
+        role: userRole || 'Produtor',
+      };
+      localStorage.setItem('farmfin_active_user', JSON.stringify(matchedUser));
+      document.cookie = `farmfin_demo_role=${matchedUser.role}; path=/; max-age=604800; SameSite=Lax`;
+
+      router.push(returnTo);
+      router.refresh();
+    };
 
     try {
       // 1. Attempt official Neon Auth (Better Auth) login
@@ -45,48 +75,29 @@ function LoginForm() {
           setIsLoading(false);
           return;
         }
+        // Any other backend error: demo personas can still fall back locally,
+        // but a real login attempt must surface the failure.
+        if (!isDemoPersona) {
+          setErrorMessage(
+            'Não foi possível autenticar no momento. Verifique sua conexão e tente novamente.'
+          );
+          setIsLoading(false);
+          return;
+        }
       }
 
-      // 2. Set fallback session cookie for middleware recognition
-      const token = `farmfin-token-${Date.now()}`;
-      document.cookie = `farmfin_session=${token}; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `better-auth.session_token=${token}; path=/; max-age=604800; SameSite=Lax`;
-
-      // 3. Save active user info locally for fast client header synchronization
-      const matchedUser = SEED_USERS.find(
-        (u) => u.email.toLowerCase() === userEmail.toLowerCase()
-      ) || {
-        id: `u-${Date.now()}`,
-        name: userEmail.split('@')[0],
-        email: userEmail,
-        role: userRole || 'Produtor',
-      };
-      localStorage.setItem('farmfin_active_user', JSON.stringify(matchedUser));
-      document.cookie = `farmfin_demo_role=${matchedUser.role}; path=/; max-age=604800; SameSite=Lax`;
-
-      // 4. Redirect to requested page or dashboard
-      router.push(returnTo);
-      router.refresh();
+      startDemoSession();
     } catch (err) {
-      console.warn('[handleLogin] Neon Auth local fallback:', err);
-      // Fallback for local demo/offline testing
-      const token = `farmfin-token-${Date.now()}`;
-      document.cookie = `farmfin_session=${token}; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `better-auth.session_token=${token}; path=/; max-age=604800; SameSite=Lax`;
-
-      const matchedUser = SEED_USERS.find(
-        (u) => u.email.toLowerCase() === userEmail.toLowerCase()
-      ) || {
-        id: `u-${Date.now()}`,
-        name: userEmail.split('@')[0],
-        email: userEmail,
-        role: userRole || 'Produtor',
-      };
-      localStorage.setItem('farmfin_active_user', JSON.stringify(matchedUser));
-      document.cookie = `farmfin_demo_role=${matchedUser.role}; path=/; max-age=604800; SameSite=Lax`;
-
-      router.push(returnTo);
-      router.refresh();
+      if (!isDemoPersona) {
+        console.error('[handleLogin] Neon Auth request failed:', err);
+        setErrorMessage(
+          'Não foi possível conectar ao serviço de autenticação. Verifique sua conexão e tente novamente.'
+        );
+        setIsLoading(false);
+        return;
+      }
+      console.warn('[handleLogin] Neon Auth unavailable, using local demo session:', err);
+      startDemoSession();
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +113,7 @@ function LoginForm() {
       setErrorMessage('Por favor, informe sua senha.');
       return;
     }
-    handleLogin(email, 'Produtor', password);
+    handleLogin(email, 'Produtor', password, false);
   };
 
   return (
@@ -297,7 +308,7 @@ function LoginForm() {
           <button
             key={user.id}
             type="button"
-            onClick={() => handleLogin(user.email, user.role)}
+            onClick={() => handleLogin(user.email, user.role, undefined, true)}
             disabled={isLoading}
             style={{
               display: 'flex',

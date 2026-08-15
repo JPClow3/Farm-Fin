@@ -1086,6 +1086,68 @@ textarea.input {
   margin-bottom: var(--space-5);
 }
 
+.empty-state__icon--danger {
+  color: var(--color-danger);
+  opacity: 0.85;
+}
+
+/* ──────────────────────────────────────────────────────────
+   SKELETON LOADING
+   ────────────────────────────────────────────────────────── */
+
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--shimmer-duration) ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+.skeleton--text {
+  height: 14px;
+  width: 100%;
+}
+
+.skeleton--title {
+  height: 22px;
+  width: 60%;
+}
+
+.skeleton--avatar,
+.skeleton--circle {
+  border-radius: var(--radius-full);
+}
+
+.skeleton--card {
+  width: 100%;
+  border-radius: var(--radius-xl);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   SPINNER
+   ────────────────────────────────────────────────────────── */
+
+.spinner {
+  display: inline-block;
+  border-radius: var(--radius-full);
+  border: 2.5px solid rgba(163, 155, 142, 0.25);
+  border-top-color: currentColor;
+  animation: spin var(--spinner-duration) linear infinite;
+  flex-shrink: 0;
+}
+
 /* ──────────────────────────────────────────────────────────
    ANIMATIONS & KEYFRAMES
    ────────────────────────────────────────────────────────── */
@@ -1118,6 +1180,21 @@ textarea.input {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

@@ -8,10 +8,12 @@ import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayTabs } from '../../components/ui/ClayTabs';
 import { ClaySelect } from '../../components/ui/ClaySelect';
 import { KpiCard } from '../../components/ui/KpiCard';
+import { Skeleton, SkeletonKpiCard } from '../../components/ui/Skeleton';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { calculateDRE, DREResult, FieldDREResult } from '../../actions/dre';
-import { exportDREToExcel } from '../../lib/exportDREExcel';
-import { generateDREPrintReport } from '../../lib/exportDREPdf';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import {
   FileSpreadsheet,
   Printer,
@@ -22,7 +24,6 @@ import {
   Download,
   Layers,
   Calendar,
-  Filter,
   ArrowRight,
   Info,
   CheckCircle2,
@@ -30,78 +31,87 @@ import {
 } from 'lucide-react';
 
 export default function DrePage() {
-  useModuleGuard('dre');
+  const moduleAllowed = useModuleGuard('dre');
   const { activeFarm, activeSeason, activeFarmId, activeSeasonId, activeFields } = useFarm();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'safra' | 'talhoes' | 'mensal' | 'periodo'>('safra');
+  const [activeTab, setActiveTab] = useState<'safra' | 'talhoes' | 'mensal'>('safra');
   const [selectedFieldId, setSelectedFieldId] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<string>(''); // '' = all year / season
   const [periodType, setPeriodType] = useState<'season' | 'annual' | 'monthly'>('season');
 
   const [dreData, setDreData] = useState<DREResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
-  useEffect(() => {
-    async function loadDRE() {
-      setIsLoading(true);
-      try {
-        const monthNum = selectedMonth ? parseInt(selectedMonth, 10) : undefined;
-        const res = await calculateDRE({
-          farmId: activeFarmId || undefined,
-          seasonId: activeSeasonId || undefined,
-          fieldId: selectedFieldId || undefined,
-          periodType: selectedMonth ? 'monthly' : periodType,
-          year: selectedYear,
-          month: monthNum,
-        });
+  const loadDRE = React.useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const monthNum = selectedMonth ? parseInt(selectedMonth, 10) : undefined;
+      const res = await calculateDRE({
+        farmId: activeFarmId || undefined,
+        seasonId: activeSeasonId || undefined,
+        fieldId: selectedFieldId || undefined,
+        periodType: selectedMonth ? 'monthly' : periodType,
+        year: selectedYear,
+        month: monthNum,
+      });
 
-        if (res.success && res.data) {
-          setDreData(res.data);
+      if (res.success && res.data) {
+        setDreData(res.data);
+      } else {
+        setDreData(null);
+        if (!res.success) {
+          setLoadError(res.error || 'Não foi possível apurar a DRE para o período selecionado.');
         }
-      } catch (err) {
-        console.error('Failed to load DRE:', err);
-      } finally {
-        setIsLoading(false);
       }
+    } catch (err) {
+      console.error('Failed to load DRE:', err);
+      setDreData(null);
+      setLoadError('Falha de comunicação ao calcular a DRE. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-    loadDRE();
   }, [activeFarmId, activeSeasonId, selectedFieldId, selectedYear, selectedMonth, periodType]);
 
-  const grossRevenue = dreData?.grossRevenue || 7075000;
-  const netRevenue = dreData?.netRevenue || 6912275;
-  const taxesDeductions = dreData?.taxesDeductions || 162725;
-  const directCosts = dreData?.directCosts || {
-    fertilizantes: 1280000,
-    defensivos: 840000,
-    sementes: 620000,
-    combustivel: 380000,
-    maoDeObra: 220000,
-    manutencao: 185000,
-    total: 3525000,
+  useEffect(() => {
+    loadDRE();
+  }, [loadDRE]);
+
+  const grossRevenue = dreData?.grossRevenue ?? 0;
+  const netRevenue = dreData?.netRevenue ?? 0;
+  const taxesDeductions = dreData?.taxesDeductions ?? 0;
+  const directCosts = dreData?.directCosts ?? {
+    fertilizantes: 0,
+    defensivos: 0,
+    sementes: 0,
+    combustivel: 0,
+    maoDeObra: 0,
+    manutencao: 0,
+    total: 0,
   };
-  const grossMargin = dreData?.grossMargin || 3387275;
-  const grossMarginPct = dreData?.grossMarginPct || 49.0;
-  const operatingExpenses = dreData?.operatingExpenses || {
-    arrendamento: 450000,
-    seguroAgricola: 140000,
-    despesasAdm: 245000,
-    total: 835000,
+  const grossMargin = dreData?.grossMargin ?? 0;
+  const grossMarginPct = dreData?.grossMarginPct ?? 0;
+  const operatingExpenses = dreData?.operatingExpenses ?? {
+    arrendamento: 0,
+    seguroAgricola: 0,
+    despesasAdm: 0,
+    total: 0,
   };
-  const ebitda = dreData?.ebitda || 2552275;
-  const ebitdaPct = dreData?.ebitdaPct || 36.9;
-  const financialExpenses = dreData?.financialExpenses || 210000;
-  const depreciation = dreData?.depreciation || 180000;
-  const netProfit = dreData?.netProfit || 2162275;
-  const netProfitPct = dreData?.netProfitPct || 31.3;
-  const revenueByCrop = dreData?.revenueByCrop || [
-    { crop: 'Soja em Grão', amount: grossRevenue * 0.85, percentage: 85.0 },
-    { crop: 'Milho Safrinha', amount: grossRevenue * 0.15, percentage: 15.0 },
-  ];
-  const fieldsDRE = dreData?.fieldsDRE || [];
-  const monthlyBreakdown = dreData?.monthlyBreakdown || [];
-  const totalPlantedArea = dreData?.totalPlantedArea || 2000;
+  const ebitda = dreData?.ebitda ?? 0;
+  const ebitdaPct = dreData?.ebitdaPct ?? 0;
+  const financialExpenses = dreData?.financialExpenses ?? 0;
+  const depreciation = dreData?.depreciation ?? 0;
+  const netProfit = dreData?.netProfit ?? 0;
+  const netProfitPct = dreData?.netProfitPct ?? 0;
+  const revenueByCrop = dreData?.revenueByCrop ?? [];
+  const fieldsDRE = dreData?.fieldsDRE ?? [];
+  const monthlyBreakdown = dreData?.monthlyBreakdown ?? [];
+  const totalPlantedArea = dreData?.totalPlantedArea ?? 0;
 
   const currentFieldObj = activeFields.find((f) => f.id === selectedFieldId);
 
@@ -132,9 +142,11 @@ export default function DrePage() {
     return activeSeason?.name || 'Safra 2025/2026';
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    if (!dreData) return;
+    setIsExporting(true);
     try {
-      if (!dreData) return;
+      const { exportDREToExcel } = await import('../../lib/exportDREExcel');
       exportDREToExcel({
         dre: dreData,
         farmName: activeFarm?.name || 'Fazenda Modelo',
@@ -154,21 +166,40 @@ export default function DrePage() {
         title: 'Erro na Exportação',
         message: 'Não foi possível gerar a planilha Excel da DRE.',
       });
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  const handlePrintPdf = () => {
+  const handlePrintPdf = async () => {
     if (!dreData) return;
-    generateDREPrintReport({
-      dre: dreData,
-      farmName: activeFarm?.name || 'Fazenda Modelo',
-      seasonName: activeSeason?.name || 'Safra Atual',
-      periodLabel: getPeriodLabel(),
-      farmCnpj: activeFarm?.cnpjCpf || '12.345.678/0001-90',
-      farmCar: activeFarm?.carNumber || 'MT-5107909-XXXX.XXXX.XXXX',
-      organizationName: 'Farm-Fin Gestão Agropecuária',
-    });
+    setIsPrinting(true);
+    try {
+      const { generateDREPrintReport } = await import('../../lib/exportDREPdf');
+      generateDREPrintReport({
+        dre: dreData,
+        farmName: activeFarm?.name || 'Fazenda Modelo',
+        seasonName: activeSeason?.name || 'Safra Atual',
+        periodLabel: getPeriodLabel(),
+        farmCnpj: activeFarm?.cnpjCpf || '12.345.678/0001-90',
+        farmCar: activeFarm?.carNumber || 'MT-5107909-XXXX.XXXX.XXXX',
+        organizationName: 'Farm-Fin Gestão Agropecuária',
+      });
+    } catch (err) {
+      console.error('Error generating DRE PDF report:', err);
+      addToast({
+        type: 'error',
+        title: 'Erro ao Gerar Relatório',
+        message: 'Não foi possível gerar o relatório de impressão da DRE.',
+      });
+    } finally {
+      setIsPrinting(false);
+    }
   };
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -182,11 +213,21 @@ export default function DrePage() {
           </p>
         </div>
         <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
-          <ClayButton variant="ghost" onClick={handleExportExcel}>
+          <ClayButton
+            variant="ghost"
+            onClick={handleExportExcel}
+            loading={isExporting}
+            disabled={!dreData}
+          >
             <Download size={15} style={{ marginRight: '6px' }} />
             Exportar XLSX Multi-Abas
           </ClayButton>
-          <ClayButton variant="primary" onClick={handlePrintPdf}>
+          <ClayButton
+            variant="primary"
+            onClick={handlePrintPdf}
+            loading={isPrinting}
+            disabled={!dreData}
+          >
             <Printer size={15} style={{ marginRight: '6px' }} />
             Imprimir / Relatório PDF
           </ClayButton>
@@ -204,7 +245,6 @@ export default function DrePage() {
             count: fieldsDRE.length,
           },
           { id: 'mensal', label: 'Evolução Mensal (12 Meses)', icon: <Calendar size={16} /> },
-          { id: 'periodo', label: 'Filtros de Período & Talhão', icon: <Filter size={16} /> },
         ]}
         activeTab={activeTab}
         onChange={(tabId) => setActiveTab(tabId as any)}
@@ -324,10 +364,38 @@ export default function DrePage() {
         )}
       </div>
 
-      {/* Methodology Alert Banner */}
-      <div
-        style={{
-          background: 'var(--color-primary-50)',
+      {isLoading ? (
+        <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
+          <div className="grid-4">
+            <SkeletonKpiCard />
+            <SkeletonKpiCard />
+            <SkeletonKpiCard />
+            <SkeletonKpiCard />
+          </div>
+          <Skeleton variant="card" height={360} />
+        </div>
+      ) : loadError ? (
+        <ClayCard>
+          <ErrorState
+            title="Não foi possível carregar a DRE"
+            description={loadError}
+            onRetry={loadDRE}
+            retrying={isLoading}
+          />
+        </ClayCard>
+      ) : !dreData ? (
+        <ClayCard>
+          <EmptyState
+            title="Nenhum dado disponível para este período"
+            description="Não há lançamentos suficientes para apurar a DRE no período e talhão selecionados. Ajuste os filtros ou lance despesas e receitas na safra ativa."
+          />
+        </ClayCard>
+      ) : (
+        <>
+          {/* Methodology Alert Banner */}
+          <div
+            style={{
+              background: 'var(--color-primary-50)',
           borderLeft: '4px solid var(--color-primary-500)',
           padding: 'var(--space-3) var(--space-4)',
           borderRadius: 'var(--radius-sm)',
@@ -1192,129 +1260,7 @@ export default function DrePage() {
         </ClayCard>
       )}
 
-      {/* TAB 4: FILTROS DE PERÍODO & TALHÃO */}
-      {activeTab === 'periodo' && (
-        <ClayCard>
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Configurações Avançadas de Apuração e Filtros</h2>
-              <p className="card-subtitle">
-                Personalize o recorte temporal e espacial da Demonstração do Resultado do Exercício
-              </p>
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: 'var(--space-4)',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 'var(--space-6)',
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                1. Recorte por Talhão (Field)
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Permite apurar a DRE isolada de um único talhão, calculando a receita proporcional
-                da cultura associada e seus custos diretos reais.
-              </p>
-              <select
-                className="input select"
-                value={selectedFieldId}
-                onChange={(e) => setSelectedFieldId(e.target.value)}
-              >
-                <option value="">Fazenda Toda (Todos os Talhões Agregados)</option>
-                {activeFields.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.area} ha - Cultura: {f.currentCrop || 'Soja'})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                2. Recorte Temporal (Exercício / Mês)
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Selecione se deseja apurar a Safra Completa (ciclo agronômico), Ano Civil (12
-                meses), ou um mês específico de competência.
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <select
-                  className="input select"
-                  value={periodType}
-                  onChange={(e) => {
-                    setPeriodType(e.target.value as any);
-                    if (e.target.value === 'season') setSelectedMonth('');
-                  }}
-                >
-                  <option value="season">Safra Integral (Ciclo da Safra)</option>
-                  <option value="annual">Ano Civil Completo</option>
-                  <option value="monthly">Mês Específico</option>
-                </select>
-
-                <select
-                  className="input select"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                >
-                  <option value="2026">2026</option>
-                  <option value="2025">2025</option>
-                  <option value="2024">2024</option>
-                </select>
-              </div>
-
-              {periodType === 'monthly' && (
-                <select
-                  className="input select"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  <option value="">Selecione o mês...</option>
-                  <option value="1">Janeiro</option>
-                  <option value="2">Fevereiro</option>
-                  <option value="3">Março</option>
-                  <option value="4">Abril</option>
-                  <option value="5">Maio</option>
-                  <option value="6">Junho</option>
-                  <option value="7">Julho</option>
-                  <option value="8">Agosto</option>
-                  <option value="9">Setembro</option>
-                  <option value="10">Outubro</option>
-                  <option value="11">Novembro</option>
-                  <option value="12">Dezembro</option>
-                </select>
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: 'var(--space-4)',
-              borderTop: '1px solid var(--border-light)',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: 'var(--space-2)',
-            }}
-          >
-            <ClayButton
-              variant="primary"
-              onClick={() => {
-                setActiveTab('safra');
-                addToast({
-                  type: 'info',
-                  title: 'Filtros Aplicados',
-                  message: `Exibindo DRE para ${getPeriodLabel()}`,
-                });
-              }}
-            >
-              Aplicar e Visualizar Demonstrativo
-            </ClayButton>
-          </div>
-        </ClayCard>
+        </>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Skeleton } from './Skeleton';
 
 export interface KpiCardProps {
   label: string;
@@ -13,6 +14,7 @@ export interface KpiCardProps {
   subtext?: string;
   className?: string;
   onClick?: () => void;
+  loading?: boolean;
 }
 
 export const KpiCard: React.FC<KpiCardProps> = ({
@@ -24,7 +26,23 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   subtext,
   className = '',
   onClick,
+  loading = false,
 }) => {
+  if (loading) {
+    return (
+      <div className={`kpi-card ${className}`.trim()}>
+        <div className="kpi-card__header">
+          <Skeleton variant="text" width="60%" height={12} />
+          <Skeleton variant="circle" width={32} height={32} />
+        </div>
+        <div style={{ margin: '10px 0' }}>
+          <Skeleton variant="title" width="70%" height={26} />
+        </div>
+        <Skeleton variant="text" width="45%" height={11} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`kpi-card ${onClick ? 'cursor-pointer' : ''} ${className}`.trim()}

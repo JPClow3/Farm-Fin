@@ -10,7 +10,11 @@ import { ClayTable } from '../../components/ui/ClayTable';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { Employee, Machinery } from '../../lib/types';
+import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import {
   Home,
   Sprout,
@@ -37,6 +41,7 @@ import {
 } from 'lucide-react';
 
 export default function CadastrosPage() {
+  const moduleAllowed = useModuleGuard('cadastros');
   const {
     farms,
     fields,
@@ -76,6 +81,9 @@ export default function CadastrosPage() {
   // Editing State
   const [editingMachineId, setEditingMachineId] = useState<string | null>(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [deletingMachine, setDeletingMachine] = useState<Machinery | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Farm State
   const [farmName, setFarmName] = useState('');
@@ -218,6 +226,7 @@ export default function CadastrosPage() {
   const handleSaveFarm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!farmName) return;
+    setIsSubmitting(true);
     try {
       await addFarm({
         name: farmName,
@@ -243,12 +252,15 @@ export default function CadastrosPage() {
         title: 'Erro ao cadastrar fazenda',
         message: err?.message || 'Não foi possível salvar a propriedade.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fieldName) return;
+    setIsSubmitting(true);
     try {
       let lat: number | undefined;
       let lng: number | undefined;
@@ -284,12 +296,15 @@ export default function CadastrosPage() {
         title: 'Erro ao cadastrar talhão',
         message: err?.message || 'Não foi possível salvar o talhão.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveSeason = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!seasonName) return;
+    setIsSubmitting(true);
     try {
       await addCropSeason({
         name: seasonName,
@@ -312,12 +327,15 @@ export default function CadastrosPage() {
         title: 'Erro ao cadastrar safra',
         message: err?.message || 'Não foi possível salvar a safra.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplierName) return;
+    setIsSubmitting(true);
     try {
       await addSupplier({
         name: supplierName,
@@ -340,12 +358,15 @@ export default function CadastrosPage() {
         title: 'Erro de Duplicidade / Validação',
         message: err?.message || 'Erro ao cadastrar fornecedor.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName) return;
+    setIsSubmitting(true);
     try {
       await addCustomer({
         name: customerName,
@@ -368,12 +389,15 @@ export default function CadastrosPage() {
         title: 'Erro de Duplicidade / Validação',
         message: err?.message || 'Erro ao cadastrar comprador.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveMachine = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!machineName) return;
+    setIsSubmitting(true);
     try {
       const payload = {
         farmId: activeFarmId,
@@ -412,31 +436,36 @@ export default function CadastrosPage() {
         title: 'Erro ao salvar máquina',
         message: err?.message || 'Não foi possível salvar o equipamento.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteMachine = async (m: Machinery) => {
-    if (confirm(`Deseja realmente excluir a máquina ${m.name}?`)) {
-      try {
-        await deleteMachinery(m.id);
-        addToast({
-          type: 'info',
-          title: 'Máquina Removida',
-          message: `${m.name} foi removida da frota.`,
-        });
-      } catch (err: any) {
-        addToast({
-          type: 'error',
-          title: 'Erro ao excluir máquina',
-          message: err?.message || 'Não foi possível excluir o equipamento.',
-        });
-      }
+  const confirmDeleteMachine = async () => {
+    if (!deletingMachine) return;
+    const m = deletingMachine;
+    try {
+      await deleteMachinery(m.id);
+      addToast({
+        type: 'info',
+        title: 'Máquina Removida',
+        message: `${m.name} foi removida da frota.`,
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Erro ao excluir máquina',
+        message: err?.message || 'Não foi possível excluir o equipamento.',
+      });
+    } finally {
+      setDeletingMachine(null);
     }
   };
 
   const handleSaveEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employeeName || !employeeRole) return;
+    setIsSubmitting(true);
     try {
       const payload = {
         farmId: activeFarmId,
@@ -476,25 +505,29 @@ export default function CadastrosPage() {
         title: 'Erro ao salvar colaborador',
         message: err?.message || 'Não foi possível salvar o colaborador.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteEmployee = async (emp: Employee) => {
-    if (confirm(`Deseja realmente remover o colaborador ${emp.name}?`)) {
-      try {
-        await deleteEmployee(emp.id);
-        addToast({
-          type: 'info',
-          title: 'Colaborador Removido',
-          message: `${emp.name} foi removido do quadro de colaboradores.`,
-        });
-      } catch (err: any) {
-        addToast({
-          type: 'error',
-          title: 'Erro ao excluir colaborador',
-          message: err?.message || 'Não foi possível excluir o colaborador.',
-        });
-      }
+  const confirmDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+    const emp = deletingEmployee;
+    try {
+      await deleteEmployee(emp.id);
+      addToast({
+        type: 'info',
+        title: 'Colaborador Removido',
+        message: `${emp.name} foi removido do quadro de colaboradores.`,
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Erro ao excluir colaborador',
+        message: err?.message || 'Não foi possível excluir o colaborador.',
+      });
+    } finally {
+      setDeletingEmployee(null);
     }
   };
 
@@ -516,6 +549,10 @@ export default function CadastrosPage() {
     employees.length > 0
       ? employees.reduce((sum, e) => sum + (e.hourCost || 0), 0) / employees.length
       : 0;
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -625,7 +662,16 @@ export default function CadastrosPage() {
       />
 
       {/* Tab: Fazendas */}
-      {activeTab === 'fazendas' && (
+      {activeTab === 'fazendas' && farms.length === 0 && (
+        <EmptyState
+          title="Nenhuma fazenda cadastrada"
+          description="Cadastre a primeira fazenda para começar a organizar talhões, safras e lançamentos financeiros."
+          actionLabel="Nova Fazenda"
+          onAction={() => setIsNewFarmModal(true)}
+        />
+      )}
+
+      {activeTab === 'fazendas' && farms.length > 0 && (
         <div className="grid-2">
           {farms.map((f) => (
             <ClayCard key={f.id}>
@@ -803,6 +849,14 @@ export default function CadastrosPage() {
                 <Plus size={14} /> Novo
               </ClayButton>
             </div>
+            {suppliers.length === 0 ? (
+              <EmptyState
+                title="Nenhum fornecedor cadastrado"
+                description="Cadastre fornecedores para vincular contas a pagar e compras de insumos."
+                actionLabel="Novo Fornecedor"
+                onAction={() => setIsNewSupplierModal(true)}
+              />
+            ) : (
             <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
               {suppliers.map((s) => (
                 <div
@@ -847,6 +901,7 @@ export default function CadastrosPage() {
                 </div>
               ))}
             </div>
+            )}
           </ClayCard>
 
           <ClayCard>
@@ -859,6 +914,14 @@ export default function CadastrosPage() {
                 <Plus size={14} /> Novo
               </ClayButton>
             </div>
+            {customers.length === 0 ? (
+              <EmptyState
+                title="Nenhum cliente cadastrado"
+                description="Cadastre compradores/tradings para vincular contas a receber e contratos de venda."
+                actionLabel="Novo Cliente"
+                onAction={() => setIsNewCustomerModal(true)}
+              />
+            ) : (
             <div className="flex-col" style={{ gap: 'var(--space-3)' }}>
               {customers.map((c) => (
                 <div
@@ -903,6 +966,7 @@ export default function CadastrosPage() {
                 </div>
               ))}
             </div>
+            )}
           </ClayCard>
         </div>
       )}
@@ -1117,7 +1181,7 @@ export default function CadastrosPage() {
                       <ClayButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteMachine(r)}
+                        onClick={() => setDeletingMachine(r)}
                         title="Excluir Máquina"
                       >
                         <Trash2 size={14} color="var(--color-danger-600)" />
@@ -1343,7 +1407,7 @@ export default function CadastrosPage() {
                       <ClayButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteEmployee(r)}
+                        onClick={() => setDeletingEmployee(r)}
                         title="Excluir Colaborador"
                       >
                         <Trash2 size={14} color="var(--color-danger-600)" />
@@ -1360,7 +1424,14 @@ export default function CadastrosPage() {
       )}
 
       {/* Tab: Contas Bancárias */}
-      {activeTab === 'bancos' && (
+      {activeTab === 'bancos' && bankAccounts.length === 0 && (
+        <EmptyState
+          title="Nenhuma conta bancária cadastrada"
+          description="Cadastre uma conta bancária para registrar pagamentos, recebimentos e conciliação."
+        />
+      )}
+
+      {activeTab === 'bancos' && bankAccounts.length > 0 && (
         <div className="grid-3">
           {bankAccounts.map((b) => (
             <ClayCard key={b.id}>
@@ -1446,7 +1517,7 @@ export default function CadastrosPage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsNewFarmModal(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Cadastrar Propriedade
             </ClayButton>
           </div>
@@ -1534,7 +1605,7 @@ export default function CadastrosPage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsNewFieldModal(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Salvar Talhão
             </ClayButton>
           </div>
@@ -1600,7 +1671,7 @@ export default function CadastrosPage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsNewSeasonModal(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Cadastrar Safra
             </ClayButton>
           </div>
@@ -1655,7 +1726,7 @@ export default function CadastrosPage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsNewSupplierModal(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Cadastrar Fornecedor
             </ClayButton>
           </div>
@@ -1708,7 +1779,7 @@ export default function CadastrosPage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsNewCustomerModal(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Cadastrar Cliente
             </ClayButton>
           </div>
@@ -1841,7 +1912,7 @@ export default function CadastrosPage() {
             >
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               {editingMachineId ? 'Salvar Alterações' : 'Cadastrar Máquina'}
             </ClayButton>
           </div>
@@ -1973,12 +2044,40 @@ export default function CadastrosPage() {
             >
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               {editingEmployeeId ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
             </ClayButton>
           </div>
         </form>
       </ClayModal>
+
+      <ConfirmDialog
+        isOpen={!!deletingMachine}
+        onClose={() => setDeletingMachine(null)}
+        onConfirm={confirmDeleteMachine}
+        title="Excluir Máquina"
+        description={
+          deletingMachine
+            ? `Deseja realmente excluir a máquina "${deletingMachine.name}"? Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Excluir"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={!!deletingEmployee}
+        onClose={() => setDeletingEmployee(null)}
+        onConfirm={confirmDeleteEmployee}
+        title="Remover Colaborador"
+        description={
+          deletingEmployee
+            ? `Deseja realmente remover "${deletingEmployee.name}" do quadro de colaboradores? Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Remover"
+        variant="danger"
+      />
     </div>
   );
 }

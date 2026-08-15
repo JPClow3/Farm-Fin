@@ -10,6 +10,7 @@ import { ClaySelect } from '../../components/ui/ClaySelect';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { uploadAndParseBankStatement, autoMatchTransactions } from '../../actions/conciliacao';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import { BankStatementItem } from '../../lib/types';
 import {
   Download,
@@ -25,7 +26,7 @@ import {
 } from 'lucide-react';
 
 export default function ConciliacaoPage() {
-  useModuleGuard('conciliacao');
+  const moduleAllowed = useModuleGuard('conciliacao');
   const { bankAccounts, bankStatements, payables, receivables, matchStatement, reloadFromDB } =
     useFarm();
   const { addToast } = useToast();
@@ -258,6 +259,10 @@ NEWFILEUID:NONE
       setIsMatching(false);
     }
   };
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>

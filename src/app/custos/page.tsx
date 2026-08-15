@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useFarm } from '../../context/FarmContext';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayTabs } from '../../components/ui/ClayTabs';
 import { ClaySelect } from '../../components/ui/ClaySelect';
-import { FieldComparisonChart } from '../../components/charts/FieldComparisonChart';
-import { CrossSeasonChart } from '../../components/charts/CrossSeasonChart';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { ApportionmentMatrix } from '../../components/finance/ApportionmentMatrix';
 import { ClayModal } from '../../components/ui/ClayModal';
 import {
@@ -20,6 +22,7 @@ import {
 import { getFieldCostsSummary, CalculatedFieldCost } from '../../actions/farm';
 import { getCrossSeasonComparison } from '../../actions/season-comparison';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import {
   Sprout,
   BarChart3,
@@ -38,8 +41,17 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+const FieldComparisonChart = dynamic(
+  () => import('../../components/charts/FieldComparisonChart').then((m) => m.FieldComparisonChart),
+  { loading: () => <Skeleton variant="card" height={260} />, ssr: false }
+);
+const CrossSeasonChart = dynamic(
+  () => import('../../components/charts/CrossSeasonChart').then((m) => m.CrossSeasonChart),
+  { loading: () => <Skeleton variant="card" height={260} />, ssr: false }
+);
+
 export default function CustosPage() {
-  useModuleGuard('custos');
+  const moduleAllowed = useModuleGuard('custos');
   const { activeFarm, activeFields, activeFarmId, activeSeasonId, activeStockMovements } =
     useFarm();
   const [activeTab, setActiveTab] = useState<'talhoes' | 'historico' | 'rateio'>('talhoes');
@@ -49,6 +61,7 @@ export default function CustosPage() {
   const [totalCost, setTotalCost] = useState(0);
   const [avgCostHa, setAvgCostHa] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Cross-season comparison state
   const [seasonComparison, setSeasonComparison] = useState<CrossSeasonComparisonResult | null>(
@@ -58,24 +71,31 @@ export default function CustosPage() {
   const [isSeasonLoading, setIsSeasonLoading] = useState(false);
 
   // Load field costs
-  useEffect(() => {
-    async function loadCustos() {
-      setIsLoading(true);
-      try {
-        const res = await getFieldCostsSummary(activeFarmId, activeSeasonId);
-        if (res.success && res.fields.length > 0) {
-          setFieldsCalculated(res.fields);
-          setTotalCost(res.totalCost);
-          setAvgCostHa(res.avgCostHa);
-        }
-      } catch (err) {
-        console.error('Failed to load field costs:', err);
-      } finally {
-        setIsLoading(false);
+  const loadCustos = React.useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getFieldCostsSummary(activeFarmId, activeSeasonId);
+      if (res.success) {
+        setFieldsCalculated(res.fields);
+        setTotalCost(res.totalCost);
+        setAvgCostHa(res.avgCostHa);
+      } else {
+        setFieldsCalculated([]);
+        setLoadError('Não foi possível apurar os custos por talhão para esta safra.');
       }
+    } catch (err) {
+      console.error('Failed to load field costs:', err);
+      setFieldsCalculated([]);
+      setLoadError('Falha de comunicação ao carregar os custos. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-    loadCustos();
   }, [activeFarmId, activeSeasonId]);
+
+  useEffect(() => {
+    loadCustos();
+  }, [loadCustos]);
 
   // Load cross-season comparison data
   useEffect(() => {
@@ -93,30 +113,9 @@ export default function CustosPage() {
     loadSeasonComparison();
   }, [activeFarmId, cropFilter]);
 
-  // Fallback to activeFields calculation if DB query returns empty initial state
-  const displayedFields = useMemo(() => {
-    if (fieldsCalculated.length > 0) return fieldsCalculated;
-
-    return activeFields.map((field) => {
-      const inputsCost = field.area * 540;
-      const machineryCost = field.area * 280;
-      const laborCost = field.area * 95;
-      const overheadCost = field.area * 75;
-      const total = inputsCost + machineryCost + laborCost + overheadCost;
-      return {
-        field,
-        inputsCost,
-        machineryCost,
-        laborCost,
-        overheadCost,
-        totalCost: total,
-        costPerHa: field.area > 0 ? total / field.area : 0,
-      };
-    });
-  }, [fieldsCalculated, activeFields]);
-
-  const displayTotal = totalCost || displayedFields.reduce((sum, f) => sum + f.totalCost, 0);
-  const displayAvgHa = avgCostHa || displayTotal / (activeFarm?.totalArea || 1);
+  const displayedFields = fieldsCalculated;
+  const displayTotal = totalCost;
+  const displayAvgHa = avgCostHa;
 
   const chartData = displayedFields.map((f) => ({
     fieldName: f.field.name,
@@ -146,6 +145,10 @@ export default function CustosPage() {
     setAvgCostHa(result.summary.avgFinalCostPerHa);
   };
 
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
+
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
       {/* Header */}
@@ -162,6 +165,7 @@ export default function CustosPage() {
       {/* Top KPIs */}
       <div className="grid-4">
         <KpiCard
+          loading={isLoading}
           label="Custo Total Consolidado"
           value={`R$ ${displayTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={<Sprout size={20} />}
@@ -169,6 +173,7 @@ export default function CustosPage() {
           subtext={`Área total: ${activeFarm?.totalArea || 0} ha`}
         />
         <KpiCard
+          loading={isLoading}
           label="Custo Médio por Hectare"
           value={`R$ ${displayAvgHa.toFixed(2)}/ha`}
           icon={<BarChart3 size={20} />}
@@ -180,6 +185,7 @@ export default function CustosPage() {
           }}
         />
         <KpiCard
+          loading={isLoading}
           label="Custo Estimado por Saca"
           value={`R$ ${(displayAvgHa / 62).toFixed(2)}/sc`}
           icon={<Wheat size={20} />}
@@ -207,7 +213,33 @@ export default function CustosPage() {
       />
 
       {/* TAB 1: Custo por Talhão */}
-      {activeTab === 'talhoes' && (
+      {activeTab === 'talhoes' && isLoading && (
+        <div className="flex-col" style={{ gap: 'var(--space-5)' }}>
+          <Skeleton variant="card" height={260} />
+          <Skeleton variant="card" height={320} />
+        </div>
+      )}
+
+      {activeTab === 'talhoes' && !isLoading && loadError && (
+        <ClayCard>
+          <ErrorState
+            title="Não foi possível carregar os custos"
+            description={loadError}
+            onRetry={loadCustos}
+          />
+        </ClayCard>
+      )}
+
+      {activeTab === 'talhoes' && !isLoading && !loadError && displayedFields.length === 0 && (
+        <ClayCard>
+          <EmptyState
+            title="Nenhum custo apurado para esta safra"
+            description="Ainda não há lançamentos de insumos, maquinário ou mão de obra vinculados aos talhões desta safra."
+          />
+        </ClayCard>
+      )}
+
+      {activeTab === 'talhoes' && !isLoading && !loadError && displayedFields.length > 0 && (
         <>
           {/* Main Comparison Chart */}
           <ClayCard>

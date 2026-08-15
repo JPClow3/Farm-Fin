@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
 import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayTabs } from '../../components/ui/ClayTabs';
 import { ClayModal } from '../../components/ui/ClayModal';
-import { CashFlowChart } from '../../components/charts/CashFlowChart';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { getCashFlowReport, CashFlowRow } from '../../actions/finance';
-import { exportCashFlowToExcel, ScenarioSimulationParams } from '../../lib/exportExcel';
+import type { ScenarioSimulationParams } from '../../lib/exportExcel';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import {
   TrendingUp,
   Sparkles,
@@ -28,6 +31,11 @@ import {
   Layers,
   RotateCcw,
 } from 'lucide-react';
+
+const CashFlowChart = dynamic(
+  () => import('../../components/charts/CashFlowChart').then((m) => m.CashFlowChart),
+  { loading: () => <Skeleton variant="card" height={300} />, ssr: false }
+);
 
 interface CustomScenarioState {
   id: 'realista' | 'otimista' | 'pessimista' | 'personalizado';
@@ -75,7 +83,7 @@ const PRESET_SCENARIOS: Record<'realista' | 'otimista' | 'pessimista', CustomSce
 };
 
 export default function FluxoDeCaixaPage() {
-  useModuleGuard('fluxo-de-caixa');
+  const moduleAllowed = useModuleGuard('fluxo-de-caixa');
   const { bankAccounts, activeFarm, activeFarmId } = useFarm();
   const { addToast } = useToast();
 
@@ -84,6 +92,8 @@ export default function FluxoDeCaixaPage() {
   const [selectedBankId, setSelectedBankId] = useState<string>('all');
   const [reportRows, setReportRows] = useState<CashFlowRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isExportingXLSX, setIsExportingXLSX] = useState(false);
 
   // Scenario Simulation State
   const [scenarioState, setScenarioState] = useState<CustomScenarioState>(
@@ -98,22 +108,29 @@ export default function FluxoDeCaixaPage() {
   );
 
   // Load Cash Flow Report from Server Action
-  useEffect(() => {
-    async function loadCashFlow() {
-      setIsLoading(true);
-      try {
-        const res = await getCashFlowReport(periodTab, activeFarmId, selectedBankId);
-        if (res.success && res.data && res.data.length > 0) {
-          setReportRows(res.data);
-        }
-      } catch (e) {
-        console.error('Failed to load cash flow from DB:', e);
-      } finally {
-        setIsLoading(false);
+  const loadCashFlow = React.useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getCashFlowReport(periodTab, activeFarmId, selectedBankId);
+      if (res.success) {
+        setReportRows(res.data || []);
+      } else {
+        setReportRows([]);
+        setLoadError('Não foi possível carregar o fluxo de caixa para o período selecionado.');
       }
+    } catch (e) {
+      console.error('Failed to load cash flow from DB:', e);
+      setReportRows([]);
+      setLoadError('Falha de comunicação ao carregar o fluxo de caixa. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-    loadCashFlow();
   }, [activeFarmId, periodTab, selectedBankId]);
+
+  useEffect(() => {
+    loadCashFlow();
+  }, [loadCashFlow]);
 
   // Compute Active Multipliers
   const inflowMult = useMemo(() => {
@@ -129,7 +146,7 @@ export default function FluxoDeCaixaPage() {
 
   // Compute Adjusted Rows
   const adjustedRows = useMemo(() => {
-    let running = reportRows.length > 0 ? reportRows[0].initialBalance : 1420000;
+    let running = reportRows.length > 0 ? reportRows[0].initialBalance : 0;
     return reportRows.map((row) => {
       const adjIn = row.inflows * inflowMult;
       const adjOut = row.outflows * outflowMult;
@@ -150,7 +167,7 @@ export default function FluxoDeCaixaPage() {
 
   // Baseline Rows (Realista) for comparison
   const baselineRows = useMemo(() => {
-    let running = reportRows.length > 0 ? reportRows[0].initialBalance : 1420000;
+    let running = reportRows.length > 0 ? reportRows[0].initialBalance : 0;
     return reportRows.map((row) => {
       const adjIn = row.inflows;
       const adjOut = row.outflows;
@@ -253,48 +270,74 @@ export default function FluxoDeCaixaPage() {
   };
 
   // Export to .XLSX
-  const handleExportXLSX = () => {
-    const selectedBank = bankAccounts.find((b) => b.id === selectedBankId);
-    const params: ScenarioSimulationParams = {
-      id: scenarioState.id,
-      label: scenarioState.label,
-      inflowMultiplier: Number(inflowMult.toFixed(3)),
-      outflowMultiplier: Number(outflowMult.toFixed(3)),
-      grainPriceDeltaPct: scenarioState.grainPriceDeltaPct,
-      receivablesDelayDays: scenarioState.receivablesDelayDays,
-      defaultRatePct: scenarioState.defaultRatePct,
-      notes: scenarioState.notes,
-    };
+  const handleExportXLSX = async () => {
+    if (adjustedRows.length === 0) {
+      addToast({
+        type: 'warning',
+        title: 'Nada para Exportar',
+        message: 'Não há lançamentos no período selecionado para gerar a planilha.',
+      });
+      return;
+    }
 
-    const periodLabels: Record<string, string> = {
-      diaria: 'Diário (14 dias)',
-      semanal: 'Semanal (8 semanas)',
-      mensal: 'Mensal (8 meses)',
-      anual: 'Safra Anual (5 Safras)',
-    };
+    setIsExportingXLSX(true);
+    try {
+      const selectedBank = bankAccounts.find((b) => b.id === selectedBankId);
+      const params: ScenarioSimulationParams = {
+        id: scenarioState.id,
+        label: scenarioState.label,
+        inflowMultiplier: Number(inflowMult.toFixed(3)),
+        outflowMultiplier: Number(outflowMult.toFixed(3)),
+        grainPriceDeltaPct: scenarioState.grainPriceDeltaPct,
+        receivablesDelayDays: scenarioState.receivablesDelayDays,
+        defaultRatePct: scenarioState.defaultRatePct,
+        notes: scenarioState.notes,
+      };
 
-    exportCashFlowToExcel({
-      rows: adjustedRows,
-      farmName: activeFarm?.name || 'Todas as Fazendas',
-      bankAccountName: selectedBank
-        ? `${selectedBank.bankName} (${selectedBank.accountNumber})`
-        : 'Todas as Contas (Consolidado)',
-      scenario: params,
-      periodTypeLabel: periodLabels[periodTab] || 'Mensal',
-      bankAccounts,
-      totalInflows,
-      totalOutflows,
-      minBalance: minBalanceInfo,
-    });
+      const periodLabels: Record<string, string> = {
+        diaria: 'Diário (14 dias)',
+        semanal: 'Semanal (8 semanas)',
+        mensal: 'Mensal (8 meses)',
+        anual: 'Safra Anual (5 Safras)',
+      };
 
-    addToast({
-      type: 'success',
-      title: 'Planilha Excel (.XLSX) Gerada!',
-      message: 'O download da planilha completa de fluxo de caixa foi concluído com sucesso.',
-    });
+      const { exportCashFlowToExcel } = await import('../../lib/exportExcel');
+      exportCashFlowToExcel({
+        rows: adjustedRows,
+        farmName: activeFarm?.name || 'Todas as Fazendas',
+        bankAccountName: selectedBank
+          ? `${selectedBank.bankName} (${selectedBank.accountNumber})`
+          : 'Todas as Contas (Consolidado)',
+        scenario: params,
+        periodTypeLabel: periodLabels[periodTab] || 'Mensal',
+        bankAccounts,
+        totalInflows,
+        totalOutflows,
+        minBalance: minBalanceInfo,
+      });
+
+      addToast({
+        type: 'success',
+        title: 'Planilha Excel (.XLSX) Gerada!',
+        message: 'O download da planilha completa de fluxo de caixa foi concluído com sucesso.',
+      });
+    } catch (err) {
+      console.error('Error exporting cash flow to Excel:', err);
+      addToast({
+        type: 'danger',
+        title: 'Erro na Exportação',
+        message: 'Não foi possível gerar a planilha de fluxo de caixa.',
+      });
+    } finally {
+      setIsExportingXLSX(false);
+    }
   };
 
   const selectedBank = bankAccounts.find((b) => b.id === selectedBankId);
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -320,7 +363,12 @@ export default function FluxoDeCaixaPage() {
             Simulador Avançado
           </ClayButton>
 
-          <ClayButton variant="primary" size="sm" onClick={handleExportXLSX}>
+          <ClayButton
+            variant="primary"
+            size="sm"
+            onClick={handleExportXLSX}
+            loading={isExportingXLSX}
+          >
             <FileSpreadsheet size={15} style={{ marginRight: '6px' }} />
             Exportar .XLSX (Excel)
           </ClayButton>
@@ -396,7 +444,7 @@ export default function FluxoDeCaixaPage() {
         </div>
       </ClayCard>
 
-      {/* Top Bank Accounts Strip (Clickable cards to filter) */}
+      {/* Top Bank Accounts Strip (read-only summary — use the pill filter above to change selection) */}
       <div className="grid-3">
         {bankAccounts.map((b) => {
           const isSelected = selectedBankId === b.id;
@@ -405,12 +453,10 @@ export default function FluxoDeCaixaPage() {
               key={b.id}
               size="sm"
               style={{
-                cursor: 'pointer',
                 border: isSelected ? '2px solid var(--color-primary-500)' : '1px solid transparent',
                 background: isSelected ? 'var(--color-primary-50)' : 'var(--bg-surface-1)',
                 transition: 'all var(--transition-fast)',
               }}
-              onClick={() => setSelectedBankId(isSelected ? 'all' : b.id)}
             >
               <div className="flex-between" style={{ marginBottom: '4px' }}>
                 <div className="flex-row" style={{ gap: '6px' }}>
@@ -457,14 +503,11 @@ export default function FluxoDeCaixaPage() {
                 <span>
                   Ag: {b.agency} • CC: {b.accountNumber}
                 </span>
-                <span
-                  style={{
-                    fontSize: '10px',
-                    color: isSelected ? 'var(--color-primary-600)' : 'var(--text-tertiary)',
-                  }}
-                >
-                  {isSelected ? '● Filtrado' : 'Clique para filtrar'}
-                </span>
+                {isSelected && (
+                  <span style={{ fontSize: '10px', color: 'var(--color-primary-600)' }}>
+                    ● Filtrado
+                  </span>
+                )}
               </div>
             </ClayCard>
           );
@@ -707,7 +750,12 @@ export default function FluxoDeCaixaPage() {
             </p>
           </div>
 
-          <ClayButton variant="ghost" size="sm" onClick={handleExportXLSX}>
+          <ClayButton
+            variant="ghost"
+            size="sm"
+            onClick={handleExportXLSX}
+            loading={isExportingXLSX}
+          >
             <FileSpreadsheet size={14} style={{ marginRight: '6px' }} />
             Baixar .XLSX
           </ClayButton>
@@ -783,11 +831,34 @@ export default function FluxoDeCaixaPage() {
 
               {adjustedRows.length === 0 && !isLoading && (
                 <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: 'center', padding: '24px', color: 'var(--text-tertiary)' }}
-                  >
-                    Nenhum lançamento encontrado para o período e conta selecionados.
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    {loadError ? (
+                      <ErrorState
+                        title="Não foi possível carregar o fluxo de caixa"
+                        description={loadError}
+                        onRetry={loadCashFlow}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          textAlign: 'center',
+                          padding: '24px',
+                          color: 'var(--text-tertiary)',
+                        }}
+                      >
+                        Nenhum lançamento encontrado para o período e conta selecionados.
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )}
+
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    <div className="flex-col" style={{ gap: '8px', padding: '16px' }}>
+                      <Skeleton variant="text" count={4} />
+                    </div>
                   </td>
                 </tr>
               )}

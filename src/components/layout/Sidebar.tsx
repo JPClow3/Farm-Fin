@@ -7,6 +7,7 @@ import { useFarm } from '../../context/FarmContext';
 import { getAuthSessionAction } from '../../actions/auth';
 import { canViewModule, AppModule } from '../../lib/permissions';
 import { UserRoleType } from '../../lib/types';
+import { Skeleton } from '../ui/Skeleton';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -155,8 +156,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     },
   ];
 
-  // While the role hasn't resolved yet, show everything to avoid a flash of an
-  // empty sidebar; once resolved, filter modules the current role can't view.
+  // Until the role resolves we don't know which modules are visible, so we
+  // render neutral skeleton placeholders below instead of flashing every
+  // item (then hiding some) or flashing an empty sidebar.
   const sections: NavSection[] = role
     ? allSections
         .map((sec) => ({
@@ -164,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           items: sec.items.filter((item) => canViewModule(role, item.module)),
         }))
         .filter((sec) => sec.items.length > 0)
-    : allSections;
+    : [];
 
   return (
     <>
@@ -193,6 +195,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* Navigation Sections */}
         <div className="flex-col" style={{ gap: 'var(--space-4)' }}>
+          {role === null &&
+            Array.from({ length: 4 }).map((_, secIdx) => (
+              <div key={secIdx} className="flex-col" style={{ gap: '8px' }}>
+                <Skeleton variant="text" width="70px" height={10} />
+                {Array.from({ length: secIdx === 0 ? 2 : 2 }).map((_, itemIdx) => (
+                  <div
+                    key={itemIdx}
+                    className="flex-row items-center"
+                    style={{ gap: '10px', padding: '8px 12px' }}
+                  >
+                    <Skeleton variant="circle" width={18} height={18} />
+                    <Skeleton variant="text" width="65%" height={12} />
+                  </div>
+                ))}
+              </div>
+            ))}
+
           {sections.map((sec) => (
             <div key={sec.title} className="flex-col" style={{ gap: '2px' }}>
               <div className="sidebar__section-label">{sec.title}</div>

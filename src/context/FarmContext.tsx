@@ -57,6 +57,7 @@ import {
   createStockExitAction,
 } from '../actions/stock';
 import { getTodayDateString } from '../lib/dateUtils';
+import { useToast } from './ToastContext';
 import {
   getMachinery,
   createMachinery,
@@ -179,6 +180,7 @@ const PREF_CUSTOM_RANGE_KEY = 'farmfin_pref_custom_range';
 const FarmContext = createContext<FarmContextData>({} as FarmContextData);
 
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { addToast } = useToast();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
   const [seasons, setSeasons] = useState<CropSeason[]>([]);
@@ -635,104 +637,280 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addPayable = useCallback(
     async (data: Omit<Payable, 'id'> & { installmentsCount?: number }) => {
-      const created = await createPayable(data);
-      setPayables((prev) => [created, ...prev]);
+      const tempId = `temp-${Date.now()}`;
+      setPayables((prev) => [{ ...data, id: tempId } as Payable, ...prev]);
+      try {
+        const created = await createPayable(data);
+        setPayables((prev) => prev.map((p) => (p.id === tempId ? created : p)));
+      } catch (err) {
+        setPayables((prev) => prev.filter((p) => p.id !== tempId));
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Lançar Conta',
+          message: 'Não foi possível salvar o lançamento. Tente novamente.',
+          action: { label: 'Tentar novamente', onClick: () => addPayable(data) },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
-  const updatePayable = useCallback(async (id: string, data: Partial<Payable>) => {
-    setPayables((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
-    await updatePayableAction(id, data);
-  }, []);
+  const updatePayable = useCallback(
+    async (id: string, data: Partial<Payable>) => {
+      let previous: Payable | undefined;
+      setPayables((prev) =>
+        prev.map((p) => {
+          if (p.id === id) {
+            previous = p;
+            return { ...p, ...data };
+          }
+          return p;
+        })
+      );
+      try {
+        await updatePayableAction(id, data);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          setPayables((prev) => prev.map((p) => (p.id === id ? snapshot : p)));
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Salvar',
+          message: 'Não foi possível salvar as alterações da conta. Tente novamente.',
+          action: { label: 'Tentar novamente', onClick: () => updatePayable(id, data) },
+        });
+        throw err;
+      }
+    },
+    [addToast]
+  );
 
   const approvePayable = useCallback(
     async (id: string, approverName: string = 'Diretoria Financeira') => {
       const today = new Date().toISOString().split('T')[0];
+      let previous: Payable | undefined;
       setPayables((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                approvalStatus: 'aprovado',
-                approvedBy: approverName,
-                approvedAt: today,
-              }
-            : p
-        )
+        prev.map((p) => {
+          if (p.id === id) {
+            previous = p;
+            return {
+              ...p,
+              approvalStatus: 'aprovado',
+              approvedBy: approverName,
+              approvedAt: today,
+            };
+          }
+          return p;
+        })
       );
-      await approvePayableAction(id, approverName);
+      try {
+        await approvePayableAction(id, approverName);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          setPayables((prev) => prev.map((p) => (p.id === id ? snapshot : p)));
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Aprovar',
+          message: 'Não foi possível aprovar a conta. Tente novamente.',
+          action: { label: 'Tentar novamente', onClick: () => approvePayable(id, approverName) },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
   const rejectPayable = useCallback(
     async (id: string, reason: string, approverName: string = 'Diretoria Financeira') => {
       const today = new Date().toISOString().split('T')[0];
+      let previous: Payable | undefined;
       setPayables((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                approvalStatus: 'rejeitado',
-                status: 'cancelado',
-                rejectionReason: reason,
-                approvedBy: approverName,
-                approvedAt: today,
-              }
-            : p
-        )
+        prev.map((p) => {
+          if (p.id === id) {
+            previous = p;
+            return {
+              ...p,
+              approvalStatus: 'rejeitado',
+              status: 'cancelado',
+              rejectionReason: reason,
+              approvedBy: approverName,
+              approvedAt: today,
+            };
+          }
+          return p;
+        })
       );
-      await rejectPayableAction(id, reason, approverName);
+      try {
+        await rejectPayableAction(id, reason, approverName);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          setPayables((prev) => prev.map((p) => (p.id === id ? snapshot : p)));
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Rejeitar',
+          message: 'Não foi possível rejeitar a conta. Tente novamente.',
+          action: {
+            label: 'Tentar novamente',
+            onClick: () => rejectPayable(id, reason, approverName),
+          },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
   const payPayable = useCallback(
     async (id: string, bankAccountId: string, paidAmount: number, paymentDate?: string) => {
       const pDate = paymentDate || new Date().toISOString().split('T')[0];
+      let previousPayable: Payable | undefined;
+      let previousBankBalance: number | undefined;
+
       // Optimistic update
       setPayables((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                status: 'pago',
-                paidAmount,
-                paymentDate: pDate,
-                bankAccountId,
-              }
-            : p
-        )
+        prev.map((p) => {
+          if (p.id === id) {
+            previousPayable = p;
+            return {
+              ...p,
+              status: 'pago',
+              paidAmount,
+              paymentDate: pDate,
+              bankAccountId,
+            };
+          }
+          return p;
+        })
       );
 
       setBankAccounts((prev) =>
-        prev.map((b) => (b.id === bankAccountId ? { ...b, balance: b.balance - paidAmount } : b))
+        prev.map((b) => {
+          if (b.id === bankAccountId) {
+            previousBankBalance = b.balance;
+            return { ...b, balance: b.balance - paidAmount };
+          }
+          return b;
+        })
       );
 
-      // Persist to server
-      await payPayableAction(id, bankAccountId, paidAmount, pDate);
+      try {
+        // Persist to server
+        await payPayableAction(id, bankAccountId, paidAmount, pDate);
+      } catch (err) {
+        if (previousPayable) {
+          const snapshot = previousPayable;
+          setPayables((prev) => prev.map((p) => (p.id === id ? snapshot : p)));
+        }
+        if (previousBankBalance !== undefined) {
+          const snapshotBalance = previousBankBalance;
+          setBankAccounts((prev) =>
+            prev.map((b) => (b.id === bankAccountId ? { ...b, balance: snapshotBalance } : b))
+          );
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Registrar Pagamento',
+          message: 'A baixa não pôde ser confirmada no banco. Tente novamente.',
+          action: {
+            label: 'Tentar novamente',
+            onClick: () => payPayable(id, bankAccountId, paidAmount, pDate),
+          },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
-  const deletePayable = useCallback(async (id: string) => {
-    setPayables((prev) => prev.filter((p) => p.id !== id));
-    await deletePayableAction(id);
-  }, []);
+  const deletePayable = useCallback(
+    async (id: string) => {
+      let previous: Payable | undefined;
+      let previousIndex = -1;
+      setPayables((prev) => {
+        previousIndex = prev.findIndex((p) => p.id === id);
+        previous = prev[previousIndex];
+        return prev.filter((p) => p.id !== id);
+      });
+      try {
+        await deletePayableAction(id);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          const idx = previousIndex;
+          setPayables((prev) => {
+            const next = [...prev];
+            next.splice(Math.min(idx, next.length), 0, snapshot);
+            return next;
+          });
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Excluir',
+          message: 'Não foi possível excluir o lançamento. Tente novamente.',
+        });
+        throw err;
+      }
+    },
+    [addToast]
+  );
 
   const addReceivable = useCallback(
     async (data: Omit<Receivable, 'id'> & { installmentsCount?: number }) => {
-      const created = await createReceivable(data);
-      setReceivables((prev) => [created, ...prev]);
+      const tempId = `temp-${Date.now()}`;
+      setReceivables((prev) => [{ ...data, id: tempId } as Receivable, ...prev]);
+      try {
+        const created = await createReceivable(data);
+        setReceivables((prev) => prev.map((r) => (r.id === tempId ? created : r)));
+      } catch (err) {
+        setReceivables((prev) => prev.filter((r) => r.id !== tempId));
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Lançar Recebimento',
+          message: 'Não foi possível salvar o contrato. Tente novamente.',
+          action: { label: 'Tentar novamente', onClick: () => addReceivable(data) },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
-  const updateReceivable = useCallback(async (id: string, data: Partial<Receivable>) => {
-    setReceivables((prev) => prev.map((r) => (r.id === id ? { ...r, ...data } : r)));
-    await updateReceivableAction(id, data);
-  }, []);
+  const updateReceivable = useCallback(
+    async (id: string, data: Partial<Receivable>) => {
+      let previous: Receivable | undefined;
+      setReceivables((prev) =>
+        prev.map((r) => {
+          if (r.id === id) {
+            previous = r;
+            return { ...r, ...data };
+          }
+          return r;
+        })
+      );
+      try {
+        await updateReceivableAction(id, data);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          setReceivables((prev) => prev.map((r) => (r.id === id ? snapshot : r)));
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Salvar',
+          message: 'Não foi possível salvar as alterações do contrato. Tente novamente.',
+          action: { label: 'Tentar novamente', onClick: () => updateReceivable(id, data) },
+        });
+        throw err;
+      }
+    },
+    [addToast]
+  );
 
   const receiveReceivable = useCallback(
     async (id: string, bankAccountId: string, receivedDate?: string) => {
@@ -740,9 +918,13 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const target = receivables.find((r) => r.id === id);
       const amountReceived = target ? target.totalAmount : 0;
 
+      let previousReceivable: Receivable | undefined;
+      let previousBankBalance: number | undefined;
+
       setReceivables((prev) =>
         prev.map((r) => {
           if (r.id === id) {
+            previousReceivable = r;
             return {
               ...r,
               status: 'pago',
@@ -756,27 +938,83 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (amountReceived > 0) {
         setBankAccounts((prev) =>
-          prev.map((b) =>
-            b.id === bankAccountId ? { ...b, balance: b.balance + amountReceived } : b
-          )
+          prev.map((b) => {
+            if (b.id === bankAccountId) {
+              previousBankBalance = b.balance;
+              return { ...b, balance: b.balance + amountReceived };
+            }
+            return b;
+          })
         );
       }
 
-      await receiveReceivableAction(id, bankAccountId, rDate, amountReceived);
+      try {
+        await receiveReceivableAction(id, bankAccountId, rDate, amountReceived);
+      } catch (err) {
+        if (previousReceivable) {
+          const snapshot = previousReceivable;
+          setReceivables((prev) => prev.map((r) => (r.id === id ? snapshot : r)));
+        }
+        if (previousBankBalance !== undefined) {
+          const snapshotBalance = previousBankBalance;
+          setBankAccounts((prev) =>
+            prev.map((b) => (b.id === bankAccountId ? { ...b, balance: snapshotBalance } : b))
+          );
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Confirmar Recebimento',
+          message: 'O crédito não pôde ser confirmado no banco. Tente novamente.',
+          action: {
+            label: 'Tentar novamente',
+            onClick: () => receiveReceivable(id, bankAccountId, rDate),
+          },
+        });
+        throw err;
+      }
     },
-    [receivables]
+    [receivables, addToast]
   );
 
-  const deleteReceivable = useCallback(async (id: string) => {
-    setReceivables((prev) => prev.filter((r) => r.id !== id));
-    await deleteReceivableAction(id);
-  }, []);
+  const deleteReceivable = useCallback(
+    async (id: string) => {
+      let previous: Receivable | undefined;
+      let previousIndex = -1;
+      setReceivables((prev) => {
+        previousIndex = prev.findIndex((r) => r.id === id);
+        previous = prev[previousIndex];
+        return prev.filter((r) => r.id !== id);
+      });
+      try {
+        await deleteReceivableAction(id);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          const idx = previousIndex;
+          setReceivables((prev) => {
+            const next = [...prev];
+            next.splice(Math.min(idx, next.length), 0, snapshot);
+            return next;
+          });
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Excluir',
+          message: 'Não foi possível excluir o recebimento. Tente novamente.',
+        });
+        throw err;
+      }
+    },
+    [addToast]
+  );
 
   const fixPriceReceivable = useCallback(
     async (id: string, unitPrice: number, fixingDate?: string) => {
+      let previous: Receivable | undefined;
       setReceivables((prev) =>
         prev.map((r) => {
           if (r.id === id) {
+            previous = r;
             const rawQty = r.quantity !== undefined && r.quantity > 0 ? r.quantity : r.bagsQuantity;
             const newTotal = rawQty > 0 ? rawQty * unitPrice : unitPrice;
             return {
@@ -789,20 +1027,41 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return r;
         })
       );
-      await fixPriceReceivableAction(id, unitPrice, fixingDate);
+      try {
+        await fixPriceReceivableAction(id, unitPrice, fixingDate);
+      } catch (err) {
+        if (previous) {
+          const snapshot = previous;
+          setReceivables((prev) => prev.map((r) => (r.id === id ? snapshot : r)));
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Fixar Preço',
+          message: 'Não foi possível confirmar a fixação de preço. Tente novamente.',
+          action: {
+            label: 'Tentar novamente',
+            onClick: () => fixPriceReceivable(id, unitPrice, fixingDate),
+          },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
   const settleBarterContract = useCallback(
     async (receivableId: string, payableId?: string, settlementDate?: string, notes?: string) => {
       const sDate = settlementDate || new Date().toISOString().split('T')[0];
 
+      let previousReceivable: Receivable | undefined;
+      let previousPayable: Payable | undefined;
+
       // Optimistically update receivable
       let targetPayableId = payableId;
       setReceivables((prev) =>
         prev.map((r) => {
           if (r.id === receivableId) {
+            previousReceivable = r;
             if (!targetPayableId && r.linkedPayableId) {
               targetPayableId = r.linkedPayableId;
             }
@@ -822,6 +1081,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPayables((prev) =>
           prev.map((p) => {
             if (p.id === targetPayableId) {
+              previousPayable = p;
               return {
                 ...p,
                 status: 'pago',
@@ -836,33 +1096,80 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
       }
 
-      await settleBarterContractAction(receivableId, targetPayableId, sDate, notes);
+      try {
+        await settleBarterContractAction(receivableId, targetPayableId, sDate, notes);
+      } catch (err) {
+        if (previousReceivable) {
+          const snapshot = previousReceivable;
+          setReceivables((prev) => prev.map((r) => (r.id === receivableId ? snapshot : r)));
+        }
+        if (previousPayable) {
+          const snapshot = previousPayable;
+          setPayables((prev) => prev.map((p) => (p.id === targetPayableId ? snapshot : p)));
+        }
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Liquidar Barter',
+          message: 'Não foi possível confirmar a liquidação da operação. Tente novamente.',
+          action: {
+            label: 'Tentar novamente',
+            onClick: () => settleBarterContract(receivableId, payableId, sDate, notes),
+          },
+        });
+        throw err;
+      }
     },
-    []
+    [addToast]
   );
 
-  const linkBarterPayable = useCallback(async (receivableId: string, payableId: string) => {
-    setReceivables((prev) =>
-      prev.map((r) =>
-        r.id === receivableId
-          ? {
-              ...r,
-              linkedPayableId: payableId,
-              barterStatus: 'vinculado',
-              contractType: 'Barter Insumos',
-            }
-          : r
-      )
-    );
-    setPayables((prev) =>
-      prev.map((p) =>
-        p.id === payableId
-          ? { ...p, linkedReceivableId: receivableId, isBarter: true, barterStatus: 'vinculado' }
-          : p
-      )
-    );
-    await linkBarterPayableAction(receivableId, payableId);
-  }, []);
+  const linkBarterPayable = useCallback(
+    async (receivableId: string, payableId: string) => {
+      setReceivables((prev) =>
+        prev.map((r) =>
+          r.id === receivableId
+            ? {
+                ...r,
+                linkedPayableId: payableId,
+                barterStatus: 'vinculado',
+                contractType: 'Barter Insumos',
+              }
+            : r
+        )
+      );
+      setPayables((prev) =>
+        prev.map((p) =>
+          p.id === payableId
+            ? { ...p, linkedReceivableId: receivableId, isBarter: true, barterStatus: 'vinculado' }
+            : p
+        )
+      );
+      try {
+        await linkBarterPayableAction(receivableId, payableId);
+      } catch (err) {
+        setReceivables((prev) =>
+          prev.map((r) =>
+            r.id === receivableId
+              ? { ...r, linkedPayableId: undefined, barterStatus: 'aberto' }
+              : r
+          )
+        );
+        setPayables((prev) =>
+          prev.map((p) =>
+            p.id === payableId
+              ? { ...p, linkedReceivableId: undefined, isBarter: false, barterStatus: 'nenhum' }
+              : p
+          )
+        );
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Vincular',
+          message: 'Não foi possível vincular o contrato barter. Tente novamente.',
+        });
+        throw err;
+      }
+    },
+    [addToast]
+  );
 
   const addStockItem = useCallback(
     async (item: Omit<StockItem, 'id'>) => {
@@ -882,6 +1189,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const totalCost = currentQty * currentAvgCost + incomingQty * incomingPrice;
         const newAvgCost =
           totalQty > 0 ? parseFloat((totalCost / totalQty).toFixed(2)) : incomingPrice;
+        const previousItem = existing;
 
         setStockItems((prev) =>
           prev.map((s) =>
@@ -899,8 +1207,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
           )
         );
 
+        const tempMovementId = `temp-mov-${Date.now()}`;
         const newMovement: StockMovement = {
-          id: `mov-${Date.now()}`,
+          id: tempMovementId,
           farmId: item.farmId,
           stockItemId: existing.id,
           itemName: existing.name,
@@ -915,30 +1224,43 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setStockMovements((prev) => [newMovement, ...prev]);
 
-        await createStockEntryAction({
-          farmId: item.farmId,
-          name: item.name,
-          category: item.category,
-          unit: item.unit,
-          quantity: incomingQty,
-          unitPrice: incomingPrice,
-          minQuantity: item.minQuantity,
-          supplierName: item.lastSupplier || undefined,
-          documentNumber: item.documentNumber || undefined,
-          batchNumber: item.batchNumber || undefined,
-          location: item.location || undefined,
-          expiryDate: item.expiryDate || undefined,
-          date: entryDate,
-        });
+        try {
+          await createStockEntryAction({
+            farmId: item.farmId,
+            name: item.name,
+            category: item.category,
+            unit: item.unit,
+            quantity: incomingQty,
+            unitPrice: incomingPrice,
+            minQuantity: item.minQuantity,
+            supplierName: item.lastSupplier || undefined,
+            documentNumber: item.documentNumber || undefined,
+            batchNumber: item.batchNumber || undefined,
+            location: item.location || undefined,
+            expiryDate: item.expiryDate || undefined,
+            date: entryDate,
+          });
+        } catch (err) {
+          setStockItems((prev) => prev.map((s) => (s.id === existing.id ? previousItem : s)));
+          setStockMovements((prev) => prev.filter((m) => m.id !== tempMovementId));
+          addToast({
+            type: 'danger',
+            title: 'Erro ao Registrar Entrada',
+            message: 'Não foi possível salvar a entrada de estoque. Tente novamente.',
+            action: { label: 'Tentar novamente', onClick: () => addStockItem(item) },
+          });
+          throw err;
+        }
       } else {
-        const created = await createStockItem(item);
-        setStockItems((prev) => [created, ...prev]);
+        const tempId = `temp-${Date.now()}`;
+        const tempMovementId = `temp-mov-${Date.now()}`;
+        setStockItems((prev) => [{ ...item, id: tempId } as StockItem, ...prev]);
 
         const newMovement: StockMovement = {
-          id: `mov-${Date.now()}`,
+          id: tempMovementId,
           farmId: item.farmId,
-          stockItemId: created.id,
-          itemName: created.name,
+          stockItemId: tempId,
+          itemName: item.name,
           type: 'entrada',
           quantity: incomingQty,
           unit: item.unit,
@@ -949,29 +1271,72 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
           totalCost: parseFloat((incomingQty * incomingPrice).toFixed(2)),
         };
         setStockMovements((prev) => [newMovement, ...prev]);
+
+        try {
+          const created = await createStockItem(item);
+          setStockItems((prev) => prev.map((s) => (s.id === tempId ? created : s)));
+          setStockMovements((prev) =>
+            prev.map((m) => (m.id === tempMovementId ? { ...m, stockItemId: created.id } : m))
+          );
+        } catch (err) {
+          setStockItems((prev) => prev.filter((s) => s.id !== tempId));
+          setStockMovements((prev) => prev.filter((m) => m.id !== tempMovementId));
+          addToast({
+            type: 'danger',
+            title: 'Erro ao Cadastrar Insumo',
+            message: 'Não foi possível salvar o novo insumo. Tente novamente.',
+            action: { label: 'Tentar novamente', onClick: () => addStockItem(item) },
+          });
+          throw err;
+        }
       }
     },
-    [stockItems]
+    [stockItems, addToast]
   );
 
-  const addStockMovement = useCallback(async (movement: Omit<StockMovement, 'id'>) => {
-    const created = await addStockMovementAction(movement);
-    setStockMovements((prev) => [created, ...prev]);
+  const addStockMovement = useCallback(
+    async (movement: Omit<StockMovement, 'id'>) => {
+      const tempId = `temp-mov-${Date.now()}`;
+      setStockMovements((prev) => [{ ...movement, id: tempId }, ...prev]);
 
-    setStockItems((prev) =>
-      prev.map((item) => {
-        if (item.id === movement.stockItemId) {
-          const delta = movement.type === 'entrada' ? movement.quantity : -movement.quantity;
-          const newQty = Math.max(0, item.quantity + delta);
-          return {
-            ...item,
-            quantity: newQty,
-          };
+      let previousStockItem: StockItem | undefined;
+      setStockItems((prev) =>
+        prev.map((item) => {
+          if (item.id === movement.stockItemId) {
+            previousStockItem = item;
+            const delta = movement.type === 'entrada' ? movement.quantity : -movement.quantity;
+            const newQty = Math.max(0, item.quantity + delta);
+            return {
+              ...item,
+              quantity: newQty,
+            };
+          }
+          return item;
+        })
+      );
+
+      try {
+        const created = await addStockMovementAction(movement);
+        setStockMovements((prev) => prev.map((m) => (m.id === tempId ? created : m)));
+      } catch (err) {
+        setStockMovements((prev) => prev.filter((m) => m.id !== tempId));
+        if (previousStockItem) {
+          const snapshot = previousStockItem;
+          setStockItems((prev) =>
+            prev.map((item) => (item.id === movement.stockItemId ? snapshot : item))
+          );
         }
-        return item;
-      })
-    );
-  }, []);
+        addToast({
+          type: 'danger',
+          title: 'Erro ao Registrar Movimentação',
+          message: 'Não foi possível salvar a movimentação de estoque. Tente novamente.',
+          action: { label: 'Tentar novamente', onClick: () => addStockMovement(movement) },
+        });
+        throw err;
+      }
+    },
+    [addToast]
+  );
 
   const matchStatement = useCallback(
     async (statementId: string, transactionIds: string | string[]) => {

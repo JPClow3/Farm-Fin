@@ -5,12 +5,18 @@ import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 
 export type ToastType = 'success' | 'warning' | 'danger' | 'error' | 'info';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastItem {
   id: string;
   type: ToastType;
   title: string;
   message?: string;
   duration?: number;
+  action?: ToastAction;
 }
 
 interface ToastContextData {
@@ -28,9 +34,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const addToast = useCallback(
-    ({ type, title, message, duration = 4000 }: Omit<ToastItem, 'id'>) => {
+    ({ type, title, message, duration = 4000, action }: Omit<ToastItem, 'id'>) => {
       const id = Math.random().toString(36).substring(2, 9);
-      setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+      setToasts((prev) => [...prev, { id, type, title, message, duration, action }]);
 
       if (duration > 0) {
         setTimeout(() => {
@@ -60,9 +66,32 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 {(t.type === 'danger' || t.type === 'error') && <XCircle size={18} />}
                 {t.type === 'info' && <Info size={18} />}
               </div>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="toast__title">{t.title}</div>
                 {t.message && <div className="toast__message">{t.message}</div>}
+                {t.action && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      t.action?.onClick();
+                      removeToast(t.id);
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      fontSize: 'var(--text-xs)',
+                      fontWeight: 700,
+                      textDecoration: 'underline',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t.action.label}
+                  </button>
+                )}
               </div>
             </div>
           );

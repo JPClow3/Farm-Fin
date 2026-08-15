@@ -23,6 +23,8 @@ import {
 import { calculateDueDateAlertSummary, getDueDateAlertCategory } from '../../lib/financeAlerts';
 import { sendDueDateAlertsNotificationAction } from '../../actions/finance';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import {
   Plus,
   CreditCard,
@@ -43,7 +45,7 @@ import {
 } from 'lucide-react';
 
 export default function ContasAPagarPage() {
-  useModuleGuard('contas-a-pagar');
+  const moduleAllowed = useModuleGuard('contas-a-pagar');
   const {
     activeFarmId,
     activeSeasonId,
@@ -83,6 +85,7 @@ export default function ContasAPagarPage() {
   const [viewingAttachment, setViewingAttachment] = useState<Payable | null>(null);
   const [rejectingPayable, setRejectingPayable] = useState<Payable | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
+  const [deletingPayable, setDeletingPayable] = useState<Payable | null>(null);
 
   // New Payable Form State
   const [description, setDescription] = useState('');
@@ -550,16 +553,7 @@ export default function ContasAPagarPage() {
               size="sm"
               iconOnly
               title="Excluir Lançamento"
-              onClick={async () => {
-                if (confirm('Tem certeza que deseja excluir esta conta?')) {
-                  await deletePayable(row.id);
-                  addToast({
-                    type: 'info',
-                    title: 'Excluído',
-                    message: 'Lançamento removido do banco de dados.',
-                  });
-                }
-              }}
+              onClick={() => setDeletingPayable(row)}
             >
               <Trash2 size={15} />
             </ClayButton>
@@ -568,6 +562,10 @@ export default function ContasAPagarPage() {
       },
     },
   ];
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -1187,6 +1185,29 @@ export default function ContasAPagarPage() {
           </form>
         </ClayModal>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deletingPayable}
+        onClose={() => setDeletingPayable(null)}
+        onConfirm={async () => {
+          if (!deletingPayable) return;
+          await deletePayable(deletingPayable.id);
+          addToast({
+            type: 'info',
+            title: 'Excluído',
+            message: 'Lançamento removido do banco de dados.',
+          });
+          setDeletingPayable(null);
+        }}
+        title="Excluir Lançamento"
+        description={
+          deletingPayable
+            ? `Tem certeza que deseja excluir "${deletingPayable.description}"? Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Excluir"
+        variant="danger"
+      />
     </div>
   );
 }

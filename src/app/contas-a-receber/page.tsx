@@ -22,6 +22,8 @@ import {
 import { getTodayDateString, addMonthsToDate } from '../../lib/dateUtils';
 import { AgingAnalysisView } from '../../components/finance/AgingAnalysisView';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import {
   Plus,
   CircleDollarSign,
@@ -42,7 +44,7 @@ import {
 } from 'lucide-react';
 
 export default function ContasAReceberPage() {
-  useModuleGuard('contas-a-receber');
+  const moduleAllowed = useModuleGuard('contas-a-receber');
   const {
     activeFarmId,
     activeSeasonId,
@@ -78,6 +80,8 @@ export default function ContasAReceberPage() {
   const [receivingItem, setReceivingItem] = useState<Receivable | null>(null);
   const [fixingPriceItem, setFixingPriceItem] = useState<Receivable | null>(null);
   const [barterSettlingItem, setBarterSettlingItem] = useState<Receivable | null>(null);
+  const [deletingReceivable, setDeletingReceivable] = useState<Receivable | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Receivable Form State
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
@@ -223,6 +227,8 @@ export default function ContasAReceberPage() {
     const rawQty = parseFloat(quantity) || 0;
     const parsedUnitPrice = parseFloat(unitPrice.replace(',', '.')) || 0;
 
+    setIsSubmitting(true);
+    try {
     await addReceivable({
       farmId: activeFarmId,
       cropSeasonId: activeSeasonId,
@@ -268,6 +274,9 @@ export default function ContasAReceberPage() {
     setDescription('');
     setLinkedPayableId('');
     setRecurrencePattern('none');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOpenEdit = (r: Receivable) => {
@@ -294,6 +303,8 @@ export default function ContasAReceberPage() {
     const newTotal = rawQty * price;
     const normalizedBags = calculateNormalizedBags(rawQty, editCommodityUnit);
 
+    setIsSubmitting(true);
+    try {
     await updateReceivable(editingReceivable.id, {
       description: editDescription,
       commodityUnit: editCommodityUnit,
@@ -322,6 +333,9 @@ export default function ContasAReceberPage() {
     });
 
     setEditingReceivable(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleConfirmFixPrice = async (e: React.FormEvent) => {
@@ -338,36 +352,46 @@ export default function ContasAReceberPage() {
       return;
     }
 
-    await fixPriceReceivable(fixingPriceItem.id, parsedPrice, priceFixingDate);
+    setIsSubmitting(true);
+    try {
+      await fixPriceReceivable(fixingPriceItem.id, parsedPrice, priceFixingDate);
 
-    addToast({
-      type: 'success',
-      title: 'Preço Fixado com Sucesso!',
-      message: `Contrato fixado a R$ ${parsedPrice.toFixed(2)}/${fixingPriceItem.commodityUnit || 'sc'}. Receita consolidada!`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Preço Fixado com Sucesso!',
+        message: `Contrato fixado a R$ ${parsedPrice.toFixed(2)}/${fixingPriceItem.commodityUnit || 'sc'}. Receita consolidada!`,
+      });
 
-    setFixingPriceItem(null);
-    setNewFixedPrice('');
+      setFixingPriceItem(null);
+      setNewFixedPrice('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleConfirmSettleBarter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!barterSettlingItem) return;
 
-    await settleBarterContract(
-      barterSettlingItem.id,
-      barterSettlingItem.linkedPayableId || undefined,
-      barterSettlementDate,
-      barterNotes
-    );
+    setIsSubmitting(true);
+    try {
+      await settleBarterContract(
+        barterSettlingItem.id,
+        barterSettlingItem.linkedPayableId || undefined,
+        barterSettlementDate,
+        barterNotes
+      );
 
-    addToast({
-      type: 'success',
-      title: 'Operação Barter Liquidada!',
-      message: `Entrega física confirmada e contas a pagar vinculado compensado automaticamente.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Operação Barter Liquidada!',
+        message: `Entrega física confirmada e contas a pagar vinculado compensado automaticamente.`,
+      });
 
-    setBarterSettlingItem(null);
+      setBarterSettlingItem(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleConfirmReceive = async (e: React.FormEvent) => {
@@ -376,15 +400,20 @@ export default function ContasAReceberPage() {
 
     const bankId = selectedBankAccountId || bankAccounts[0]?.id;
 
-    await receiveReceivable(receivingItem.id, bankId, receivedDate);
+    setIsSubmitting(true);
+    try {
+      await receiveReceivable(receivingItem.id, bankId, receivedDate);
 
-    addToast({
-      type: 'success',
-      title: 'Recebimento Confirmado!',
-      message: `Crédito de R$ ${receivingItem.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} liquidado com sucesso.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Recebimento Confirmado!',
+        message: `Crédito de R$ ${receivingItem.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} liquidado com sucesso.`,
+      });
 
-    setReceivingItem(null);
+      setReceivingItem(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const columns: Column<Receivable>[] = [
@@ -633,12 +662,7 @@ export default function ContasAReceberPage() {
             size="sm"
             iconOnly
             title="Excluir"
-            onClick={async () => {
-              if (confirm('Deseja excluir este recebimento do banco de dados?')) {
-                await deleteReceivable(row.id);
-                addToast({ type: 'info', title: 'Excluído', message: 'Recebimento removido.' });
-              }
-            }}
+            onClick={() => setDeletingReceivable(row)}
           >
             <Trash2 size={15} />
           </ClayButton>
@@ -646,6 +670,10 @@ export default function ContasAReceberPage() {
       ),
     },
   ];
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -1108,7 +1136,7 @@ export default function ContasAReceberPage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsNewModalOpen(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Salvar Contrato no Banco
             </ClayButton>
           </div>
@@ -1214,7 +1242,7 @@ export default function ContasAReceberPage() {
               <ClayButton type="button" variant="ghost" onClick={() => setFixingPriceItem(null)}>
                 Cancelar
               </ClayButton>
-              <ClayButton type="submit" variant="primary">
+              <ClayButton type="submit" variant="primary" loading={isSubmitting}>
                 Confirmar Fixação de Preço
               </ClayButton>
             </div>
@@ -1303,7 +1331,7 @@ export default function ContasAReceberPage() {
               <ClayButton type="button" variant="ghost" onClick={() => setBarterSettlingItem(null)}>
                 Cancelar
               </ClayButton>
-              <ClayButton type="submit" variant="primary">
+              <ClayButton type="submit" variant="primary" loading={isSubmitting}>
                 Confirmar Entrega e Liquidar Barter
               </ClayButton>
             </div>
@@ -1397,7 +1425,7 @@ export default function ContasAReceberPage() {
               <ClayButton type="button" variant="ghost" onClick={() => setEditingReceivable(null)}>
                 Cancelar
               </ClayButton>
-              <ClayButton type="submit" variant="primary">
+              <ClayButton type="submit" variant="primary" loading={isSubmitting}>
                 Salvar Alterações
               </ClayButton>
             </div>
@@ -1470,13 +1498,32 @@ export default function ContasAReceberPage() {
               <ClayButton type="button" variant="ghost" onClick={() => setReceivingItem(null)}>
                 Cancelar
               </ClayButton>
-              <ClayButton type="submit" variant="primary">
+              <ClayButton type="submit" variant="primary" loading={isSubmitting}>
                 Confirmar Crédito no Banco
               </ClayButton>
             </div>
           </form>
         </ClayModal>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deletingReceivable}
+        onClose={() => setDeletingReceivable(null)}
+        onConfirm={async () => {
+          if (!deletingReceivable) return;
+          await deleteReceivable(deletingReceivable.id);
+          addToast({ type: 'info', title: 'Excluído', message: 'Recebimento removido.' });
+          setDeletingReceivable(null);
+        }}
+        title="Excluir Recebimento"
+        description={
+          deletingReceivable
+            ? `Deseja excluir "${deletingReceivable.description}" do banco de dados? Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Excluir"
+        variant="danger"
+      />
     </div>
   );
 }

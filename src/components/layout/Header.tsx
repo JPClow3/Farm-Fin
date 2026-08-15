@@ -46,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
     setCustomDateRange,
     currentPeriodInfo,
     kpis,
+    isLoading,
   } = useFarm();
 
   const [showCustomDateModal, setShowCustomDateModal] = useState(false);
@@ -129,6 +130,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             <select
               value={activeFarmId}
               onChange={(e) => setActiveFarmId(e.target.value)}
+              disabled={isLoading}
               className="input select"
               style={{
                 padding: '6px 28px 6px 12px',
@@ -153,6 +155,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             <select
               value={activeSeasonId}
               onChange={(e) => setActiveSeasonId(e.target.value)}
+              disabled={isLoading}
               className="input select"
               style={{
                 padding: '6px 28px 6px 12px',

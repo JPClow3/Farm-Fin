@@ -12,10 +12,12 @@ import { ClayTable, Column } from '../../components/ui/ClayTable';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { ClayTabs } from '../../components/ui/ClayTabs';
 import { ProgressBar } from '../../components/ui/ProgressBar';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { StockItem, KardexReportItem, LotTraceabilityReport } from '../../lib/types';
 import { getTodayDateString } from '../../lib/dateUtils';
 import { calculateStockAlertSummary, getStockAlertCategory, getExpiryAlertCategory } from '../../lib/stockAlerts';
-import { exportKardexToExcel } from '../../lib/exportKardexExcel';
+import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import {
   Package,
   Sprout,
@@ -40,6 +42,7 @@ import {
 } from 'lucide-react';
 
 export default function EstoquePage() {
+  const moduleAllowed = useModuleGuard('estoque');
   const {
     activeFarm,
     activeFarmId,
@@ -69,6 +72,7 @@ export default function EstoquePage() {
   const [kardexTypeFilter, setKardexTypeFilter] = useState<'todos' | 'entrada' | 'saida'>('todos');
   const [kardexStartDate, setKardexStartDate] = useState<string>('');
   const [kardexEndDate, setKardexEndDate] = useState<string>('');
+  const [isExportingKardex, setIsExportingKardex] = useState(false);
   const [kardexLotSearch, setKardexLotSearch] = useState<string>('');
 
   // Lot traceability filter
@@ -78,6 +82,7 @@ export default function EstoquePage() {
   // Modals
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Item / Entry Form
   const [itemName, setItemName] = useState('');
@@ -345,31 +350,36 @@ export default function EstoquePage() {
       return;
     }
 
-    await addStockItem({
-      farmId: activeFarmId,
-      name: itemName.trim(),
-      category: itemCategory,
-      unit,
-      quantity: qty,
-      minQuantity: minQ,
-      averageCost: cost,
-      unitPrice: cost,
-      lastSupplier: selectedSup?.name || 'Fornecedor',
-      batchNumber: batchNumber.trim() || `LT-${Date.now().toString().slice(-6)}`,
-      location: location.trim() || 'Galpão Principal',
-      expiryDate: expiryDate || '2027-12-31',
-      documentNumber: documentNumber.trim() || 'NF-e',
-      createdAt: entryDate,
-    });
+    setIsSubmitting(true);
+    try {
+      await addStockItem({
+        farmId: activeFarmId,
+        name: itemName.trim(),
+        category: itemCategory,
+        unit,
+        quantity: qty,
+        minQuantity: minQ,
+        averageCost: cost,
+        unitPrice: cost,
+        lastSupplier: selectedSup?.name || 'Fornecedor',
+        batchNumber: batchNumber.trim() || `LT-${Date.now().toString().slice(-6)}`,
+        location: location.trim() || 'Galpão Principal',
+        expiryDate: expiryDate || '2027-12-31',
+        documentNumber: documentNumber.trim() || 'NF-e',
+        createdAt: entryDate,
+      });
 
-    addToast({
-      type: 'success',
-      title: 'Entrada Registrada com Sucesso!',
-      message: `${qty} ${unit} de "${itemName}" integrados ao almoxarifado. Custo Médio Ponderado (CMP) atualizado para R$ ${projectedCMP.newAvgCost.toFixed(2)}/${unit}.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Entrada Registrada com Sucesso!',
+        message: `${qty} ${unit} de "${itemName}" integrados ao almoxarifado. Custo Médio Ponderado (CMP) atualizado para R$ ${projectedCMP.newAvgCost.toFixed(2)}/${unit}.`,
+      });
 
-    setIsEntryModalOpen(false);
-    setItemName('');
+      setIsEntryModalOpen(false);
+      setItemName('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCreateExit = async (e: React.FormEvent) => {
@@ -399,55 +409,73 @@ export default function EstoquePage() {
 
     const exitCost = qty * targetItem.averageCost;
 
-    await addStockMovement({
-      farmId: activeFarmId,
-      stockItemId: targetItem.id,
-      itemName: targetItem.name,
-      type: 'saida',
-      quantity: qty,
-      unit: targetItem.unit,
-      date: applicationDate,
-      fieldId: targetField?.id,
-      fieldName: targetField?.name,
-      machinery: selectedMachinery,
-      operator,
-      documentNumber: `Req. Talhão ${targetField?.name || 'Geral'}`,
-      batchNumber: exitBatchNumber || targetItem.batchNumber,
-      location: targetItem.location,
-      totalCost: parseFloat(exitCost.toFixed(2)),
-    });
+    setIsSubmitting(true);
+    try {
+      await addStockMovement({
+        farmId: activeFarmId,
+        stockItemId: targetItem.id,
+        itemName: targetItem.name,
+        type: 'saida',
+        quantity: qty,
+        unit: targetItem.unit,
+        date: applicationDate,
+        fieldId: targetField?.id,
+        fieldName: targetField?.name,
+        machinery: selectedMachinery,
+        operator,
+        documentNumber: `Req. Talhão ${targetField?.name || 'Geral'}`,
+        batchNumber: exitBatchNumber || targetItem.batchNumber,
+        location: targetItem.location,
+        totalCost: parseFloat(exitCost.toFixed(2)),
+      });
 
-    addToast({
-      type: 'success',
-      title: 'Aplicação no Talhão Registrada!',
-      message: `Baixa de ${qty} ${targetItem.unit} no ${targetField?.name}. Custo direto alocado: R$ ${exitCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (CMP: R$ ${targetItem.averageCost.toFixed(2)}/${targetItem.unit}).`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Aplicação no Talhão Registrada!',
+        message: `Baixa de ${qty} ${targetItem.unit} no ${targetField?.name}. Custo direto alocado: R$ ${exitCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (CMP: R$ ${targetItem.averageCost.toFixed(2)}/${targetItem.unit}).`,
+      });
 
-    setIsExitModalOpen(false);
+      setIsExitModalOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleExportExcel = () => {
-    const itemFilterName =
-      kardexItemFilter === 'todos'
-        ? 'Todos os Insumos'
-        : activeStockItems.find((i) => i.id === kardexItemFilter)?.name || 'Insumo Selecionado';
+  const handleExportExcel = async () => {
+    setIsExportingKardex(true);
+    try {
+      const itemFilterName =
+        kardexItemFilter === 'todos'
+          ? 'Todos os Insumos'
+          : activeStockItems.find((i) => i.id === kardexItemFilter)?.name || 'Insumo Selecionado';
 
-    exportKardexToExcel({
-      kardexRows: kardexData,
-      stockItems: activeStockItems,
-      farmName: activeFarm?.name || 'Fazenda Modelo',
-      selectedItemName: itemFilterName,
-      periodLabel:
-        kardexStartDate || kardexEndDate
-          ? `${kardexStartDate || 'Início'} até ${kardexEndDate || 'Hoje'}`
-          : 'Histórico Completo',
-    });
+      const { exportKardexToExcel } = await import('../../lib/exportKardexExcel');
+      exportKardexToExcel({
+        kardexRows: kardexData,
+        stockItems: activeStockItems,
+        farmName: activeFarm?.name || 'Fazenda Modelo',
+        selectedItemName: itemFilterName,
+        periodLabel:
+          kardexStartDate || kardexEndDate
+            ? `${kardexStartDate || 'Início'} até ${kardexEndDate || 'Hoje'}`
+            : 'Histórico Completo',
+      });
 
-    addToast({
-      type: 'success',
-      title: 'Download Iniciado',
-      message: 'Planilha Excel do Livro Kardex gerada com sucesso!',
-    });
+      addToast({
+        type: 'success',
+        title: 'Download Iniciado',
+        message: 'Planilha Excel do Livro Kardex gerada com sucesso!',
+      });
+    } catch (err) {
+      console.error('Error exporting Kardex to Excel:', err);
+      addToast({
+        type: 'danger',
+        title: 'Erro na Exportação',
+        message: 'Não foi possível gerar a planilha do Livro Kardex.',
+      });
+    } finally {
+      setIsExportingKardex(false);
+    }
   };
 
   const kardexColumns: Column<KardexReportItem>[] = [
@@ -541,6 +569,10 @@ export default function EstoquePage() {
       ),
     },
   ];
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -694,6 +726,12 @@ export default function EstoquePage() {
           </ClayCard>
 
           {/* Stock Cards Grid */}
+          {filteredItems.length === 0 ? (
+            <EmptyState
+              title="Nenhum insumo encontrado"
+              description="Ajuste os filtros de busca ou cadastre uma nova entrada de estoque para começar."
+            />
+          ) : (
           <div className="grid-3">
             {filteredItems.map((item) => {
               const stockCat = getStockAlertCategory(item.quantity, item.minQuantity);
@@ -846,6 +884,7 @@ export default function EstoquePage() {
               );
             })}
           </div>
+          )}
         </>
       )}
 
@@ -861,7 +900,12 @@ export default function EstoquePage() {
             </div>
 
             <div className="flex-row flex-wrap" style={{ gap: 'var(--space-2)' }}>
-              <ClayButton variant="secondary" size="sm" onClick={handleExportExcel}>
+              <ClayButton
+                variant="secondary"
+                size="sm"
+                onClick={handleExportExcel}
+                loading={isExportingKardex}
+              >
                 <FileSpreadsheet size={15} style={{ marginRight: '6px' }} />
                 Exportar Kardex (Excel)
               </ClayButton>
@@ -946,6 +990,12 @@ export default function EstoquePage() {
             </div>
           </ClayCard>
 
+          {lotTraceabilityData.length === 0 ? (
+            <EmptyState
+              title="Nenhum lote rastreável encontrado"
+              description="Ajuste a busca ou registre uma entrada de estoque com número de lote para habilitar a rastreabilidade."
+            />
+          ) : (
           <div className="grid-2">
             {lotTraceabilityData.map((lot) => (
               <ClayCard key={lot.batchNumber}>
@@ -1068,6 +1118,7 @@ export default function EstoquePage() {
               </ClayCard>
             ))}
           </div>
+          )}
         </div>
       )}
 
@@ -1325,7 +1376,7 @@ export default function EstoquePage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsEntryModalOpen(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Salvar Entrada no Almoxarifado
             </ClayButton>
           </div>
@@ -1410,7 +1461,7 @@ export default function EstoquePage() {
             <ClayButton type="button" variant="ghost" onClick={() => setIsExitModalOpen(false)}>
               Cancelar
             </ClayButton>
-            <ClayButton type="submit" variant="primary">
+            <ClayButton type="submit" variant="primary" loading={isSubmitting}>
               Confirmar Aplicação no Talhão
             </ClayButton>
           </div>

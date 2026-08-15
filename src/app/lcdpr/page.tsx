@@ -7,8 +7,12 @@ import { ClayCard } from '../../components/ui/ClayCard';
 import { ClayButton } from '../../components/ui/ClayButton';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { ClayModal } from '../../components/ui/ClayModal';
+import { Skeleton, SkeletonKpiCard } from '../../components/ui/Skeleton';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { getLCDPREntries, generateLCDPR, LCDPREntry } from '../../actions/lcdpr';
 import { useModuleGuard } from '../../lib/useModuleGuard';
+import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import {
   Landmark,
   FileCode2,
@@ -19,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export default function LcdprPage() {
-  useModuleGuard('lcdpr');
+  const moduleAllowed = useModuleGuard('lcdpr');
   const { activeFarm, activeFarmId } = useFarm();
   const { addToast } = useToast();
 
@@ -29,57 +33,96 @@ export default function LcdprPage() {
   const [totalDespesas, setTotalDespesas] = useState(0);
   const [saldoFiscal, setSaldoFiscal] = useState(0);
   const [generatedTxtContent, setGeneratedTxtContent] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  useEffect(() => {
-    async function loadLCDPR() {
-      try {
-        const [resEntries, resTxt] = await Promise.all([
-          getLCDPREntries(activeFarmId, 2026),
-          generateLCDPR(2026, activeFarmId),
-        ]);
+  const loadLCDPR = React.useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [resEntries, resTxt] = await Promise.all([
+        getLCDPREntries(activeFarmId, 2026),
+        generateLCDPR(2026, activeFarmId),
+      ]);
 
-        if (resEntries.success) {
-          setEntries(resEntries.entries);
-          setTotalReceitas(resEntries.totalReceitas);
-          setTotalDespesas(resEntries.totalDespesas);
-          setSaldoFiscal(resEntries.saldoFiscal);
-        }
-
-        if (resTxt.success && resTxt.data) {
-          setGeneratedTxtContent(resTxt.data.content);
-        }
-      } catch (err) {
-        console.error('Failed to load LCDPR:', err);
+      if (resEntries.success) {
+        setEntries(resEntries.entries);
+        setTotalReceitas(resEntries.totalReceitas);
+        setTotalDespesas(resEntries.totalDespesas);
+        setSaldoFiscal(resEntries.saldoFiscal);
+      } else {
+        setEntries([]);
+        setLoadError('Não foi possível apurar os lançamentos do Livro Caixa Digital.');
       }
+
+      if (resTxt.success && resTxt.data) {
+        setGeneratedTxtContent(resTxt.data.content);
+      }
+    } catch (err) {
+      console.error('Failed to load LCDPR:', err);
+      setEntries([]);
+      setLoadError('Falha de comunicação ao carregar o LCDPR. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-    loadLCDPR();
   }, [activeFarmId]);
 
+  useEffect(() => {
+    loadLCDPR();
+  }, [loadLCDPR]);
+
   const handleDownloadTxt = async () => {
-    let txt = generatedTxtContent;
-    if (!txt) {
-      const res = await generateLCDPR(2026, activeFarmId);
-      if (res.success && res.data) {
-        txt = res.data.content;
+    setIsDownloading(true);
+    try {
+      let txt = generatedTxtContent;
+      if (!txt) {
+        const res = await generateLCDPR(2026, activeFarmId);
+        if (res.success && res.data) {
+          txt = res.data.content;
+        }
       }
+
+      if (!txt) {
+        addToast({
+          type: 'warning',
+          title: 'Nada para Gerar',
+          message: 'Não há lançamentos suficientes para gerar o arquivo LCDPR.',
+        });
+        return;
+      }
+
+      const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `LCDPR_2026_${activeFarm?.name?.replace(/\s+/g, '_') || 'Fazenda'}_Layout1.3.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      addToast({
+        type: 'success',
+        title: 'Arquivo LCDPR Gerado!',
+        message:
+          'Arquivo .txt gerado com sucesso em conformidade com a Receita Federal do Brasil (Layout 1.3).',
+      });
+    } catch (err) {
+      console.error('Failed to generate LCDPR download:', err);
+      addToast({
+        type: 'danger',
+        title: 'Erro ao Gerar Arquivo',
+        message: 'Não foi possível gerar o arquivo LCDPR (.txt).',
+      });
+    } finally {
+      setIsDownloading(false);
     }
-
-    const blob = new Blob([txt || ''], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `LCDPR_2026_${activeFarm?.name?.replace(/\s+/g, '_') || 'Fazenda'}_Layout1.3.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    addToast({
-      type: 'success',
-      title: 'Arquivo LCDPR Gerado!',
-      message:
-        'Arquivo .txt gerado com sucesso em conformidade com a Receita Federal do Brasil (Layout 1.3).',
-    });
   };
+
+  if (!moduleAllowed) {
+    return <AppShellSkeleton />;
+  }
 
   return (
     <div className="flex-col" style={{ gap: 'var(--space-6)' }}>
@@ -97,7 +140,12 @@ export default function LcdprPage() {
             <FileCode2 size={15} style={{ marginRight: '6px' }} />
             Visualizar Layout .TXT
           </ClayButton>
-          <ClayButton variant="primary" onClick={handleDownloadTxt}>
+          <ClayButton
+            variant="primary"
+            onClick={handleDownloadTxt}
+            loading={isDownloading}
+            disabled={isLoading}
+          >
             <Download size={15} style={{ marginRight: '6px' }} />
             Baixar Arquivo LCDPR (.txt)
           </ClayButton>
@@ -143,6 +191,7 @@ export default function LcdprPage() {
       {/* Fiscal KPIs */}
       <div className="grid-3">
         <KpiCard
+          loading={isLoading}
           label="Total de Receitas da Atividade Rural"
           value={`R$ ${totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={<CircleDollarSign size={20} />}
@@ -150,6 +199,7 @@ export default function LcdprPage() {
           subtext="Entradas tributáveis"
         />
         <KpiCard
+          loading={isLoading}
           label="Total de Despesas (Custeio e Investimento)"
           value={`R$ ${totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={<CreditCard size={20} />}
@@ -157,6 +207,7 @@ export default function LcdprPage() {
           subtext="Deduções autorizadas pela RFB"
         />
         <KpiCard
+          loading={isLoading}
           label="Resultado Líquido Apurado no Livro Caixa"
           value={`R$ ${saldoFiscal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={<BarChart3 size={20} />}
@@ -211,6 +262,22 @@ export default function LcdprPage() {
           </div>
         </div>
 
+        {isLoading ? (
+          <div className="flex-col" style={{ gap: '10px' }}>
+            <Skeleton variant="text" count={6} />
+          </div>
+        ) : loadError ? (
+          <ErrorState
+            title="Não foi possível carregar os lançamentos"
+            description={loadError}
+            onRetry={loadLCDPR}
+          />
+        ) : entries.length === 0 ? (
+          <EmptyState
+            title="Nenhum lançamento registrado em 2026"
+            description="Ainda não há contas pagas ou recebidas classificadas para o Livro Caixa Digital deste ano."
+          />
+        ) : (
         <div className="clay-table-wrapper">
           <table className="clay-table">
             <thead>
@@ -291,6 +358,7 @@ export default function LcdprPage() {
             </tbody>
           </table>
         </div>
+        )}
       </ClayCard>
 
       {/* Preview Modal for Layout .txt */}

@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { AppShellSkeleton } from './AppShellSkeleton';
+import { Breadcrumbs } from './Breadcrumbs';
 import { ClayModal } from '../ui/ClayModal';
 import { ClayInput } from '../ui/ClayInput';
 import { ClaySelect } from '../ui/ClaySelect';
@@ -27,6 +29,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     activeFields,
     addPayable,
     addReceivable,
+    isLoading,
   } = useFarm();
   const { addToast } = useToast();
 
@@ -111,7 +114,16 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onOpenQuickNew={() => setIsQuickNewOpen(true)}
       />
-      <main className="app-main">{children}</main>
+      <main className="app-main">
+        {isLoading ? (
+          <AppShellSkeleton />
+        ) : (
+          <>
+            <Breadcrumbs />
+            {children}
+          </>
+        )}
+      </main>
 
       {/* Quick Launch Modal */}
       <ClayModal

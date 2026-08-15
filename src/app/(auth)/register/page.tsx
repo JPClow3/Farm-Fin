@@ -82,14 +82,12 @@ function RegisterForm() {
 
     setIsLoading(true);
 
+    // 1. Register with Better Auth / Neon Auth API. This provider call is
+    // best-effort — if it's unreachable we still proceed to the real DB write
+    // below, since that's what actually creates the account. A genuine
+    // "already registered" response, though, should stop the flow.
     try {
-      // 1. Register with Better Auth / Neon Auth API
-      const authRes = await authClient.signUp.email({
-        email,
-        password,
-        name,
-      });
-
+      const authRes = await authClient.signUp.email({ email, password, name });
       if (authRes?.error) {
         if (authRes.error.message?.includes('already exists') || authRes.error.status === 422) {
           setErrorMessage('Este e-mail já está cadastrado. Tente fazer login.');
@@ -97,8 +95,14 @@ function RegisterForm() {
           return;
         }
       }
+    } catch (err) {
+      console.warn('[Register] Neon Auth signUp unreachable, continuing with DB registration:', err);
+    }
 
-      // 2. Initialize Tenant Organization & Farm record in database
+    // 2. Initialize Tenant Organization & Farm record in the database. This is
+    // the write that actually matters — its failure must be surfaced, never
+    // silently treated as a successful registration.
+    try {
       const tenantRes = await registerUserAction({
         name,
         email,
@@ -110,12 +114,12 @@ function RegisterForm() {
       const assignedOrgId = tenantRes.organization?.id || `org-${Date.now()}`;
       const assignedUserId = tenantRes.user?.id || `u-${Date.now()}`;
 
-      // 3. Set Session Cookies
+      // Set Session Cookies
       const token = `farmfin-token-${Date.now()}`;
       document.cookie = `farmfin_session=${token}; path=/; max-age=604800; SameSite=Lax`;
       document.cookie = `better-auth.session_token=${token}; path=/; max-age=604800; SameSite=Lax`;
 
-      // 4. Save active user in localStorage
+      // Save active user in localStorage
       const activeUser = {
         id: assignedUserId,
         organizationId: assignedOrgId,
@@ -133,28 +137,10 @@ function RegisterForm() {
         router.refresh();
       }, 800);
     } catch (err) {
-      console.warn('[Register] Neon Auth registration fallback:', err);
-      // Fallback for offline demo mode
-      const token = `farmfin-token-${Date.now()}`;
-      document.cookie = `farmfin_session=${token}; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `better-auth.session_token=${token}; path=/; max-age=604800; SameSite=Lax`;
-
-      const activeUser = {
-        id: `u-${Date.now()}`,
-        organizationId: `org-${Date.now()}`,
-        name,
-        email,
-        role,
-      };
-      localStorage.setItem('farmfin_active_user', JSON.stringify(activeUser));
-      document.cookie = `farmfin_demo_role=${role}; path=/; max-age=604800; SameSite=Lax`;
-
-      setSuccessMessage('Cadastro concluído! Redirecionando...');
-      setTimeout(() => {
-        router.push('/');
-        router.refresh();
-      }, 600);
-    } finally {
+      console.error('[Register] Failed to create tenant/organization/farm record:', err);
+      setErrorMessage(
+        'Não foi possível concluir o cadastro no banco de dados. Verifique sua conexão e tente novamente — nenhuma conta foi criada.'
+      );
       setIsLoading(false);
     }
   };
