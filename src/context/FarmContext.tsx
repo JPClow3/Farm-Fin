@@ -609,6 +609,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const averageCostPerHectare = estimatedCropCost / (totalArea || 1);
 
     const lowStockCount = activeStockItems.filter((s) => s.quantity <= s.minQuantity).length;
+    const pendingReconciliationCount = bankStatements.filter(
+      (s) => !s.matched && s.status !== 'conciliado'
+    ).length;
 
     return {
       totalBankBalance,
@@ -630,8 +633,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dueIn3DaysPayablesCount: dueIn3DaysPayables.length,
       dueIn7DaysPayablesCount: dueIn7DaysPayables.length,
       pendingApprovalPayablesCount: pendingApprovalPayables.length,
+      pendingReconciliationCount,
     };
-  }, [bankAccounts, activePayables, activeReceivables, activeStockItems, activeFarm]);
+  }, [bankAccounts, activePayables, activeReceivables, activeStockItems, activeFarm, bankStatements]);
 
   // Mutators with direct Server Action persistence (Single Source of Truth)
 

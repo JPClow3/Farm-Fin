@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { authClient } from '../../lib/auth-client';
+import { PeriodCashFlowSparkline } from '../finance/PeriodCashFlowSparkline';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -240,6 +241,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                 Editar período
               </button>
             )}
+
+            {/* Instant Cash Flow Trend Sparkline */}
+            <PeriodCashFlowSparkline />
           </div>
         </div>
 

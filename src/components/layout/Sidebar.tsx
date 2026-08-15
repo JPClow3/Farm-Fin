@@ -98,6 +98,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           href: '/conciliacao',
           label: 'Conciliação Bancária',
           icon: <Building2 size={18} strokeWidth={2.2} />,
+          badgeCount:
+            (kpis.pendingReconciliationCount || 0) > 0
+              ? kpis.pendingReconciliationCount
+              : undefined,
           module: 'conciliacao',
         },
       ],

@@ -15,6 +15,8 @@ export interface KpiCardProps {
   className?: string;
   onClick?: () => void;
   loading?: boolean;
+  variant?: 'default' | 'highlight' | 'accent';
+  featuredBadge?: string;
 }
 
 export const KpiCard: React.FC<KpiCardProps> = ({
@@ -27,10 +29,19 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   className = '',
   onClick,
   loading = false,
+  variant = 'default',
+  featuredBadge,
 }) => {
+  const variantClass =
+    variant === 'highlight'
+      ? 'kpi-card--highlight'
+      : variant === 'accent'
+        ? 'kpi-card--accent'
+        : '';
+
   if (loading) {
     return (
-      <div className={`kpi-card ${className}`.trim()}>
+      <div className={`kpi-card ${variantClass} ${className}`.trim()}>
         <div className="kpi-card__header">
           <Skeleton variant="text" width="60%" height={12} />
           <Skeleton variant="circle" width={32} height={32} />
@@ -45,10 +56,13 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 
   return (
     <div
-      className={`kpi-card ${onClick ? 'cursor-pointer' : ''} ${className}`.trim()}
+      className={`kpi-card ${variantClass} ${onClick ? 'cursor-pointer' : ''} ${className}`.trim()}
       onClick={onClick}
       style={{ cursor: onClick ? 'pointer' : 'default' }}
     >
+      {featuredBadge && (
+        <span className="kpi-card__featured-badge">{featuredBadge}</span>
+      )}
       <div className="kpi-card__header">
         <span className="kpi-card__label">{label}</span>
         <div className={`kpi-card__icon kpi-card__icon--${iconColor}`}>{icon}</div>
