@@ -124,6 +124,7 @@ function RegisterForm() {
         role,
       };
       localStorage.setItem('farmfin_active_user', JSON.stringify(activeUser));
+      document.cookie = `farmfin_demo_role=${role}; path=/; max-age=604800; SameSite=Lax`;
 
       setSuccessMessage('Conta criada com sucesso! Inicializando ambiente...');
 
@@ -146,6 +147,7 @@ function RegisterForm() {
         role,
       };
       localStorage.setItem('farmfin_active_user', JSON.stringify(activeUser));
+      document.cookie = `farmfin_demo_role=${role}; path=/; max-age=604800; SameSite=Lax`;
 
       setSuccessMessage('Cadastro concluído! Redirecionando...');
       setTimeout(() => {

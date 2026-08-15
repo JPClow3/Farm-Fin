@@ -76,7 +76,17 @@ export const CostBreakdownChart: React.FC<CostBreakdownChartProps> = ({
                   flexShrink: 0,
                 }}
               />
-              <span style={{ color: 'var(--text-primary)', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.label}</span>
+              <span
+                style={{
+                  color: 'var(--text-primary)',
+                  fontWeight: '500',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {cat.label}
+              </span>
             </div>
             <div className="flex-row" style={{ gap: '12px' }}>
               <span style={{ color: 'var(--text-secondary)' }}>

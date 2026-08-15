@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
 import { ClayCard } from '../../components/ui/ClayCard';
@@ -8,10 +9,13 @@ import { ClayButton } from '../../components/ui/ClayButton';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
 import { Settings, Smartphone, Mail, Package, RotateCcw, ShieldCheck } from 'lucide-react';
+import { useModuleGuard } from '../../lib/useModuleGuard';
 
 export default function ConfiguracoesPage() {
+  useModuleGuard('configuracoes');
   const { resetToDefaults } = useFarm();
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [producerName, setProducerName] = useState('Antônio da Silva Carvalho');
   const [document, setDocument] = useState('123.456.789-00');
@@ -248,6 +252,7 @@ export default function ConfiguracoesPage() {
                   { value: 'Gestor', label: 'Gestor de Fazenda (Operacional)' },
                   { value: 'Financeiro', label: 'Assistente Financeiro (Lançamentos)' },
                   { value: 'Contador', label: 'Contador Rural (DRE / LCDPR)' },
+                  { value: 'Operador', label: 'Operador de Campo (Estoque / Maquinário)' },
                 ]}
                 value={activeRole}
                 onChange={(e) => {
@@ -261,11 +266,13 @@ export default function ConfiguracoesPage() {
                     user.role = newRole;
                     localStorage.setItem('farmfin_active_user', JSON.stringify(user));
                   } catch {}
+                  window.document.cookie = `farmfin_demo_role=${newRole}; path=/; max-age=604800; SameSite=Lax`;
                   addToast({
                     type: 'info',
                     title: 'Perfil RBAC Alterado',
                     message: `Permissões e visualização agora ajustadas para: ${newRole}.`,
                   });
+                  router.refresh();
                 }}
               />
 

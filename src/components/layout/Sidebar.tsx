@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useFarm } from '../../context/FarmContext';
+import { getAuthSessionAction } from '../../actions/auth';
+import { canViewModule, AppModule } from '../../lib/permissions';
+import { UserRoleType } from '../../lib/types';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -29,6 +32,7 @@ interface NavItemConfig {
   label: string;
   icon: React.ReactNode;
   badgeCount?: number;
+  module: AppModule;
 }
 
 interface NavSection {
@@ -39,8 +43,23 @@ interface NavSection {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const { kpis } = useFarm();
+  const [role, setRole] = useState<UserRoleType | null>(null);
 
-  const sections: NavSection[] = [
+  useEffect(() => {
+    let cancelled = false;
+    getAuthSessionAction()
+      .then((session) => {
+        if (!cancelled) setRole(session.role);
+      })
+      .catch(() => {
+        if (!cancelled) setRole('Produtor');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  const allSections: NavSection[] = [
     {
       title: 'Principal',
       items: [
@@ -48,11 +67,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           href: '/',
           label: 'Dashboard',
           icon: <LayoutDashboard size={18} strokeWidth={2.2} />,
+          module: 'dashboard',
         },
         {
           href: '/fluxo-de-caixa',
           label: 'Fluxo de Caixa',
           icon: <TrendingUp size={18} strokeWidth={2.2} />,
+          module: 'fluxo-de-caixa',
         },
       ],
     },
@@ -64,16 +85,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           label: 'Contas a Pagar',
           icon: <CreditCard size={18} strokeWidth={2.2} />,
           badgeCount: kpis.overduePayablesCount > 0 ? kpis.overduePayablesCount : undefined,
+          module: 'contas-a-pagar',
         },
         {
           href: '/contas-a-receber',
           label: 'Contas a Receber',
           icon: <CircleDollarSign size={18} strokeWidth={2.2} />,
+          module: 'contas-a-receber',
         },
         {
           href: '/conciliacao',
           label: 'Conciliação Bancária',
           icon: <Building2 size={18} strokeWidth={2.2} />,
+          module: 'conciliacao',
         },
       ],
     },
@@ -85,11 +109,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           label: 'Estoque de Insumos',
           icon: <Package size={18} strokeWidth={2.2} />,
           badgeCount: kpis.lowStockCount > 0 ? kpis.lowStockCount : undefined,
+          module: 'estoque',
         },
         {
           href: '/custos',
           label: 'Custo por Talhão',
           icon: <Sprout size={18} strokeWidth={2.2} />,
+          module: 'custos',
         },
       ],
     },
@@ -100,11 +126,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           href: '/dre',
           label: 'DRE Agrícola',
           icon: <FileSpreadsheet size={18} strokeWidth={2.2} />,
+          module: 'dre',
         },
         {
           href: '/lcdpr',
           label: 'LCDPR (Receita Federal)',
           icon: <Landmark size={18} strokeWidth={2.2} />,
+          module: 'lcdpr',
         },
       ],
     },
@@ -115,15 +143,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           href: '/cadastros',
           label: 'Cadastros Base',
           icon: <FolderKanban size={18} strokeWidth={2.2} />,
+          module: 'cadastros',
         },
         {
           href: '/configuracoes',
           label: 'Configurações',
           icon: <Settings size={18} strokeWidth={2.2} />,
+          module: 'configuracoes',
         },
       ],
     },
   ];
+
+  // While the role hasn't resolved yet, show everything to avoid a flash of an
+  // empty sidebar; once resolved, filter modules the current role can't view.
+  const sections: NavSection[] = role
+    ? allSections
+        .map((sec) => ({
+          ...sec,
+          items: sec.items.filter((item) => canViewModule(role, item.module)),
+        }))
+        .filter((sec) => sec.items.length > 0)
+    : allSections;
 
   return (
     <>
@@ -166,9 +207,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     onClick={onClose}
                   >
                     <span className="nav-item__icon">{item.icon}</span>
-                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                    <span
+                      style={{
+                        flex: 1,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {item.label}
+                    </span>
                     {item.badgeCount !== undefined && (
-                      <span className="nav-item__badge" style={{ flexShrink: 0 }}>{item.badgeCount}</span>
+                      <span className="nav-item__badge" style={{ flexShrink: 0 }}>
+                        {item.badgeCount}
+                      </span>
                     )}
                   </Link>
                 );

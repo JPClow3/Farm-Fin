@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { registerUserAction, registerSchema, getAuthSessionAction } from '../auth';
+import { registerUserAction, getAuthSessionAction } from '../auth';
+import { registerSchema } from '../../lib/validations/auth.schema';
 
 describe('Auth Server Actions', () => {
   it('validates registerSchema successfully with valid data', () => {

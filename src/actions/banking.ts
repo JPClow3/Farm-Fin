@@ -8,6 +8,8 @@ import { SEED_BANK_ACCOUNTS, SEED_BANK_STATEMENTS } from '@/db/seed';
 import { BankAccount, BankStatementItem } from '@/lib/types';
 import { createBankAccountSchema, matchStatementSchema } from '@/lib/validations';
 import { mapDbBankAccountToBankAccount, mapDbBankStatementToBankStatement } from '@/lib/mappers';
+import { requireModuleAccess } from '@/lib/permissionGuard';
+import { writeAuditLog } from '@/lib/audit';
 
 // ----------------------
 // Bank Accounts
@@ -32,6 +34,7 @@ export async function getBankAccounts(organizationId?: string): Promise<BankAcco
 }
 
 export async function createBankAccount(data: Omit<BankAccount, 'id'>): Promise<BankAccount> {
+  const session = await requireModuleAccess('cadastros', 'manage');
   const parsed = createBankAccountSchema.safeParse(data);
   const validData = parsed.success ? parsed.data : data;
 
@@ -47,10 +50,18 @@ export async function createBankAccount(data: Omit<BankAccount, 'id'>): Promise<
         balance: validData.balance ?? 0,
         type: validData.type,
         pixKey: validData.pixKey || null,
+        createdBy: session.user.id,
+        updatedBy: session.user.id,
       })
       .returning();
 
     if (result[0]) {
+      await writeAuditLog({
+        action: 'create',
+        entityType: 'bank_account',
+        entityId: result[0].id,
+        details: validData.bankName,
+      });
       return mapDbBankAccountToBankAccount(result[0]);
     }
   } catch (error) {
@@ -93,11 +104,18 @@ export async function getBankStatements(bankAccountId?: string): Promise<BankSta
   }
 }
 
+/**
+ * Confirms a manual match between a bank statement line and one or more
+ * payables/receivables (N:M - e.g. a single combined bank transfer that
+ * settles several separate invoices at once).
+ */
 export async function matchStatementAction(
   statementId: string,
-  transactionId: string
+  transactionIds: string | string[]
 ): Promise<{ success: boolean; error?: string }> {
-  const parsed = matchStatementSchema.safeParse({ statementId, transactionId });
+  await requireModuleAccess('conciliacao', 'manage');
+  const ids = (Array.isArray(transactionIds) ? transactionIds : [transactionIds]).filter(Boolean);
+  const parsed = matchStatementSchema.safeParse({ statementId, transactionIds: ids });
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message || 'Dados inválidos.' };
   }
@@ -107,10 +125,18 @@ export async function matchStatementAction(
       .update(bankStatements)
       .set({
         matched: true,
-        matchedTransactionId: parsed.data.transactionId,
+        matchedTransactionId: parsed.data.transactionIds[0],
+        matchedTransactionIds: JSON.stringify(parsed.data.transactionIds),
         confidenceScore: 100,
       })
       .where(eq(bankStatements.id, parsed.data.statementId));
+
+    await writeAuditLog({
+      action: 'update',
+      entityType: 'reconciliation',
+      entityId: parsed.data.statementId,
+      details: `Conciliado manualmente com ${parsed.data.transactionIds.length} lançamento(s): ${parsed.data.transactionIds.join(', ')}`,
+    });
 
     return { success: true };
   } catch (error) {

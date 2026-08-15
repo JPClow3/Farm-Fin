@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 
-export type ToastType = 'success' | 'warning' | 'danger' | 'info';
+export type ToastType = 'success' | 'warning' | 'danger' | 'error' | 'info';
 
 export interface ToastItem {
   id: string;
@@ -45,25 +45,28 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
       <div className="toast-container">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`toast toast--${t.type}`}
-            onClick={() => removeToast(t.id)}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }}
-          >
-            <div style={{ flexShrink: 0, marginTop: '2px' }}>
-              {t.type === 'success' && <CheckCircle2 size={18} />}
-              {t.type === 'warning' && <AlertTriangle size={18} />}
-              {t.type === 'danger' && <XCircle size={18} />}
-              {t.type === 'info' && <Info size={18} />}
+        {toasts.map((t) => {
+          const toastClass = t.type === 'error' ? 'toast--danger' : `toast--${t.type}`;
+          return (
+            <div
+              key={t.id}
+              className={`toast ${toastClass}`}
+              onClick={() => removeToast(t.id)}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }}
+            >
+              <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                {t.type === 'success' && <CheckCircle2 size={18} />}
+                {t.type === 'warning' && <AlertTriangle size={18} />}
+                {(t.type === 'danger' || t.type === 'error') && <XCircle size={18} />}
+                {t.type === 'info' && <Info size={18} />}
+              </div>
+              <div>
+                <div className="toast__title">{t.title}</div>
+                {t.message && <div className="toast__message">{t.message}</div>}
+              </div>
             </div>
-            <div>
-              <div className="toast__title">{t.title}</div>
-              {t.message && <div className="toast__message">{t.message}</div>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

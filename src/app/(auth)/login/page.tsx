@@ -62,6 +62,7 @@ function LoginForm() {
         role: userRole || 'Produtor',
       };
       localStorage.setItem('farmfin_active_user', JSON.stringify(matchedUser));
+      document.cookie = `farmfin_demo_role=${matchedUser.role}; path=/; max-age=604800; SameSite=Lax`;
 
       // 4. Redirect to requested page or dashboard
       router.push(returnTo);
@@ -82,6 +83,7 @@ function LoginForm() {
         role: userRole || 'Produtor',
       };
       localStorage.setItem('farmfin_active_user', JSON.stringify(matchedUser));
+      document.cookie = `farmfin_demo_role=${matchedUser.role}; path=/; max-age=604800; SameSite=Lax`;
 
       router.push(returnTo);
       router.refresh();

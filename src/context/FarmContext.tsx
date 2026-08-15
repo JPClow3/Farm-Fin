@@ -13,6 +13,7 @@ import {
   StockItem,
   StockMovement,
   Machinery,
+  Employee,
   BankStatementItem,
   AgroKPIs,
 } from '../lib/types';
@@ -23,13 +24,18 @@ import {
   getFields,
   createField,
   getCropSeasons,
+  createCropSeason,
   getSuppliers,
+  createSupplier,
   getCustomers,
+  createCustomer,
 } from '../actions/farm';
 import {
   getPayables,
   createPayable,
   updatePayable as updatePayableAction,
+  approvePayableAction,
+  rejectPayableAction,
   payPayableAction,
   deletePayable as deletePayableAction,
   getReceivables,
@@ -37,6 +43,9 @@ import {
   updateReceivable as updateReceivableAction,
   receiveReceivableAction,
   deleteReceivable as deleteReceivableAction,
+  fixPriceReceivableAction,
+  settleBarterContractAction,
+  linkBarterPayableAction,
 } from '../actions/finance';
 import { getBankAccounts, getBankStatements, matchStatementAction } from '../actions/banking';
 import {
@@ -44,12 +53,37 @@ import {
   createStockItem,
   getStockMovements,
   addStockMovementAction,
+  createStockEntryAction,
+  createStockExitAction,
 } from '../actions/stock';
+import { getTodayDateString } from '../lib/dateUtils';
 import {
   getMachinery,
   createMachinery,
+  updateMachinery as updateMachineryAction,
   deleteMachinery as deleteMachineryAction,
 } from '../actions/machinery';
+import {
+  getEmployees,
+  createEmployee,
+  updateEmployee as updateEmployeeAction,
+  deleteEmployee as deleteEmployeeAction,
+} from '../actions/employees';
+
+export type GlobalPeriodFilterType =
+  'safra' | 'mes_atual' | 'proximos_30_dias' | 'trimestre' | 'ano_atual' | 'personalizado';
+
+export interface CustomDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+export interface PeriodInfo {
+  type: GlobalPeriodFilterType;
+  startDate: string;
+  endDate: string;
+  label: string;
+}
 
 interface FarmContextData {
   // Active Selection
@@ -59,6 +93,11 @@ interface FarmContextData {
   activeSeasonId: string;
   setActiveSeasonId: (id: string) => void;
   activeSeason: CropSeason;
+  periodFilter: GlobalPeriodFilterType;
+  setPeriodFilter: (filter: GlobalPeriodFilterType) => void;
+  customDateRange: CustomDateRange;
+  setCustomDateRange: (range: CustomDateRange) => void;
+  currentPeriodInfo: PeriodInfo;
   isLoading: boolean;
 
   // Collections
@@ -71,19 +110,27 @@ interface FarmContextData {
   bankAccounts: BankAccount[];
   payables: Payable[];
   activePayables: Payable[];
+  activeSeasonPayables: Payable[];
+  periodFilteredPayables: Payable[];
   receivables: Receivable[];
   activeReceivables: Receivable[];
+  activeSeasonReceivables: Receivable[];
+  periodFilteredReceivables: Receivable[];
   stockItems: StockItem[];
   activeStockItems: StockItem[];
   stockMovements: StockMovement[];
   activeStockMovements: StockMovement[];
   machinery: Machinery[];
   activeMachinery: Machinery[];
+  employees: Employee[];
+  activeEmployees: Employee[];
   bankStatements: BankStatementItem[];
 
   // Mutators
   addPayable: (data: Omit<Payable, 'id'> & { installmentsCount?: number }) => Promise<void>;
   updatePayable: (id: string, data: Partial<Payable>) => Promise<void>;
+  approvePayable: (id: string, approverName?: string) => Promise<void>;
+  rejectPayable: (id: string, reason: string, approverName?: string) => Promise<void>;
   payPayable: (
     id: string,
     bankAccountId: string,
@@ -95,12 +142,28 @@ interface FarmContextData {
   updateReceivable: (id: string, data: Partial<Receivable>) => Promise<void>;
   receiveReceivable: (id: string, bankAccountId: string, receivedDate?: string) => Promise<void>;
   deleteReceivable: (id: string) => Promise<void>;
+  fixPriceReceivable: (id: string, unitPrice: number, fixingDate?: string) => Promise<void>;
+  settleBarterContract: (
+    receivableId: string,
+    payableId?: string,
+    settlementDate?: string,
+    notes?: string
+  ) => Promise<void>;
+  linkBarterPayable: (receivableId: string, payableId: string) => Promise<void>;
   addStockItem: (item: Omit<StockItem, 'id'>) => Promise<void>;
   addStockMovement: (movement: Omit<StockMovement, 'id'>) => Promise<void>;
-  matchStatement: (statementId: string, transactionId: string) => Promise<void>;
+  matchStatement: (statementId: string, transactionIds: string | string[]) => Promise<void>;
   addField: (field: Omit<Field, 'id'>) => Promise<void>;
   addFarm: (farm: Omit<Farm, 'id'>) => Promise<void>;
+  addCropSeason: (season: Omit<CropSeason, 'id'>) => Promise<void>;
+  addSupplier: (supplier: Omit<Supplier, 'id'>) => Promise<void>;
+  addCustomer: (customer: Omit<Customer, 'id'>) => Promise<void>;
   addMachinery: (machinery: Omit<Machinery, 'id'>) => Promise<void>;
+  updateMachinery: (id: string, data: Partial<Machinery>) => Promise<void>;
+  deleteMachinery: (id: string) => Promise<void>;
+  addEmployee: (employee: Omit<Employee, 'id'>) => Promise<void>;
+  updateEmployee: (id: string, data: Partial<Employee>) => Promise<void>;
+  deleteEmployee: (id: string) => Promise<void>;
   resetToDefaults: () => Promise<void>;
   reloadFromDB: () => Promise<void>;
 
@@ -110,6 +173,8 @@ interface FarmContextData {
 
 const PREF_FARM_KEY = 'farmfin_pref_farm_id';
 const PREF_SEASON_KEY = 'farmfin_pref_season_id';
+const PREF_PERIOD_KEY = 'farmfin_pref_period_filter';
+const PREF_CUSTOM_RANGE_KEY = 'farmfin_pref_custom_range';
 
 const FarmContext = createContext<FarmContextData>({} as FarmContextData);
 
@@ -125,10 +190,16 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [machinery, setMachinery] = useState<Machinery[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [bankStatements, setBankStatements] = useState<BankStatementItem[]>([]);
 
   const [activeFarmId, setActiveFarmIdState] = useState<string>('');
   const [activeSeasonId, setActiveSeasonIdState] = useState<string>('');
+  const [periodFilter, setPeriodFilterState] = useState<GlobalPeriodFilterType>('safra');
+  const [customDateRange, setCustomDateRangeState] = useState<CustomDateRange>({
+    startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Preference persistence helpers
@@ -143,6 +214,20 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSeasonIdState(id);
     try {
       localStorage.setItem(PREF_SEASON_KEY, id);
+    } catch {}
+  }, []);
+
+  const setPeriodFilter = useCallback((filter: GlobalPeriodFilterType) => {
+    setPeriodFilterState(filter);
+    try {
+      localStorage.setItem(PREF_PERIOD_KEY, filter);
+    } catch {}
+  }, []);
+
+  const setCustomDateRange = useCallback((range: CustomDateRange) => {
+    setCustomDateRangeState(range);
+    try {
+      localStorage.setItem(PREF_CUSTOM_RANGE_KEY, JSON.stringify(range));
     } catch {}
   }, []);
 
@@ -162,6 +247,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fetchedStockItems,
         fetchedStockMovements,
         fetchedMachinery,
+        fetchedEmployees,
         fetchedBankStatements,
       ] = await Promise.all([
         getFarms(),
@@ -175,6 +261,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getStockItems(),
         getStockMovements(),
         getMachinery(),
+        getEmployees(),
         getBankStatements(),
       ]);
 
@@ -189,6 +276,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setStockItems(fetchedStockItems);
       setStockMovements(fetchedStockMovements);
       setMachinery(fetchedMachinery);
+      setEmployees(fetchedEmployees);
       setBankStatements(fetchedBankStatements);
 
       // Determine active farm dynamically
@@ -217,6 +305,28 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         initialSeasonId = currentSeason.id;
       }
       setActiveSeasonIdState(initialSeasonId);
+
+      // Determine saved period filter
+      try {
+        const savedPeriod = localStorage.getItem(PREF_PERIOD_KEY) as GlobalPeriodFilterType;
+        if (
+          savedPeriod &&
+          [
+            'safra',
+            'mes_atual',
+            'proximos_30_dias',
+            'trimestre',
+            'ano_atual',
+            'personalizado',
+          ].includes(savedPeriod)
+        ) {
+          setPeriodFilterState(savedPeriod);
+        }
+        const savedRange = localStorage.getItem(PREF_CUSTOM_RANGE_KEY);
+        if (savedRange) {
+          setCustomDateRangeState(JSON.parse(savedRange));
+        }
+      } catch {}
     } catch (error) {
       console.error('[FarmContext] Error loading initial state from DB:', error);
     } finally {
@@ -256,6 +366,86 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, [seasons, activeSeasonId]);
 
+  const currentPeriodInfo = useMemo<PeriodInfo>(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+
+    if (periodFilter === 'safra') {
+      return {
+        type: 'safra',
+        startDate: activeSeason?.startDate || `${currentYear}-01-01`,
+        endDate: activeSeason?.endDate || `${currentYear}-12-31`,
+        label: activeSeason?.name || 'Safra Atual',
+      };
+    }
+
+    if (periodFilter === 'mes_atual') {
+      const startOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+      const endOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+      const monthNames = [
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+      ];
+      return {
+        type: 'mes_atual',
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+        label: `Mês Atual (${monthNames[currentMonth]}/${currentYear})`,
+      };
+    }
+
+    if (periodFilter === 'proximos_30_dias') {
+      const today = now.toISOString().split('T')[0];
+      const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      return {
+        type: 'proximos_30_dias',
+        startDate: today,
+        endDate: future,
+        label: 'Próximos 30 Dias',
+      };
+    }
+
+    if (periodFilter === 'trimestre') {
+      const quarter = Math.floor(currentMonth / 3);
+      const startQuarter = new Date(currentYear, quarter * 3, 1).toISOString().split('T')[0];
+      const endQuarter = new Date(currentYear, quarter * 3 + 3, 0).toISOString().split('T')[0];
+      return {
+        type: 'trimestre',
+        startDate: startQuarter,
+        endDate: endQuarter,
+        label: `${quarter + 1}º Trimestre/${currentYear}`,
+      };
+    }
+
+    if (periodFilter === 'ano_atual') {
+      return {
+        type: 'ano_atual',
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`,
+        label: `Ano Calendário ${currentYear}`,
+      };
+    }
+
+    // Personalizado
+    return {
+      type: 'personalizado',
+      startDate: customDateRange.startDate,
+      endDate: customDateRange.endDate,
+      label: `Personalizado (${customDateRange.startDate} até ${customDateRange.endDate})`,
+    };
+  }, [periodFilter, activeSeason, customDateRange]);
+
   const activeFields = useMemo(() => {
     return fields.filter((f) => f.farmId === activeFarmId);
   }, [fields, activeFarmId]);
@@ -264,9 +454,49 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return payables.filter((p) => p.farmId === activeFarmId);
   }, [payables, activeFarmId]);
 
+  const activeSeasonPayables = useMemo(() => {
+    return payables.filter((p) => {
+      if (p.farmId !== activeFarmId) return false;
+      if (p.cropSeasonId && activeSeasonId && p.cropSeasonId === activeSeasonId) return true;
+      if (!p.cropSeasonId && activeSeason?.startDate && activeSeason?.endDate) {
+        return p.dueDate >= activeSeason.startDate && p.dueDate <= activeSeason.endDate;
+      }
+      return true;
+    });
+  }, [payables, activeFarmId, activeSeasonId, activeSeason]);
+
+  const periodFilteredPayables = useMemo(() => {
+    if (periodFilter === 'safra') return activeSeasonPayables;
+    return activePayables.filter((p) => {
+      const d = p.dueDate || p.paymentDate;
+      if (!d) return true;
+      return d >= currentPeriodInfo.startDate && d <= currentPeriodInfo.endDate;
+    });
+  }, [periodFilter, activeSeasonPayables, activePayables, currentPeriodInfo]);
+
   const activeReceivables = useMemo(() => {
     return receivables.filter((r) => r.farmId === activeFarmId);
   }, [receivables, activeFarmId]);
+
+  const activeSeasonReceivables = useMemo(() => {
+    return receivables.filter((r) => {
+      if (r.farmId !== activeFarmId) return false;
+      if (r.cropSeasonId && activeSeasonId && r.cropSeasonId === activeSeasonId) return true;
+      if (!r.cropSeasonId && activeSeason?.startDate && activeSeason?.endDate) {
+        return r.dueDate >= activeSeason.startDate && r.dueDate <= activeSeason.endDate;
+      }
+      return true;
+    });
+  }, [receivables, activeFarmId, activeSeasonId, activeSeason]);
+
+  const periodFilteredReceivables = useMemo(() => {
+    if (periodFilter === 'safra') return activeSeasonReceivables;
+    return activeReceivables.filter((r) => {
+      const d = r.dueDate || r.receivedDate;
+      if (!d) return true;
+      return d >= currentPeriodInfo.startDate && d <= currentPeriodInfo.endDate;
+    });
+  }, [periodFilter, activeSeasonReceivables, activeReceivables, currentPeriodInfo]);
 
   const activeStockItems = useMemo(() => {
     return stockItems.filter((s) => s.farmId === activeFarmId);
@@ -280,6 +510,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return machinery.filter((m) => m.farmId === activeFarmId);
   }, [machinery, activeFarmId]);
 
+  const activeEmployees = useMemo(() => {
+    return employees.filter((e) => e.farmId === activeFarmId);
+  }, [employees, activeFarmId]);
+
   // KPI Calculations
   const kpis = useMemo(() => {
     const totalBankBalance = bankAccounts.reduce((sum, b) => sum + b.balance, 0);
@@ -288,7 +522,6 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (p) => p.status === 'pendente' || p.status === 'vencido'
     );
     const totalPendingPayables = pendingPayables.reduce((sum, p) => sum + p.amount, 0);
-
     const todayStr = new Date().toISOString().split('T')[0];
     const overduePayables = activePayables.filter(
       (p) => p.status === 'vencido' || (p.status === 'pendente' && p.dueDate < todayStr)
@@ -296,9 +529,61 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const totalOverduePayables = overduePayables.reduce((sum, p) => sum + p.amount, 0);
 
     const dueTodayPayables = activePayables.filter(
-      (p) => p.status === 'pendente' && p.dueDate === todayStr
+      (p) => (p.status === 'pendente' || p.status === 'vencido') && p.dueDate === todayStr
     );
     const totalDueTodayPayables = dueTodayPayables.reduce((sum, p) => sum + p.amount, 0);
+
+    const dueIn3DaysPayables = activePayables.filter((p) => {
+      if (p.status === 'pago' || p.status === 'cancelado') return false;
+      const pParts = p.dueDate.split('-');
+      const tParts = todayStr.split('-');
+      if (pParts.length === 3 && tParts.length === 3) {
+        const pUtc = Date.UTC(
+          parseInt(pParts[0], 10),
+          parseInt(pParts[1], 10) - 1,
+          parseInt(pParts[2], 10)
+        );
+        const tUtc = Date.UTC(
+          parseInt(tParts[0], 10),
+          parseInt(tParts[1], 10) - 1,
+          parseInt(tParts[2], 10)
+        );
+        const diff = Math.round((pUtc - tUtc) / (1000 * 60 * 60 * 24));
+        return diff >= 1 && diff <= 3;
+      }
+      return false;
+    });
+    const totalDueIn3DaysPayables = dueIn3DaysPayables.reduce((sum, p) => sum + p.amount, 0);
+
+    const dueIn7DaysPayables = activePayables.filter((p) => {
+      if (p.status === 'pago' || p.status === 'cancelado') return false;
+      const pParts = p.dueDate.split('-');
+      const tParts = todayStr.split('-');
+      if (pParts.length === 3 && tParts.length === 3) {
+        const pUtc = Date.UTC(
+          parseInt(pParts[0], 10),
+          parseInt(pParts[1], 10) - 1,
+          parseInt(pParts[2], 10)
+        );
+        const tUtc = Date.UTC(
+          parseInt(tParts[0], 10),
+          parseInt(tParts[1], 10) - 1,
+          parseInt(tParts[2], 10)
+        );
+        const diff = Math.round((pUtc - tUtc) / (1000 * 60 * 60 * 24));
+        return diff >= 4 && diff <= 7;
+      }
+      return false;
+    });
+    const totalDueIn7DaysPayables = dueIn7DaysPayables.reduce((sum, p) => sum + p.amount, 0);
+
+    const pendingApprovalPayables = activePayables.filter(
+      (p) =>
+        p.requiresApproval &&
+        p.approvalStatus !== 'aprovado' &&
+        p.status !== 'pago' &&
+        p.status !== 'cancelado'
+    );
 
     const pendingReceivables = activeReceivables.filter((r) => r.status === 'pendente');
     const totalPendingReceivables = pendingReceivables.reduce((sum, r) => sum + r.totalAmount, 0);
@@ -328,6 +613,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalPendingPayables,
       totalOverduePayables,
       totalDueTodayPayables,
+      totalDueIn3DaysPayables,
+      totalDueIn7DaysPayables,
       totalPendingReceivables,
       totalReceivedThisMonth: receivedThisMonth,
       totalPaidThisMonth: paidThisMonth,
@@ -337,6 +624,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       averageCostPerHectare,
       lowStockCount,
       overduePayablesCount: overduePayables.length,
+      dueTodayPayablesCount: dueTodayPayables.length,
+      dueIn3DaysPayablesCount: dueIn3DaysPayables.length,
+      dueIn7DaysPayablesCount: dueIn7DaysPayables.length,
+      pendingApprovalPayablesCount: pendingApprovalPayables.length,
     };
   }, [bankAccounts, activePayables, activeReceivables, activeStockItems, activeFarm]);
 
@@ -354,6 +645,48 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPayables((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
     await updatePayableAction(id, data);
   }, []);
+
+  const approvePayable = useCallback(
+    async (id: string, approverName: string = 'Diretoria Financeira') => {
+      const today = new Date().toISOString().split('T')[0];
+      setPayables((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                approvalStatus: 'aprovado',
+                approvedBy: approverName,
+                approvedAt: today,
+              }
+            : p
+        )
+      );
+      await approvePayableAction(id, approverName);
+    },
+    []
+  );
+
+  const rejectPayable = useCallback(
+    async (id: string, reason: string, approverName: string = 'Diretoria Financeira') => {
+      const today = new Date().toISOString().split('T')[0];
+      setPayables((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                approvalStatus: 'rejeitado',
+                status: 'cancelado',
+                rejectionReason: reason,
+                approvedBy: approverName,
+                approvedAt: today,
+              }
+            : p
+        )
+      );
+      await rejectPayableAction(id, reason, approverName);
+    },
+    []
+  );
 
   const payPayable = useCallback(
     async (id: string, bankAccountId: string, paidAmount: number, paymentDate?: string) => {
@@ -439,10 +772,187 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await deleteReceivableAction(id);
   }, []);
 
-  const addStockItem = useCallback(async (item: Omit<StockItem, 'id'>) => {
-    const created = await createStockItem(item);
-    setStockItems((prev) => [created, ...prev]);
+  const fixPriceReceivable = useCallback(
+    async (id: string, unitPrice: number, fixingDate?: string) => {
+      setReceivables((prev) =>
+        prev.map((r) => {
+          if (r.id === id) {
+            const rawQty = r.quantity !== undefined && r.quantity > 0 ? r.quantity : r.bagsQuantity;
+            const newTotal = rawQty > 0 ? rawQty * unitPrice : unitPrice;
+            return {
+              ...r,
+              unitPrice,
+              totalAmount: newTotal,
+              priceFixingStatus: 'fixado',
+            };
+          }
+          return r;
+        })
+      );
+      await fixPriceReceivableAction(id, unitPrice, fixingDate);
+    },
+    []
+  );
+
+  const settleBarterContract = useCallback(
+    async (receivableId: string, payableId?: string, settlementDate?: string, notes?: string) => {
+      const sDate = settlementDate || new Date().toISOString().split('T')[0];
+
+      // Optimistically update receivable
+      let targetPayableId = payableId;
+      setReceivables((prev) =>
+        prev.map((r) => {
+          if (r.id === receivableId) {
+            if (!targetPayableId && r.linkedPayableId) {
+              targetPayableId = r.linkedPayableId;
+            }
+            return {
+              ...r,
+              status: 'pago',
+              barterStatus: 'liquidado',
+              receivedDate: sDate,
+            };
+          }
+          return r;
+        })
+      );
+
+      // Optimistically update linked payable if available
+      if (targetPayableId) {
+        setPayables((prev) =>
+          prev.map((p) => {
+            if (p.id === targetPayableId) {
+              return {
+                ...p,
+                status: 'pago',
+                isBarter: true,
+                barterStatus: 'liquidado',
+                paymentDate: sDate,
+                paidAmount: p.amount,
+              };
+            }
+            return p;
+          })
+        );
+      }
+
+      await settleBarterContractAction(receivableId, targetPayableId, sDate, notes);
+    },
+    []
+  );
+
+  const linkBarterPayable = useCallback(async (receivableId: string, payableId: string) => {
+    setReceivables((prev) =>
+      prev.map((r) =>
+        r.id === receivableId
+          ? {
+              ...r,
+              linkedPayableId: payableId,
+              barterStatus: 'vinculado',
+              contractType: 'Barter Insumos',
+            }
+          : r
+      )
+    );
+    setPayables((prev) =>
+      prev.map((p) =>
+        p.id === payableId
+          ? { ...p, linkedReceivableId: receivableId, isBarter: true, barterStatus: 'vinculado' }
+          : p
+      )
+    );
+    await linkBarterPayableAction(receivableId, payableId);
   }, []);
+
+  const addStockItem = useCallback(
+    async (item: Omit<StockItem, 'id'>) => {
+      const existing = stockItems.find(
+        (s) =>
+          s.farmId === item.farmId && s.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+      );
+
+      const incomingQty = Number(item.quantity) || 0;
+      const incomingPrice = Number(item.unitPrice ?? item.averageCost) || 0;
+      const entryDate = item.createdAt ? String(item.createdAt).slice(0, 10) : getTodayDateString();
+
+      if (existing) {
+        const currentQty = Number(existing.quantity) || 0;
+        const currentAvgCost = Number(existing.averageCost) || 0;
+        const totalQty = currentQty + incomingQty;
+        const totalCost = currentQty * currentAvgCost + incomingQty * incomingPrice;
+        const newAvgCost =
+          totalQty > 0 ? parseFloat((totalCost / totalQty).toFixed(2)) : incomingPrice;
+
+        setStockItems((prev) =>
+          prev.map((s) =>
+            s.id === existing.id
+              ? {
+                  ...s,
+                  quantity: totalQty,
+                  averageCost: newAvgCost,
+                  lastSupplier: item.lastSupplier || s.lastSupplier,
+                  batchNumber: item.batchNumber || s.batchNumber,
+                  location: item.location || s.location,
+                  expiryDate: item.expiryDate || s.expiryDate,
+                }
+              : s
+          )
+        );
+
+        const newMovement: StockMovement = {
+          id: `mov-${Date.now()}`,
+          farmId: item.farmId,
+          stockItemId: existing.id,
+          itemName: existing.name,
+          type: 'entrada',
+          quantity: incomingQty,
+          unit: existing.unit,
+          date: entryDate,
+          documentNumber: item.documentNumber || 'NF-e',
+          batchNumber: item.batchNumber || existing.batchNumber || 'LT-PADRAO',
+          location: item.location || existing.location || 'Galpão Principal',
+          totalCost: parseFloat((incomingQty * incomingPrice).toFixed(2)),
+        };
+        setStockMovements((prev) => [newMovement, ...prev]);
+
+        await createStockEntryAction({
+          farmId: item.farmId,
+          name: item.name,
+          category: item.category,
+          unit: item.unit,
+          quantity: incomingQty,
+          unitPrice: incomingPrice,
+          minQuantity: item.minQuantity,
+          supplierName: item.lastSupplier || undefined,
+          documentNumber: item.documentNumber || undefined,
+          batchNumber: item.batchNumber || undefined,
+          location: item.location || undefined,
+          expiryDate: item.expiryDate || undefined,
+          date: entryDate,
+        });
+      } else {
+        const created = await createStockItem(item);
+        setStockItems((prev) => [created, ...prev]);
+
+        const newMovement: StockMovement = {
+          id: `mov-${Date.now()}`,
+          farmId: item.farmId,
+          stockItemId: created.id,
+          itemName: created.name,
+          type: 'entrada',
+          quantity: incomingQty,
+          unit: item.unit,
+          date: entryDate,
+          documentNumber: item.documentNumber || 'NF-e',
+          batchNumber: item.batchNumber || 'LT-PADRAO',
+          location: item.location || 'Galpão Principal',
+          totalCost: parseFloat((incomingQty * incomingPrice).toFixed(2)),
+        };
+        setStockMovements((prev) => [newMovement, ...prev]);
+      }
+    },
+    [stockItems]
+  );
 
   const addStockMovement = useCallback(async (movement: Omit<StockMovement, 'id'>) => {
     const created = await addStockMovementAction(movement);
@@ -463,21 +973,26 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, []);
 
-  const matchStatement = useCallback(async (statementId: string, transactionId: string) => {
-    setBankStatements((prev) =>
-      prev.map((stmt) =>
-        stmt.id === statementId
-          ? {
-              ...stmt,
-              matched: true,
-              matchedTransactionId: transactionId,
-              confidenceScore: 100,
-            }
-          : stmt
-      )
-    );
-    await matchStatementAction(statementId, transactionId);
-  }, []);
+  const matchStatement = useCallback(
+    async (statementId: string, transactionIds: string | string[]) => {
+      const ids = Array.isArray(transactionIds) ? transactionIds : [transactionIds];
+      setBankStatements((prev) =>
+        prev.map((stmt) =>
+          stmt.id === statementId
+            ? {
+                ...stmt,
+                matched: true,
+                matchedTransactionId: ids[0],
+                matchedTransactionIds: ids,
+                confidenceScore: 100,
+              }
+            : stmt
+        )
+      );
+      await matchStatementAction(statementId, transactionIds);
+    },
+    []
+  );
 
   const addField = useCallback(async (field: Omit<Field, 'id'>) => {
     const created = await createField(field);
@@ -495,9 +1010,55 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [activeFarmId, setActiveFarmId]
   );
 
+  const addCropSeason = useCallback(
+    async (season: Omit<CropSeason, 'id'>) => {
+      const created = await createCropSeason(season);
+      setSeasons((prev) => [...prev, created]);
+      if (created.isCurrent) {
+        setActiveSeasonId(created.id);
+      }
+    },
+    [setActiveSeasonId]
+  );
+
+  const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id'>) => {
+    const created = await createSupplier(supplier);
+    setSuppliers((prev) => [...prev, created]);
+  }, []);
+
+  const addCustomer = useCallback(async (customer: Omit<Customer, 'id'>) => {
+    const created = await createCustomer(customer);
+    setCustomers((prev) => [...prev, created]);
+  }, []);
+
   const addMachinery = useCallback(async (item: Omit<Machinery, 'id'>) => {
     const created = await createMachinery(item);
     setMachinery((prev) => [...prev, created]);
+  }, []);
+
+  const updateMachinery = useCallback(async (id: string, data: Partial<Machinery>) => {
+    const updated = await updateMachineryAction(id, data);
+    setMachinery((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+  }, []);
+
+  const deleteMachinery = useCallback(async (id: string) => {
+    await deleteMachineryAction(id);
+    setMachinery((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
+  const addEmployee = useCallback(async (item: Omit<Employee, 'id'>) => {
+    const created = await createEmployee(item);
+    setEmployees((prev) => [created, ...prev]);
+  }, []);
+
+  const updateEmployee = useCallback(async (id: string, data: Partial<Employee>) => {
+    const updated = await updateEmployeeAction(id, data);
+    setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, ...updated } : e)));
+  }, []);
+
+  const deleteEmployee = useCallback(async (id: string) => {
+    await deleteEmployeeAction(id);
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
   const resetToDefaults = useCallback(async () => {
@@ -518,6 +1079,11 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeSeasonId,
         setActiveSeasonId,
         activeSeason,
+        periodFilter,
+        setPeriodFilter,
+        customDateRange,
+        setCustomDateRange,
+        currentPeriodInfo,
         isLoading,
         farms,
         fields,
@@ -528,29 +1094,48 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         bankAccounts,
         payables,
         activePayables,
+        activeSeasonPayables,
+        periodFilteredPayables,
         receivables,
         activeReceivables,
+        activeSeasonReceivables,
+        periodFilteredReceivables,
         stockItems,
         activeStockItems,
         stockMovements,
         activeStockMovements,
         machinery,
         activeMachinery,
+        employees,
+        activeEmployees,
         bankStatements,
         addPayable,
         updatePayable,
+        approvePayable,
+        rejectPayable,
         payPayable,
         deletePayable,
         addReceivable,
         updateReceivable,
         receiveReceivable,
         deleteReceivable,
+        fixPriceReceivable,
+        settleBarterContract,
+        linkBarterPayable,
         addStockItem,
         addStockMovement,
         matchStatement,
         addField,
         addFarm,
+        addCropSeason,
+        addSupplier,
+        addCustomer,
         addMachinery,
+        updateMachinery,
+        deleteMachinery,
+        addEmployee,
+        updateEmployee,
+        deleteEmployee,
         resetToDefaults,
         reloadFromDB: loadData,
         kpis,

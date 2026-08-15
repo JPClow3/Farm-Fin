@@ -34,7 +34,17 @@ export const FieldComparisonChart: React.FC<FieldComparisonChartProps> = ({
         return (
           <div key={item.fieldName} className="flex-col" style={{ gap: '4px' }}>
             <div className="flex-between" style={{ fontSize: 'var(--text-xs)' }}>
-              <span style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flex: 1 }}>
+              <span
+                style={{
+                  fontWeight: '600',
+                  color: 'var(--text-primary)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
                 {item.fieldName} ({item.area} ha)
               </span>
               <div className="flex-row" style={{ gap: '8px', flexShrink: 0 }}>

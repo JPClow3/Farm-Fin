@@ -4,6 +4,23 @@ import { getPayables, getReceivables } from './finance';
 import { getFarms } from './farm';
 import { generateLCDPRSchema } from '@/lib/validations';
 import { ActionResult } from '@/lib/action-result';
+import { requireModuleAccess } from '@/lib/permissionGuard';
+import { writeAuditLog } from '@/lib/audit';
+import { Farm } from '@/lib/types';
+
+/**
+ * LCDPR reports the DECLARANT's proportional share of revenue/expenses for
+ * farms held in condomínio or parceria (multiple co-owners), per Receita
+ * Federal rules for rural producers - not the farm's full operational total.
+ * Individual/arrendamento/comodato exploitation types report 100%.
+ */
+function getDeclarantShareFactor(farm?: Farm): number {
+  if (!farm) return 1;
+  const isSplit = farm.exploitationType === 'condominio' || farm.exploitationType === 'parceria';
+  if (!isSplit) return 1;
+  const pct = farm.declarantPercentage ?? 100;
+  return Math.max(0, Math.min(100, pct)) / 100;
+}
 
 export interface LCDPREntry {
   id: string;
@@ -39,6 +56,7 @@ export async function getLCDPREntries(
   saldoFiscal: number;
   error?: string;
 }> {
+  await requireModuleAccess('lcdpr', 'view');
   try {
     const [farmsList, payablesList, receivablesList] = await Promise.all([
       getFarms(),
@@ -48,14 +66,17 @@ export async function getLCDPREntries(
 
     const activeFarm = farmsList.find((f) => f.id === farmId) || farmsList[0];
     const yearStr = String(year);
+    const shareFactor = getDeclarantShareFactor(activeFarm);
 
     const entries: LCDPREntry[] = [];
     let totalReceitas = 0;
     let totalDespesas = 0;
 
     for (const r of receivablesList) {
+      if (r.includeInLcdpr === false) continue;
       if (r.dueDate.startsWith(yearStr) || r.dueDate.startsWith('2026')) {
-        totalReceitas += r.totalAmount;
+        const declaredAmount = r.totalAmount * shareFactor;
+        totalReceitas += declaredAmount;
         entries.push({
           id: r.id,
           date: r.dueDate,
@@ -66,15 +87,21 @@ export async function getLCDPREntries(
           numDoc: 'REC-00' + r.id.slice(-4),
           docType: 'Recibo / NF',
           tipoDoc: 'Recibo / NF',
-          history: r.description,
-          historico: r.description,
+          history:
+            shareFactor < 1
+              ? `${r.description} (${Math.round(shareFactor * 100)}% rateio declarante)`
+              : r.description,
+          historico:
+            shareFactor < 1
+              ? `${r.description} (${Math.round(shareFactor * 100)}% rateio declarante)`
+              : r.description,
           participante: r.customerName,
           participantDoc: '84.046.101/0001-93',
           cpfCnpj: '84.046.101/0001-93',
           entryType: 'Receita da Produção',
           tipoLancamento: 'Receita da Produção',
-          amount: r.totalAmount,
-          valor: r.totalAmount,
+          amount: declaredAmount,
+          valor: declaredAmount,
           balanceType: 'E',
           tipo: 'E',
         });
@@ -82,8 +109,10 @@ export async function getLCDPREntries(
     }
 
     for (const p of payablesList) {
+      if (p.includeInLcdpr === false) continue;
       if (p.dueDate.startsWith(yearStr) || p.dueDate.startsWith('2026')) {
-        totalDespesas += p.amount;
+        const declaredAmount = p.amount * shareFactor;
+        totalDespesas += declaredAmount;
         entries.push({
           id: p.id,
           date: p.dueDate,
@@ -94,15 +123,21 @@ export async function getLCDPREntries(
           numDoc: 'NF-e ' + p.id.slice(-5),
           docType: 'Nota Fiscal',
           tipoDoc: 'Nota Fiscal',
-          history: p.description,
-          historico: p.description,
+          history:
+            shareFactor < 1
+              ? `${p.description} (${Math.round(shareFactor * 100)}% rateio declarante)`
+              : p.description,
+          historico:
+            shareFactor < 1
+              ? `${p.description} (${Math.round(shareFactor * 100)}% rateio declarante)`
+              : p.description,
           participante: p.supplierName,
           participantDoc: '12.345.678/0001-90',
           cpfCnpj: '12.345.678/0001-90',
           entryType: 'Despesa de Custeio',
           tipoLancamento: 'Despesa de Custeio',
-          amount: p.amount,
-          valor: p.amount,
+          amount: declaredAmount,
+          valor: declaredAmount,
           balanceType: 'S',
           tipo: 'S',
         });
@@ -135,23 +170,59 @@ export async function generateLCDPR(
   year: number = 2026,
   farmId: string = 'f0000000-0000-4000-8000-000000000001'
 ): Promise<ActionResult<{ content: string; filename: string }>> {
+  await requireModuleAccess('lcdpr', 'manage');
   try {
     const parsed = generateLCDPRSchema.safeParse({ year, farmId });
     const validYear = parsed.success ? parsed.data.year : year;
     const validFarmId = parsed.success ? parsed.data.farmId : farmId;
 
-    const mockTxt = `0000|LCDPR|0013|12345678901234|${validYear}
-0010|${validFarmId}|FAZENDA SANTA FE|BR-163 KM 740|SORRISO|MT|78890-000
-0030|1|FAZENDA SANTA FE|MT-5107909|12345678|100|2400|0
-0040|1|001|0845-1|28475-9|BANCO DO BRASIL
-0050|0101${validYear}|1|1|1|145000.00|D|3355000.00|P|PAGTO YARA BRASIL ADUBOS
-0050|1501${validYear}|1|1|1|480000.00|C|3835000.00|P|REC VENDA AMAGGI EXPORTACAO
-9999|7`;
+    const [farmsList, report] = await Promise.all([
+      getFarms(),
+      getLCDPREntries(validFarmId, validYear),
+    ]);
+    const farm = farmsList.find((f) => f.id === validFarmId) || farmsList[0];
+    const shareFactor = getDeclarantShareFactor(farm);
+    const cnpjCpf = (farm?.cnpjCpf || farm?.caepf || '00000000000000').replace(/\D/g, '');
+    const carNumber = farm?.carNumber || 'N/A';
+    const [city, state] = (farm?.location || 'Sorriso - MT').split(' - ');
+
+    let runningBalance = 0;
+    const lines: string[] = [];
+    lines.push(`0000|LCDPR|0013|${cnpjCpf}|${validYear}`);
+    lines.push(`0010|${validFarmId}|${(farm?.name || 'FAZENDA').toUpperCase()}|${carNumber}|${(city || 'SORRISO').toUpperCase()}|${(state || 'MT').trim()}`);
+    lines.push(
+      `0030|1|${(farm?.name || 'FAZENDA').toUpperCase()}|${carNumber}|${farm?.caepf || ''}|${
+        farm?.exploitationType === 'condominio' || farm?.exploitationType === 'parceria'
+          ? Math.round(shareFactor * 100)
+          : 100
+      }|${Math.round(farm?.totalArea || 0)}|0`
+    );
+
+    // Sorted chronologically for the running balance column (report entries are newest-first)
+    const chronological = [...report.entries].sort((a, b) => a.date.localeCompare(b.date));
+    for (const e of chronological) {
+      runningBalance += e.tipo === 'E' ? e.amount : -e.amount;
+      const [yy, mm, dd] = e.date.split('-');
+      const ddmmyyyy = `${dd}${mm}${yy}`;
+      lines.push(
+        `0050|${ddmmyyyy}|1|1|1|${e.amount.toFixed(2)}|${e.tipo}|${runningBalance.toFixed(2)}|P|${e.historico}`
+      );
+    }
+    lines.push(`9999|${lines.length + 1}`);
+
+    const content = lines.join('\n');
+
+    await writeAuditLog({
+      action: 'generate',
+      entityType: 'lcdpr',
+      entityId: validFarmId,
+      details: `LCDPR ${validYear} gerado: ${chronological.length} lançamentos, saldo fiscal R$ ${report.saldoFiscal.toFixed(2)}`,
+    });
 
     return {
       success: true,
       data: {
-        content: mockTxt,
+        content,
         filename: `LCDPR_${validYear}_${validFarmId.slice(0, 8)}.txt`,
       },
     };

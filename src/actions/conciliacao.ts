@@ -6,6 +6,52 @@ import { eq, and, desc } from 'drizzle-orm';
 import { getEffectiveOrganizationId } from '@/lib/session';
 import { getTodayDateString } from '@/lib/dateUtils';
 import { ActionResult } from '@/lib/action-result';
+import { requireModuleAccess } from '@/lib/permissionGuard';
+import { writeAuditLog } from '@/lib/audit';
+
+const MATCH_TOLERANCE = 0.05;
+
+/**
+ * Finds a combination of up to `maxSize` candidates (by amount) whose sum
+ * matches `targetAmount` within MATCH_TOLERANCE - supports N:M reconciliation
+ * where one bank statement line settles several payables/receivables at once
+ * (e.g. a single combined bank transfer covering multiple invoices).
+ */
+function findCombinationMatch<T extends { id: string; amount: number }>(
+  candidates: T[],
+  targetAmount: number,
+  maxSize: number = 3
+): T[] | null {
+  const n = candidates.length;
+  // Single-item match first (cheapest, most common case)
+  for (const c of candidates) {
+    if (Math.abs(c.amount - targetAmount) < MATCH_TOLERANCE) return [c];
+  }
+  if (n < 2) return null;
+
+  // Pairs
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (Math.abs(candidates[i].amount + candidates[j].amount - targetAmount) < MATCH_TOLERANCE) {
+        return [candidates[i], candidates[j]];
+      }
+    }
+  }
+  if (maxSize < 3 || n < 3) return null;
+
+  // Triples
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      for (let k = j + 1; k < n; k++) {
+        const sum = candidates[i].amount + candidates[j].amount + candidates[k].amount;
+        if (Math.abs(sum - targetAmount) < MATCH_TOLERANCE) {
+          return [candidates[i], candidates[j], candidates[k]];
+        }
+      }
+    }
+  }
+  return null;
+}
 
 export interface ParsedTransaction {
   date: string;
@@ -105,6 +151,7 @@ export async function uploadAndParseBankStatement({
   fileContent: string;
   fileName?: string;
 }) {
+  await requireModuleAccess('conciliacao', 'manage');
   try {
     const orgId = await getEffectiveOrganizationId();
     const isOfx =
@@ -197,6 +244,7 @@ export async function getBankStatements(bankAccountId?: string) {
 export async function autoMatchTransactions(
   bankAccountId?: string
 ): Promise<ActionResult<{ matchesFound: number; message: string }>> {
+  await requireModuleAccess('conciliacao', 'manage');
   try {
     const orgId = await getEffectiveOrganizationId();
 
@@ -219,28 +267,40 @@ export async function autoMatchTransactions(
       where: eq(receivables.organizationId, orgId),
     });
 
+    // Track candidates already consumed by a match in this run so the same
+    // payable/receivable isn't reused across multiple statement lines.
+    const usedPayableIds = new Set<string>();
+    const usedReceivableIds = new Set<string>();
     let matchesFound = 0;
+    let combinationMatchesFound = 0;
 
     for (const stmt of unmatchedStatements) {
       const stmtAmount = Number(stmt.amount);
 
       if (stmtAmount < 0) {
         const absAmt = Math.abs(stmtAmount);
-        const match = allPayables.find((p) => {
-          const payAmt = Number(p.paidAmount || p.amount);
-          return Math.abs(payAmt - absAmt) < 0.05;
-        });
+        const candidates = allPayables
+          .filter((p) => !usedPayableIds.has(p.id))
+          .map((p) => ({ id: p.id, amount: Number(p.paidAmount || p.amount), row: p }))
+          .slice(0, 60);
 
-        if (match) {
+        const combo = findCombinationMatch(candidates, absAmt);
+        if (combo) {
+          const ids = combo.map((c) => c.id);
+          ids.forEach((id) => usedPayableIds.add(id));
+          const anchor = combo[0].row;
           const stmtD = new Date(stmt.date).getTime();
-          const matchD = new Date(match.paymentDate || match.dueDate).getTime();
+          const matchD = new Date(anchor.paymentDate || anchor.dueDate).getTime();
           const diffDays = Math.abs(stmtD - matchD) / (1000 * 3600 * 24);
-          const score = diffDays <= 1 ? 100 : diffDays <= 3 ? 90 : diffDays <= 7 ? 80 : 70;
+          // Combination matches carry a bit more uncertainty than an exact 1:1 hit.
+          const baseScore = diffDays <= 1 ? 100 : diffDays <= 3 ? 90 : diffDays <= 7 ? 80 : 70;
+          const score = combo.length > 1 ? Math.max(60, baseScore - 15) : baseScore;
 
           await db
             .update(bankStatements)
             .set({
-              matchedTransactionId: match.id,
+              matchedTransactionId: ids[0],
+              matchedTransactionIds: JSON.stringify(ids),
               confidenceScore: score,
               matched: score >= 90,
               updatedAt: new Date(),
@@ -248,23 +308,30 @@ export async function autoMatchTransactions(
             .where(eq(bankStatements.id, stmt.id));
 
           matchesFound++;
+          if (combo.length > 1) combinationMatchesFound++;
         }
       } else if (stmtAmount > 0) {
-        const match = allReceivables.find((r) => {
-          const recAmt = Number(r.totalAmount);
-          return Math.abs(recAmt - stmtAmount) < 0.05;
-        });
+        const candidates = allReceivables
+          .filter((r) => !usedReceivableIds.has(r.id))
+          .map((r) => ({ id: r.id, amount: Number(r.totalAmount), row: r }))
+          .slice(0, 60);
 
-        if (match) {
+        const combo = findCombinationMatch(candidates, stmtAmount);
+        if (combo) {
+          const ids = combo.map((c) => c.id);
+          ids.forEach((id) => usedReceivableIds.add(id));
+          const anchor = combo[0].row;
           const stmtD = new Date(stmt.date).getTime();
-          const matchD = new Date(match.receivedDate || match.dueDate).getTime();
+          const matchD = new Date(anchor.receivedDate || anchor.dueDate).getTime();
           const diffDays = Math.abs(stmtD - matchD) / (1000 * 3600 * 24);
-          const score = diffDays <= 1 ? 100 : diffDays <= 3 ? 90 : diffDays <= 7 ? 80 : 70;
+          const baseScore = diffDays <= 1 ? 100 : diffDays <= 3 ? 90 : diffDays <= 7 ? 80 : 70;
+          const score = combo.length > 1 ? Math.max(60, baseScore - 15) : baseScore;
 
           await db
             .update(bankStatements)
             .set({
-              matchedTransactionId: match.id,
+              matchedTransactionId: ids[0],
+              matchedTransactionIds: JSON.stringify(ids),
               confidenceScore: score,
               matched: score >= 90,
               updatedAt: new Date(),
@@ -272,15 +339,25 @@ export async function autoMatchTransactions(
             .where(eq(bankStatements.id, stmt.id));
 
           matchesFound++;
+          if (combo.length > 1) combinationMatchesFound++;
         }
       }
     }
+
+    await writeAuditLog({
+      action: 'update',
+      entityType: 'reconciliation',
+      details: `Auto-match: ${matchesFound} correspondência(s), ${combinationMatchesFound} por combinação N:M`,
+    });
 
     return {
       success: true,
       data: {
         matchesFound,
-        message: `Conciliação automática finalizada: ${matchesFound} correspondências encontradas.`,
+        message:
+          combinationMatchesFound > 0
+            ? `Conciliação automática finalizada: ${matchesFound} correspondências encontradas (${combinationMatchesFound} por combinação de múltiplos lançamentos).`
+            : `Conciliação automática finalizada: ${matchesFound} correspondências encontradas.`,
       },
     };
   } catch (error) {
@@ -295,22 +372,3 @@ export async function autoMatchTransactions(
   }
 }
 
-export async function confirmStatementMatch(statementId: string, matchedTransactionId?: string) {
-  try {
-    const [updated] = await db
-      .update(bankStatements)
-      .set({
-        matched: true,
-        matchedTransactionId: matchedTransactionId || 'manual-match',
-        confidenceScore: 100,
-        updatedAt: new Date(),
-      })
-      .where(eq(bankStatements.id, statementId))
-      .returning();
-
-    return { success: true, data: updated };
-  } catch (error) {
-    console.warn('[confirmStatementMatch] DB update fallback:', error);
-    return { success: true };
-  }
-}

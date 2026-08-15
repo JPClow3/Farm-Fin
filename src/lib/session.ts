@@ -1,7 +1,9 @@
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { auth } from './auth';
 import { DEFAULT_ORG_ID, SEED_USERS } from '../db/seed';
 import { User, UserRoleType } from './types';
+
+const DEMO_ROLES: UserRoleType[] = ['Produtor', 'Gestor', 'Financeiro', 'Contador', 'Operador'];
 
 export interface SessionContext {
   user: User;
@@ -44,6 +46,27 @@ export async function getCurrentSession(): Promise<SessionContext> {
     }
   } catch (error) {
     // Session resolution fallback for local/demo execution
+  }
+
+  // No real Better Auth session was resolved. Fall back to the demo persona
+  // selected at /login or /configuracoes (stored as a cookie so it's visible
+  // server-side, unlike the localStorage copy used for instant client rendering).
+  try {
+    const cookieStore = await cookies();
+    const demoRole = cookieStore.get('farmfin_demo_role')?.value as UserRoleType | undefined;
+    if (demoRole && DEMO_ROLES.includes(demoRole)) {
+      const demoUser =
+        SEED_USERS.find((u) => u.role === demoRole) ||
+        ({ ...SEED_USERS[0], role: demoRole } as User);
+      return {
+        user: demoUser,
+        organizationId: demoUser.organizationId || DEFAULT_ORG_ID,
+        role: demoRole,
+        isAuthenticated: true,
+      };
+    }
+  } catch {
+    // headers/cookies unavailable outside a request context (e.g. tests) - ignore
   }
 
   // Default demo session (Seu Antônio - Produtor)

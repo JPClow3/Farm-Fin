@@ -1,24 +1,15 @@
 'use server';
 
-import { z } from 'zod';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
 import { DEFAULT_ORG_ID } from '@/db/seed';
 import { getCurrentSession, SessionContext } from '@/lib/session';
+import { registerSchema, RegisterInput } from '@/lib/validations/auth.schema';
 
-// Zod Schema for User Registration
-export const registerSchema = z.object({
-  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
-  organizationName: z
-    .string()
-    .min(2, 'Nome da fazenda/empresa é obrigatório')
-    .default('Fazenda Santa Fé'),
-  role: z.enum(['Produtor', 'Gestor', 'Financeiro', 'Contador', 'Operador']).default('Produtor'),
-});
-
-export type RegisterInput = z.infer<typeof registerSchema>;
+// Note: registerSchema/RegisterInput live in @/lib/validations/auth.schema, not here -
+// a 'use server' file may only export async functions, so the Zod schema object can't
+// live (or be re-exported) from this file. Import it directly from that module instead.
+export type { RegisterInput };
 
 export interface RegisterResult {
   success: boolean;

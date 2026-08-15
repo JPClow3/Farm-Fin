@@ -8,6 +8,7 @@ import { ClayButton } from '../../components/ui/ClayButton';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { ClayModal } from '../../components/ui/ClayModal';
 import { getLCDPREntries, generateLCDPR, LCDPREntry } from '../../actions/lcdpr';
+import { useModuleGuard } from '../../lib/useModuleGuard';
 import {
   Landmark,
   FileCode2,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function LcdprPage() {
+  useModuleGuard('lcdpr');
   const { activeFarm, activeFarmId } = useFarm();
   const { addToast } = useToast();
 
@@ -234,7 +236,16 @@ export default function LcdprPage() {
                       {item.tipoDoc}
                     </div>
                   </td>
-                  <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.historico}</td>
+                  <td
+                    style={{
+                      maxWidth: '280px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.historico}
+                  </td>
                   <td>
                     <div style={{ fontWeight: '500', fontSize: 'var(--text-xs)' }}>
                       {item.participante}

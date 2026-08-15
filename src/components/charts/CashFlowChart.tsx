@@ -11,7 +11,8 @@ interface CashFlowMonthData {
 
 interface CashFlowChartProps {
   data?: CashFlowMonthData[];
-  scenario?: 'realista' | 'otimista' | 'pessimista';
+  scenario?: 'realista' | 'otimista' | 'pessimista' | 'personalizado';
+  isPreCalculated?: boolean;
 }
 
 const DEFAULT_DATA: CashFlowMonthData[] = [
@@ -28,16 +29,24 @@ const DEFAULT_DATA: CashFlowMonthData[] = [
 export const CashFlowChart: React.FC<CashFlowChartProps> = ({
   data = DEFAULT_DATA,
   scenario = 'realista',
+  isPreCalculated = true,
 }) => {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  // Apply scenario multiplier
-  const multiplier = scenario === 'otimista' ? 1.15 : scenario === 'pessimista' ? 0.85 : 1.0;
+  // If not pre-calculated, apply fallback multipliers
+  const multiplier = isPreCalculated
+    ? 1.0
+    : scenario === 'otimista'
+      ? 1.15
+      : scenario === 'pessimista'
+        ? 0.85
+        : 1.0;
+  const outMultiplier = isPreCalculated ? 1.0 : scenario === 'pessimista' ? 1.08 : 1.0;
 
   const adjustedData = data.map((d) => ({
     ...d,
     inflow: d.inflow * multiplier,
-    outflow: d.outflow * (scenario === 'pessimista' ? 1.08 : 1.0),
+    outflow: d.outflow * outMultiplier,
     balance: d.balance * multiplier,
   }));
 

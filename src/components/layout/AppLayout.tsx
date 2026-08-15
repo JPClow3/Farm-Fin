@@ -30,18 +30,20 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   } = useFarm();
   const { addToast } = useToast();
 
-  // If on auth page (login/register), render children cleanly without dashboard layout
-  if (pathname?.startsWith('/login') || pathname?.startsWith('/register')) {
-    return <>{children}</>;
-  }
-
-  // Quick form state
+  // Quick form state - declared unconditionally (before the auth-page early
+  // return below) so hook order stays consistent across client-side
+  // navigations between /login and the rest of the app.
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(() => getTodayDateString());
   const [entityId, setEntityId] = useState('');
   const [fieldId, setFieldId] = useState('');
   const [category, setCategory] = useState('Insumos > Fertilizantes');
+
+  // If on auth page (login/register), render children cleanly without dashboard layout
+  if (pathname?.startsWith('/login') || pathname?.startsWith('/register')) {
+    return <>{children}</>;
+  }
 
   const handleSaveQuick = (e: React.FormEvent) => {
     e.preventDefault();

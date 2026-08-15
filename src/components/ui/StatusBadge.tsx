@@ -6,6 +6,11 @@ export type StatusType =
   | 'vencido'
   | 'parcial'
   | 'cancelado'
+  | 'aguardando_aprovacao'
+  | 'pendente_aprovacao'
+  | 'aprovado'
+  | 'rejeitado'
+  | 'recorrente'
   | 'success'
   | 'warning'
   | 'danger'
@@ -34,7 +39,16 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, classNa
             ? 'Parcial'
             : normalizedStatus === 'cancelado'
               ? 'Cancelado'
-              : status);
+              : normalizedStatus === 'aguardando_aprovacao' ||
+                  normalizedStatus === 'pendente_aprovacao'
+                ? 'Aguardando Aprovação'
+                : normalizedStatus === 'aprovado'
+                  ? 'Aprovado'
+                  : normalizedStatus === 'rejeitado'
+                    ? 'Rejeitado'
+                    : normalizedStatus === 'recorrente'
+                      ? 'Recorrente'
+                      : status);
 
   return (
     <span className={`badge badge--${normalizedStatus} ${className}`.trim()}>{displayLabel}</span>

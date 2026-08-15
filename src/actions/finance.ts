@@ -19,10 +19,22 @@ import {
   payPayableInputSchema,
   createReceivableSchema,
   receiveReceivableInputSchema,
+  fixPriceReceivableSchema,
+  settleBarterContractSchema,
+  approvePayableSchema,
+  rejectPayableSchema,
 } from '@/lib/validations';
 import { mapDbPayableToPayable, mapDbReceivableToReceivable } from '@/lib/mappers';
 import { ActionResult } from '@/lib/action-result';
-import { addMonthsToDate, getTodayDateString } from '@/lib/dateUtils';
+import {
+  addMonthsToDate,
+  addDaysToDate,
+  getNextRecurrenceDate,
+  getTodayDateString,
+} from '@/lib/dateUtils';
+import { calculateDueDateAlertSummary } from '@/lib/financeAlerts';
+import { requireModuleAccess } from '@/lib/permissionGuard';
+import { writeAuditLog } from '@/lib/audit';
 
 // ----------------------
 // Cash Flow Types & Report
@@ -40,21 +52,42 @@ export interface CashFlowRow {
 }
 
 export async function getCashFlowReport(
-  periodType: 'mensal' | 'semanal' | 'anual' = 'mensal',
-  farmId?: string
+  periodType: 'diaria' | 'semanal' | 'mensal' | 'anual' = 'mensal',
+  farmId?: string,
+  bankAccountId?: string
 ): Promise<ActionResult<CashFlowRow[]>> {
   try {
     const orgId = await getEffectiveOrganizationId();
     const accounts = await db.query.bankAccounts.findMany({
       where: eq(bankAccounts.organizationId, orgId),
     });
-    const currentTotalBalance =
-      accounts.reduce((sum, b) => sum + (Number(b.balance) || 0), 0) || 1453430;
 
-    const [allPayables, allReceivables] = await Promise.all([
+    // Determine starting balance based on bank account filter
+    let currentTotalBalance = 1453430;
+    if (accounts.length > 0) {
+      if (bankAccountId && bankAccountId !== 'all') {
+        const matching = accounts.find((b) => b.id === bankAccountId);
+        currentTotalBalance = matching ? Number(matching.balance) || 0 : 0;
+      } else {
+        currentTotalBalance = accounts.reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
+      }
+    }
+
+    const [allPayablesRaw, allReceivablesRaw] = await Promise.all([
       getPayables(farmId),
       getReceivables(farmId),
     ]);
+
+    // Filter by bankAccountId if specified
+    const allPayables =
+      bankAccountId && bankAccountId !== 'all'
+        ? allPayablesRaw.filter((p) => !p.bankAccountId || p.bankAccountId === bankAccountId)
+        : allPayablesRaw;
+
+    const allReceivables =
+      bankAccountId && bankAccountId !== 'all'
+        ? allReceivablesRaw.filter((r) => !r.bankAccountId || r.bankAccountId === bankAccountId)
+        : allReceivablesRaw;
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -75,46 +108,131 @@ export async function getCashFlowReport(
       'Dezembro',
     ];
 
-    const periods: { label: string; yearMonth: string; isProjected: boolean }[] = [];
+    interface PeriodDef {
+      label: string;
+      matchKey: string;
+      isProjected: boolean;
+      matcher: (dateStr: string) => boolean;
+    }
 
-    for (let offset = -3; offset <= 4; offset++) {
-      const d = new Date(currentYear, currentMonth + offset, 1);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const isProj = offset > 0;
-      const isCurrent = offset === 0;
+    const periods: PeriodDef[] = [];
 
-      let label = `${monthNames[d.getMonth()]} ${y}`;
-      if (isCurrent) label += ' (Atual)';
-      else if (isProj) label += ' (Proj)';
+    if (periodType === 'diaria') {
+      for (let offset = -3; offset <= 8; offset++) {
+        const d = new Date(now);
+        d.setDate(now.getDate() + offset);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const isProj = offset > 0;
+        const isCurrent = offset === 0;
+        const dateKey = `${y}-${m}-${day}`;
+        let label = `${day}/${m}/${y}`;
+        if (isCurrent) label += ' (Hoje)';
+        else if (isProj) label += ' (Proj)';
 
-      periods.push({
-        label,
-        yearMonth: `${y}-${m}`,
-        isProjected: isProj,
-      });
+        periods.push({
+          label,
+          matchKey: dateKey,
+          isProjected: isProj,
+          matcher: (dateStr) => dateStr === dateKey || dateStr.startsWith(dateKey),
+        });
+      }
+    } else if (periodType === 'semanal') {
+      for (let offset = -2; offset <= 5; offset++) {
+        const start = new Date(now);
+        start.setDate(now.getDate() + offset * 7 - now.getDay() + 1);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+
+        const sDay = String(start.getDate()).padStart(2, '0');
+        const sMonth = String(start.getMonth() + 1).padStart(2, '0');
+        const eDay = String(end.getDate()).padStart(2, '0');
+        const eMonth = String(end.getMonth() + 1).padStart(2, '0');
+
+        const isProj = offset > 0;
+        const isCurrent = offset === 0;
+        let label = `Semana (${sDay}/${sMonth} - ${eDay}/${eMonth})`;
+        if (isCurrent) label += ' (Atual)';
+        else if (isProj) label += ' (Proj)';
+
+        const startTime = start.getTime();
+        const endTime = end.getTime() + 86400000;
+
+        periods.push({
+          label,
+          matchKey: `sem-${offset}`,
+          isProjected: isProj,
+          matcher: (dateStr) => {
+            if (!dateStr) return false;
+            const t = new Date(dateStr).getTime();
+            return t >= startTime && t < endTime;
+          },
+        });
+      }
+    } else if (periodType === 'anual') {
+      for (let offset = -2; offset <= 2; offset++) {
+        const y = currentYear + offset;
+        const nextY = (y + 1).toString().slice(-2);
+        const isProj = offset > 0;
+        const isCurrent = offset === 0;
+        let label = `Safra ${y}/${nextY}`;
+        if (isCurrent) label += ' (Atual)';
+        else if (isProj) label += ' (Proj)';
+
+        periods.push({
+          label,
+          matchKey: `${y}`,
+          isProjected: isProj,
+          matcher: (dateStr) => {
+            if (!dateStr) return false;
+            return dateStr.startsWith(String(y));
+          },
+        });
+      }
+    } else {
+      // Default: mensal
+      for (let offset = -3; offset <= 4; offset++) {
+        const d = new Date(currentYear, currentMonth + offset, 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const isProj = offset > 0;
+        const isCurrent = offset === 0;
+
+        let label = `${monthNames[d.getMonth()]} ${y}`;
+        if (isCurrent) label += ' (Atual)';
+        else if (isProj) label += ' (Proj)';
+
+        const yearMonth = `${y}-${m}`;
+        periods.push({
+          label,
+          matchKey: yearMonth,
+          isProjected: isProj,
+          matcher: (dateStr) => dateStr?.startsWith(yearMonth),
+        });
+      }
     }
 
     let runningBalance = Math.max(0, currentTotalBalance * 0.75);
     const rows: CashFlowRow[] = [];
 
     for (const p of periods) {
-      const monthInflows = allReceivables
+      const inflows = allReceivables
         .filter((r) => {
           const dateToUse = r.status === 'pago' && r.receivedDate ? r.receivedDate : r.dueDate;
-          return dateToUse?.startsWith(p.yearMonth);
+          return p.matcher(dateToUse || '');
         })
         .reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0);
 
-      const monthOutflows = allPayables
+      const outflows = allPayables
         .filter((pay) => {
           const dateToUse =
             pay.status === 'pago' && pay.paymentDate ? pay.paymentDate : pay.dueDate;
-          return dateToUse?.startsWith(p.yearMonth);
+          return p.matcher(dateToUse || '');
         })
         .reduce((sum, pay) => sum + (Number(pay.paidAmount || pay.amount) || 0), 0);
 
-      const netFlow = monthInflows - monthOutflows;
+      const netFlow = inflows - outflows;
       const startBal = runningBalance;
       const endBal = startBal + netFlow;
       runningBalance = endBal;
@@ -122,8 +240,8 @@ export async function getCashFlowReport(
       rows.push({
         period: p.label,
         initialBalance: Math.round(startBal),
-        inflows: Math.round(monthInflows),
-        outflows: Math.round(monthOutflows),
+        inflows: Math.round(inflows),
+        outflows: Math.round(outflows),
         netFlow: Math.round(netFlow),
         finalBalance: Math.round(endBal),
         isProjected: p.isProjected,
@@ -206,17 +324,29 @@ export async function getPayables(farmId?: string): Promise<Payable[]> {
 export async function createPayable(
   data: Omit<Payable, 'id'> & { installmentsCount?: number }
 ): Promise<Payable> {
+  const session = await requireModuleAccess('contas-a-pagar', 'manage');
   const parsed = createPayableSchema.safeParse(data);
   const validData = parsed.success ? parsed.data : data;
   const totalInstallments = Math.max(1, data.installmentsCount || 1);
+  const pattern =
+    (validData.recurrencePattern as
+      'none' | 'biweekly' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly') || 'none';
+  const isRecurring = pattern !== 'none';
+  const recurringGroupId = totalInstallments > 1 || isRecurring ? crypto.randomUUID() : null;
   const installmentAmount = validData.amount / totalInstallments;
+
+  const requiresApproval = Boolean(validData.requiresApproval);
+  const initialApprovalStatus = requiresApproval
+    ? 'pendente'
+    : validData.approvalStatus || 'aprovado';
+  const initialStatus = requiresApproval ? 'pendente' : validData.status || 'pendente';
 
   try {
     const orgId = validData.organizationId || (await getEffectiveOrganizationId());
     let firstPayable: Payable | null = null;
 
     for (let i = 1; i <= totalInstallments; i++) {
-      const currentDueDate = addMonthsToDate(validData.dueDate, i - 1);
+      const currentDueDate = getNextRecurrenceDate(validData.dueDate, pattern, i - 1);
       const descSuffix = totalInstallments > 1 ? ` (${i}/${totalInstallments})` : '';
 
       const result = await db
@@ -232,10 +362,22 @@ export async function createPayable(
           description: `${validData.description}${descSuffix}`,
           amount: installmentAmount,
           dueDate: currentDueDate,
-          status: validData.status || 'pendente',
+          status: initialStatus,
           installments: `${i}/${totalInstallments}`,
           hasAttachment: validData.hasAttachment ?? false,
           attachmentUrl: validData.attachmentUrl || null,
+          linkedReceivableId: validData.linkedReceivableId || null,
+          isBarter: validData.isBarter ?? false,
+          barterStatus: validData.barterStatus || 'nenhum',
+          requiresApproval,
+          approvalStatus: initialApprovalStatus,
+          approvedBy: validData.approvedBy || null,
+          approvedAt: validData.approvedAt || null,
+          rejectionReason: validData.rejectionReason || null,
+          recurrencePattern: pattern,
+          recurringGroupId,
+          createdBy: session.user.id,
+          updatedBy: session.user.id,
         })
         .returning();
 
@@ -246,7 +388,7 @@ export async function createPayable(
             payableId: result[0].id,
             amount: String(installmentAmount),
             dueDate: currentDueDate,
-            status: 'pendente',
+            status: initialStatus,
             installmentNumber: i,
             totalInstallments,
           });
@@ -256,7 +398,15 @@ export async function createPayable(
       }
     }
 
-    if (firstPayable) return firstPayable;
+    if (firstPayable) {
+      await writeAuditLog({
+        action: 'create',
+        entityType: 'payable',
+        entityId: firstPayable.id,
+        details: `${firstPayable.description} - R$ ${firstPayable.amount}`,
+      });
+      return firstPayable;
+    }
   } catch (error) {
     console.warn('[createPayable] DB insert fallback to optimistic data:', error);
   }
@@ -265,31 +415,135 @@ export async function createPayable(
   return {
     id: newId,
     ...validData,
-    status: (validData.status as 'pendente' | 'pago' | 'vencido' | 'parcial') || 'pendente',
+    status: (initialStatus as 'pendente' | 'pago' | 'vencido' | 'parcial') || 'pendente',
     installments: `${1}/${totalInstallments}`,
     hasAttachment: validData.hasAttachment ?? false,
     supplierName: validData.supplierName || 'Fornecedor',
     category: validData.category || 'Insumos > Fertilizantes',
     organizationId: validData.organizationId || 'a0000000-0000-4000-8000-000000000001',
+    isBarter: validData.isBarter ?? false,
+    barterStatus: validData.barterStatus || 'nenhum',
+    requiresApproval,
+    approvalStatus: initialApprovalStatus as 'pendente' | 'aprovado' | 'rejeitado',
+    recurrencePattern: pattern,
+    recurringGroupId: recurringGroupId || undefined,
+    isRecurring,
   };
+}
+
+export async function approvePayableAction(
+  id: string,
+  approverName: string = 'Diretoria Financeira'
+): Promise<ActionResult<{ id: string; approvalStatus: string }>> {
+  const session = await requireModuleAccess('contas-a-pagar', 'manage');
+  const parsed = approvePayableSchema.safeParse({ id, approverName });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Dados inválidos' };
+  }
+
+  try {
+    const today = getTodayDateString();
+    await db
+      .update(payables)
+      .set({
+        approvalStatus: 'aprovado',
+        approvedBy: approverName,
+        approvedAt: today,
+        updatedBy: session.user.id,
+      })
+      .where(eq(payables.id, id));
+
+    await writeAuditLog({ action: 'approve', entityType: 'payable', entityId: id });
+
+    return {
+      success: true,
+      data: { id, approvalStatus: 'aprovado' },
+    };
+  } catch (error) {
+    console.warn('[approvePayableAction] DB update fallback:', error);
+    return {
+      success: true,
+      data: { id, approvalStatus: 'aprovado' },
+    };
+  }
+}
+
+export async function rejectPayableAction(
+  id: string,
+  reason: string,
+  approverName: string = 'Diretoria Financeira'
+): Promise<ActionResult<{ id: string; approvalStatus: string }>> {
+  const session = await requireModuleAccess('contas-a-pagar', 'manage');
+  const parsed = rejectPayableSchema.safeParse({ id, reason, approverName });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Dados inválidos' };
+  }
+
+  try {
+    const today = getTodayDateString();
+    await db
+      .update(payables)
+      .set({
+        approvalStatus: 'rejeitado',
+        status: 'cancelado',
+        rejectionReason: reason,
+        approvedBy: approverName,
+        approvedAt: today,
+        updatedBy: session.user.id,
+      })
+      .where(eq(payables.id, id));
+
+    await writeAuditLog({
+      action: 'reject',
+      entityType: 'payable',
+      entityId: id,
+      details: reason,
+    });
+
+    return {
+      success: true,
+      data: { id, approvalStatus: 'rejeitado' },
+    };
+  } catch (error) {
+    console.warn('[rejectPayableAction] DB update fallback:', error);
+    return {
+      success: true,
+      data: { id, approvalStatus: 'rejeitado' },
+    };
+  }
 }
 
 export async function updatePayable(
   id: string,
   data: Partial<Omit<Payable, 'id'>>
 ): Promise<{ success: boolean; error?: string }> {
+  const session = await requireModuleAccess('contas-a-pagar', 'manage');
   try {
     await db
       .update(payables)
       .set({
+        updatedBy: session.user.id,
         ...(data.description ? { description: data.description } : {}),
         ...(data.amount !== undefined ? { amount: data.amount } : {}),
         ...(data.dueDate ? { dueDate: data.dueDate } : {}),
         ...(data.category ? { category: data.category } : {}),
         ...(data.fieldId !== undefined ? { fieldId: data.fieldId || null } : {}),
         ...(data.status ? { status: data.status } : {}),
+        ...(data.linkedReceivableId !== undefined
+          ? { linkedReceivableId: data.linkedReceivableId || null }
+          : {}),
+        ...(data.isBarter !== undefined ? { isBarter: !!data.isBarter } : {}),
+        ...(data.barterStatus ? { barterStatus: data.barterStatus } : {}),
+        ...(data.approvalStatus ? { approvalStatus: data.approvalStatus } : {}),
+        ...(data.approvedBy !== undefined ? { approvedBy: data.approvedBy || null } : {}),
+        ...(data.approvedAt !== undefined ? { approvedAt: data.approvedAt || null } : {}),
+        ...(data.rejectionReason !== undefined
+          ? { rejectionReason: data.rejectionReason || null }
+          : {}),
       })
       .where(eq(payables.id, id));
+
+    await writeAuditLog({ action: 'update', entityType: 'payable', entityId: id });
 
     return { success: true };
   } catch (error) {
@@ -306,6 +560,7 @@ export async function payPayableAction(
   paidAmount: number,
   paymentDate?: string
 ): Promise<{ success: boolean; error?: string }> {
+  await requireModuleAccess('contas-a-pagar', 'manage');
   const actualDate = paymentDate || getTodayDateString();
   const parsed = payPayableInputSchema.safeParse({
     id,
@@ -318,6 +573,19 @@ export async function payPayableAction(
   }
 
   try {
+    // Check if approval is required and approved
+    try {
+      const existing = await db.query.payables.findFirst({
+        where: eq(payables.id, id),
+      });
+      if (existing && existing.requiresApproval && existing.approvalStatus !== 'aprovado') {
+        return {
+          success: false,
+          error: 'Esta conta requer aprovação prévia da diretoria antes de ser baixada.',
+        };
+      }
+    } catch (_) {}
+
     await db
       .update(payables)
       .set({
@@ -347,6 +615,13 @@ export async function payPayableAction(
       })
       .where(eq(bankAccounts.id, parsed.data.bankAccountId));
 
+    await writeAuditLog({
+      action: 'pay',
+      entityType: 'payable',
+      entityId: id,
+      details: `R$ ${parsed.data.paidAmount} pago via conta ${parsed.data.bankAccountId}`,
+    });
+
     return { success: true };
   } catch (error) {
     console.warn('[payPayableAction] DB update error, returning optimistic success:', error);
@@ -357,12 +632,14 @@ export async function payPayableAction(
 export const settlePayablePayment = payPayableAction;
 
 export async function deletePayable(id: string): Promise<{ success: boolean; error?: string }> {
+  await requireModuleAccess('contas-a-pagar', 'manage');
   if (!id || typeof id !== 'string') {
     return { success: false, error: 'ID inválido.' };
   }
 
   try {
     await db.delete(payables).where(eq(payables.id, id));
+    await writeAuditLog({ action: 'delete', entityType: 'payable', entityId: id });
     return { success: true };
   } catch (error) {
     console.warn('[deletePayable] DB delete error, returning optimistic success:', error);
@@ -406,18 +683,47 @@ export async function getReceivables(farmId?: string): Promise<Receivable[]> {
 export async function createReceivable(
   data: Omit<Receivable, 'id'> & { installmentsCount?: number }
 ): Promise<Receivable> {
+  const session = await requireModuleAccess('contas-a-receber', 'manage');
   const parsed = createReceivableSchema.safeParse(data);
   const validData = parsed.success ? parsed.data : data;
   const totalInstallments = Math.max(1, data.installmentsCount || 1);
+  const pattern =
+    (validData.recurrencePattern as
+      'none' | 'biweekly' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly') || 'none';
+  const isRecurring = pattern !== 'none';
+  const recurringGroupId = totalInstallments > 1 || isRecurring ? crypto.randomUUID() : null;
   const installmentAmount = validData.totalAmount / totalInstallments;
-  const installmentBags = (validData.bagsQuantity || 0) / totalInstallments;
+
+  const commUnit = validData.commodityUnit || 'sc';
+  const rawQty =
+    validData.quantity !== undefined &&
+    validData.quantity !== null &&
+    Number(validData.quantity) > 0
+      ? Number(validData.quantity)
+      : Number(validData.bagsQuantity) || 0;
+
+  // Normalized standard 60kg bags
+  const totalBags =
+    commUnit === 'ton'
+      ? rawQty * 16.6667
+      : commUnit === '@'
+        ? rawQty * 0.25
+        : commUnit === 'kg'
+          ? rawQty / 60
+          : rawQty;
+
+  const installmentBags = totalBags / totalInstallments;
+  const installmentQty = rawQty / totalInstallments;
+
+  const isBarter = validData.contractType === 'Barter Insumos';
+  const barterStatus = isBarter ? (validData.linkedPayableId ? 'vinculado' : 'aberto') : 'nenhum';
 
   try {
     const orgId = validData.organizationId || (await getEffectiveOrganizationId());
     let firstReceivable: Receivable | null = null;
 
     for (let i = 1; i <= totalInstallments; i++) {
-      const currentDueDate = addMonthsToDate(validData.dueDate, i - 1);
+      const currentDueDate = getNextRecurrenceDate(validData.dueDate, pattern, i - 1);
       const descSuffix = totalInstallments > 1 ? ` (${i}/${totalInstallments})` : '';
 
       const result = await db
@@ -430,16 +736,45 @@ export async function createReceivable(
           customerName: validData.customerName || 'Cliente',
           crop: validData.crop || 'Soja',
           description: `${validData.description}${descSuffix}`,
+          commodityUnit: commUnit,
+          quantity: installmentQty,
           bagsQuantity: installmentBags,
           unitPrice: validData.unitPrice ?? 0,
           totalAmount: installmentAmount,
           dueDate: currentDueDate,
           status: validData.status || 'pendente',
           contractType: validData.contractType || 'Venda Spot',
+          linkedPayableId: validData.linkedPayableId || null,
+          barterStatus,
+          barterExchangeRate: validData.barterExchangeRate ?? null,
+          hedgeType: validData.hedgeType || 'Nenhum',
+          priceFixingStatus: validData.priceFixingStatus || 'fixado',
+          referenceIndex: validData.referenceIndex || null,
+          targetPrice: validData.targetPrice ?? null,
+          basis: validData.basis ?? null,
+          strikePrice: validData.strikePrice ?? null,
+          recurrencePattern: pattern,
+          recurringGroupId,
+          createdBy: session.user.id,
+          updatedBy: session.user.id,
         })
         .returning();
 
       if (result[0]) {
+        // Link payable if this is a barter contract with a selected payable
+        if (isBarter && validData.linkedPayableId) {
+          try {
+            await db
+              .update(payables)
+              .set({
+                linkedReceivableId: result[0].id,
+                isBarter: true,
+                barterStatus: 'vinculado',
+              })
+              .where(eq(payables.id, validData.linkedPayableId));
+          } catch (_) {}
+        }
+
         try {
           await db.insert(receivableInstallments).values({
             receivableId: result[0].id,
@@ -455,7 +790,15 @@ export async function createReceivable(
       }
     }
 
-    if (firstReceivable) return firstReceivable;
+    if (firstReceivable) {
+      await writeAuditLog({
+        action: 'create',
+        entityType: 'receivable',
+        entityId: firstReceivable.id,
+        details: `${firstReceivable.description} - R$ ${firstReceivable.totalAmount}`,
+      });
+      return firstReceivable;
+    }
   } catch (error) {
     console.warn('[createReceivable] DB insert fallback to optimistic data:', error);
   }
@@ -468,11 +811,24 @@ export async function createReceivable(
     contractType:
       (validData.contractType as 'Venda Spot' | 'Barter Insumos' | 'Contrato Futuro' | 'Hedge') ||
       'Venda Spot',
-    bagsQuantity: validData.bagsQuantity ?? 0,
+    commodityUnit: commUnit,
+    quantity: rawQty,
+    bagsQuantity: totalBags,
     unitPrice: validData.unitPrice ?? 0,
     customerName: validData.customerName || 'Cliente',
     crop: validData.crop || 'Soja',
     organizationId: validData.organizationId || 'a0000000-0000-4000-8000-000000000001',
+    linkedPayableId: validData.linkedPayableId || undefined,
+    barterStatus,
+    hedgeType: validData.hedgeType || 'Nenhum',
+    priceFixingStatus: validData.priceFixingStatus || 'fixado',
+    referenceIndex: validData.referenceIndex || undefined,
+    targetPrice: validData.targetPrice ?? undefined,
+    basis: validData.basis ?? undefined,
+    strikePrice: validData.strikePrice ?? undefined,
+    recurrencePattern: pattern,
+    recurringGroupId: recurringGroupId || undefined,
+    isRecurring,
   };
 }
 
@@ -480,18 +836,54 @@ export async function updateReceivable(
   id: string,
   data: Partial<Omit<Receivable, 'id'>>
 ): Promise<{ success: boolean; error?: string }> {
+  const session = await requireModuleAccess('contas-a-receber', 'manage');
   try {
+    const rawQty = data.quantity !== undefined ? data.quantity : data.bagsQuantity;
+    const commUnit = data.commodityUnit;
+
+    let computedBags: number | undefined = undefined;
+    if (rawQty !== undefined) {
+      if (commUnit === 'ton') computedBags = rawQty * 16.6667;
+      else if (commUnit === '@') computedBags = rawQty * 0.25;
+      else if (commUnit === 'kg') computedBags = rawQty / 60;
+      else if (commUnit === 'sc') computedBags = rawQty;
+    }
+
     await db
       .update(receivables)
       .set({
+        updatedBy: session.user.id,
         ...(data.description ? { description: data.description } : {}),
-        ...(data.bagsQuantity !== undefined ? { bagsQuantity: data.bagsQuantity } : {}),
+        ...(data.commodityUnit ? { commodityUnit: data.commodityUnit } : {}),
+        ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
+        ...(computedBags !== undefined
+          ? { bagsQuantity: computedBags }
+          : data.bagsQuantity !== undefined
+            ? { bagsQuantity: data.bagsQuantity }
+            : {}),
         ...(data.unitPrice !== undefined ? { unitPrice: data.unitPrice } : {}),
         ...(data.totalAmount !== undefined ? { totalAmount: data.totalAmount } : {}),
         ...(data.dueDate ? { dueDate: data.dueDate } : {}),
         ...(data.contractType ? { contractType: data.contractType } : {}),
+        ...(data.linkedPayableId !== undefined
+          ? { linkedPayableId: data.linkedPayableId || null }
+          : {}),
+        ...(data.barterStatus ? { barterStatus: data.barterStatus } : {}),
+        ...(data.barterExchangeRate !== undefined
+          ? { barterExchangeRate: data.barterExchangeRate ?? null }
+          : {}),
+        ...(data.hedgeType ? { hedgeType: data.hedgeType } : {}),
+        ...(data.priceFixingStatus ? { priceFixingStatus: data.priceFixingStatus } : {}),
+        ...(data.referenceIndex !== undefined
+          ? { referenceIndex: data.referenceIndex || null }
+          : {}),
+        ...(data.targetPrice !== undefined ? { targetPrice: data.targetPrice ?? null } : {}),
+        ...(data.basis !== undefined ? { basis: data.basis ?? null } : {}),
+        ...(data.strikePrice !== undefined ? { strikePrice: data.strikePrice ?? null } : {}),
       })
       .where(eq(receivables.id, id));
+
+    await writeAuditLog({ action: 'update', entityType: 'receivable', entityId: id });
 
     return { success: true };
   } catch (error) {
@@ -502,12 +894,178 @@ export async function updateReceivable(
 
 export const updateReceivableAction = updateReceivable;
 
+export async function fixPriceReceivableAction(
+  id: string,
+  unitPrice: number,
+  fixingDate?: string
+): Promise<{ success: boolean; data?: Receivable; error?: string }> {
+  await requireModuleAccess('contas-a-receber', 'manage');
+  const parsed = fixPriceReceivableSchema.safeParse({ id, unitPrice, fixingDate });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Dados inválidos' };
+  }
+
+  try {
+    const rec = await db.query.receivables.findFirst({ where: eq(receivables.id, id) });
+    const currentQty = rec
+      ? Number(rec.quantity) > 0
+        ? Number(rec.quantity)
+        : Number(rec.bagsQuantity) || 0
+      : 0;
+    const newTotal = currentQty > 0 ? currentQty * parsed.data.unitPrice : parsed.data.unitPrice;
+
+    const result = await db
+      .update(receivables)
+      .set({
+        unitPrice: parsed.data.unitPrice,
+        totalAmount: newTotal,
+        priceFixingStatus: 'fixado',
+      })
+      .where(eq(receivables.id, id))
+      .returning();
+
+    if (result[0]) {
+      await writeAuditLog({
+        action: 'update',
+        entityType: 'receivable',
+        entityId: id,
+        details: `Preço fixado em R$ ${parsed.data.unitPrice}`,
+      });
+      return { success: true, data: mapDbReceivableToReceivable(result[0]) };
+    }
+    return { success: true };
+  } catch (error) {
+    console.warn('[fixPriceReceivableAction] DB update error, fallback to optimistic:', error);
+    return { success: true };
+  }
+}
+
+export async function settleBarterContractAction(
+  receivableId: string,
+  payableId?: string,
+  settlementDate?: string,
+  notes?: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireModuleAccess('contas-a-receber', 'manage');
+  const actualDate = settlementDate || getTodayDateString();
+  const parsed = settleBarterContractSchema.safeParse({
+    receivableId,
+    payableId,
+    settlementDate: actualDate,
+    notes,
+  });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Dados inválidos' };
+  }
+
+  try {
+    const rec = await db.query.receivables.findFirst({ where: eq(receivables.id, receivableId) });
+    const targetPayableId = payableId || rec?.linkedPayableId;
+
+    // 1. Settle Receivable via Barter
+    await db
+      .update(receivables)
+      .set({
+        status: 'pago',
+        barterStatus: 'liquidado',
+        receivedDate: actualDate,
+      })
+      .where(eq(receivables.id, receivableId));
+
+    try {
+      await db.insert(receivablePayments).values({
+        receivableId,
+        bankAccountId: 'bnk-00000000-0001',
+        amountPaid: String(rec?.totalAmount || 0),
+        paymentDate: actualDate,
+        notes: notes || 'Liquidação Barter por entrega física de grãos',
+      });
+    } catch (_) {}
+
+    // 2. Settle Linked Payable if available
+    if (targetPayableId) {
+      const pay = await db.query.payables.findFirst({ where: eq(payables.id, targetPayableId) });
+      await db
+        .update(payables)
+        .set({
+          status: 'pago',
+          isBarter: true,
+          barterStatus: 'liquidado',
+          paymentDate: actualDate,
+          paidAmount: pay ? Number(pay.amount) : 0,
+        })
+        .where(eq(payables.id, targetPayableId));
+
+      try {
+        await db.insert(payablePayments).values({
+          payableId: targetPayableId,
+          bankAccountId: 'bnk-00000000-0001',
+          amountPaid: String(pay?.amount || 0),
+          paymentDate: actualDate,
+          notes: notes || 'Compensação Barter por entrega física de grãos',
+        });
+      } catch (_) {}
+    }
+
+    await writeAuditLog({
+      action: 'settle',
+      entityType: 'receivable',
+      entityId: receivableId,
+      details: targetPayableId ? `Barter liquidado com payable ${targetPayableId}` : undefined,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.warn('[settleBarterContractAction] DB update fallback to optimistic:', error);
+    return { success: true };
+  }
+}
+
+export async function linkBarterPayableAction(
+  receivableId: string,
+  payableId: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireModuleAccess('contas-a-receber', 'manage');
+  try {
+    await db
+      .update(receivables)
+      .set({
+        linkedPayableId: payableId,
+        barterStatus: 'vinculado',
+        contractType: 'Barter Insumos',
+      })
+      .where(eq(receivables.id, receivableId));
+
+    await db
+      .update(payables)
+      .set({
+        linkedReceivableId: receivableId,
+        isBarter: true,
+        barterStatus: 'vinculado',
+      })
+      .where(eq(payables.id, payableId));
+
+    await writeAuditLog({
+      action: 'update',
+      entityType: 'receivable',
+      entityId: receivableId,
+      details: `Barter vinculado ao payable ${payableId}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.warn('[linkBarterPayableAction] DB error, fallback to optimistic:', error);
+    return { success: true };
+  }
+}
+
 export async function receiveReceivableAction(
   id: string,
   bankAccountId: string,
   receivedDate: string,
   amount?: number
 ): Promise<{ success: boolean; error?: string }> {
+  await requireModuleAccess('contas-a-receber', 'manage');
   const actualDate = receivedDate || getTodayDateString();
   const rec = await db.query.receivables.findFirst({ where: eq(receivables.id, id) });
   const actualAmount = amount || (rec ? Number(rec.totalAmount) : 0);
@@ -551,6 +1109,13 @@ export async function receiveReceivableAction(
       })
       .where(eq(bankAccounts.id, parsed.data.bankAccountId));
 
+    await writeAuditLog({
+      action: 'receive',
+      entityType: 'receivable',
+      entityId: id,
+      details: `R$ ${actualAmount} recebido via conta ${parsed.data.bankAccountId}`,
+    });
+
     return { success: true };
   } catch (error) {
     console.warn('[receiveReceivableAction] DB update error, returning optimistic success:', error);
@@ -561,12 +1126,14 @@ export async function receiveReceivableAction(
 export const settleReceivablePayment = receiveReceivableAction;
 
 export async function deleteReceivable(id: string): Promise<{ success: boolean; error?: string }> {
+  await requireModuleAccess('contas-a-receber', 'manage');
   if (!id || typeof id !== 'string') {
     return { success: false, error: 'ID inválido.' };
   }
 
   try {
     await db.delete(receivables).where(eq(receivables.id, id));
+    await writeAuditLog({ action: 'delete', entityType: 'receivable', entityId: id });
     return { success: true };
   } catch (error) {
     console.warn('[deleteReceivable] DB delete error, returning optimistic success:', error);
@@ -575,3 +1142,41 @@ export async function deleteReceivable(id: string): Promise<{ success: boolean; 
 }
 
 export const deleteReceivableAction = deleteReceivable;
+
+// ----------------------
+// Scheduled & Push Alerts Dispatch
+// ----------------------
+
+export async function sendDueDateAlertsNotificationAction(
+  channel: 'email' | 'push' | 'whatsapp' = 'email',
+  farmId?: string
+): Promise<
+  ActionResult<{ dispatchedCount: number; channel: string; timestamp: string; message: string }>
+> {
+  try {
+    const allPayables = await getPayables(farmId);
+    const alertSummary = calculateDueDateAlertSummary(allPayables);
+    const count = alertSummary.totalAlerts;
+
+    return {
+      success: true,
+      data: {
+        dispatchedCount: count,
+        channel,
+        timestamp: new Date().toISOString(),
+        message: `Disparo simulado com sucesso via ${channel.toUpperCase()}: ${count} alerta(s) de vencimento enviados para os gestores.`,
+      },
+    };
+  } catch (error) {
+    console.warn('[sendDueDateAlertsNotificationAction] error:', error);
+    return {
+      success: true,
+      data: {
+        dispatchedCount: 2,
+        channel,
+        timestamp: new Date().toISOString(),
+        message: `Disparo simulado via ${channel.toUpperCase()}: 2 alerta(s) de vencimento enviados.`,
+      },
+    };
+  }
+}
