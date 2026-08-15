@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFarm } from '../../context/FarmContext';
 import { ClayButton } from '../ui/ClayButton';
@@ -22,6 +22,9 @@ import {
   ShieldAlert,
   Clock,
   Calendar,
+  ChevronDown,
+  ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 
 import { authClient } from '../../lib/auth-client';
@@ -64,6 +67,27 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [currentUser, setCurrentUser] = useState<User>(SEED_USERS[0]);
+
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Click outside listener to dismiss dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setShowNotifications(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -136,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                 padding: '6px 28px 6px 12px',
                 fontSize: 'var(--text-sm)',
                 fontWeight: '600',
-                maxWidth: '200px',
+                maxWidth: '220px',
                 height: '36px',
               }}
               title="Selecionar Fazenda Ativa"
@@ -160,7 +184,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
               style={{
                 padding: '6px 28px 6px 12px',
                 fontSize: 'var(--text-xs)',
-                maxWidth: '180px',
+                maxWidth: '190px',
                 height: '36px',
               }}
               title="Selecionar Safra Agrícola"
@@ -183,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
               style={{
                 padding: '6px 28px 6px 10px',
                 fontSize: 'var(--text-xs)',
-                maxWidth: '170px',
+                maxWidth: '180px',
                 height: '36px',
                 background: 'var(--bg-surface-2)',
                 borderColor: 'var(--border-subtle)',
@@ -208,6 +232,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                   cursor: 'pointer',
                   fontSize: '11px',
                   color: 'var(--color-primary-600)',
+                  fontWeight: '600',
                   textDecoration: 'underline',
                   padding: '0 4px',
                 }}
@@ -231,27 +256,34 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             <span className="hide-mobile">Novo Lançamento</span>
           </ClayButton>
 
-          {/* Notifications Button */}
-          <div style={{ position: 'relative' }}>
+          {/* Notifications Button & Dropdown */}
+          <div ref={notificationsRef} style={{ position: 'relative' }}>
             <ClayButton
               variant="ghost"
               size="sm"
               iconOnly
-              onClick={() => setShowNotifications(!showNotifications)}
-              aria-label="Notificações"
-              style={{ position: 'relative' }}
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                if (showUserMenu) setShowUserMenu(false);
+              }}
+              aria-label="Notificações e Alertas"
+              style={{
+                position: 'relative',
+                background: showNotifications ? 'var(--bg-surface-2)' : undefined,
+              }}
             >
               <Bell size={18} />
               {totalAlertCount > 0 && (
                 <span
                   style={{
                     position: 'absolute',
-                    top: '2px',
-                    right: '2px',
+                    top: '4px',
+                    right: '4px',
                     minWidth: '8px',
                     height: '8px',
                     borderRadius: '50%',
                     background: 'var(--color-danger)',
+                    border: '2px solid var(--bg-surface-1)',
                   }}
                 />
               )}
@@ -261,26 +293,47 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
             {showNotifications && (
               <div
                 className="dropdown__menu"
-                style={{ width: 'min(340px, 92vw)', right: 0, padding: 'var(--space-4)' }}
+                style={{
+                  width: 'min(360px, 94vw)',
+                  right: 0,
+                  padding: 'var(--space-4)',
+                }}
               >
-                <div className="flex-between" style={{ marginBottom: 'var(--space-2)' }}>
-                  <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>
-                    Notificações & Alertas ({totalAlertCount})
-                  </span>
+                <div
+                  className="flex-between"
+                  style={{
+                    marginBottom: 'var(--space-3)',
+                    paddingBottom: 'var(--space-2)',
+                    borderBottom: '1px solid rgba(212, 201, 186, 0.4)',
+                  }}
+                >
+                  <div className="flex-row items-center" style={{ gap: '6px' }}>
+                    <Bell size={16} color="var(--color-primary-700)" />
+                    <span style={{ fontWeight: '700', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                      Alertas & Avisos ({totalAlertCount})
+                    </span>
+                  </div>
                   <span
                     style={{
                       fontSize: '11px',
                       color: 'var(--color-primary-600)',
                       cursor: 'pointer',
+                      fontWeight: '600',
                     }}
                     onClick={() => setShowNotifications(false)}
                   >
                     Fechar
                   </span>
                 </div>
+
                 <div
                   className="flex-col"
-                  style={{ gap: '8px', maxHeight: '360px', overflowY: 'auto' }}
+                  style={{
+                    gap: '8px',
+                    maxHeight: '380px',
+                    overflowY: 'auto',
+                    paddingRight: '2px',
+                  }}
                 >
                   {/* Approval Alerts */}
                   {(kpis.pendingApprovalPayablesCount || 0) > 0 && (
@@ -290,28 +343,32 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         setShowNotifications(false);
                       }}
                       style={{
-                        padding: '8px 10px',
-                        background: '#fef3c7',
-                        borderRadius: 'var(--radius-sm)',
+                        padding: '10px 12px',
+                        background: '#fffbeb',
+                        borderRadius: 'var(--radius-md)',
                         fontSize: '12px',
                         color: '#92400e',
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: '8px',
+                        gap: '10px',
                         cursor: 'pointer',
                         border: '1px solid #fde68a',
+                        transition: 'all var(--transition-fast)',
                       }}
                     >
                       <ShieldAlert
-                        size={16}
+                        size={17}
                         style={{ flexShrink: 0, marginTop: '2px', color: '#b45309' }}
                       />
-                      <div>
-                        <strong>
-                          {kpis.pendingApprovalPayablesCount} despesa(s) aguardando aprovação
-                        </strong>{' '}
-                        da diretoria antes do pagamento.
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '700', color: '#78350f' }}>
+                          Aprovação Pendente ({kpis.pendingApprovalPayablesCount})
+                        </div>
+                        <div style={{ color: '#92400e', marginTop: '2px' }}>
+                          Despesa(s) aguardando liberação da diretoria antes da baixa.
+                        </div>
                       </div>
+                      <ArrowRight size={14} style={{ color: '#b45309', flexShrink: 0, marginTop: '3px' }} />
                     </div>
                   )}
 
@@ -323,26 +380,32 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         setShowNotifications(false);
                       }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         background: 'var(--color-danger-light)',
-                        borderRadius: 'var(--radius-sm)',
+                        borderRadius: 'var(--radius-md)',
                         fontSize: '12px',
                         color: 'var(--color-danger-dark)',
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: '8px',
+                        gap: '10px',
                         cursor: 'pointer',
+                        border: '1px solid #fecaca',
+                        transition: 'all var(--transition-fast)',
                       }}
                     >
-                      <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <div>
-                        <strong>{kpis.overduePayablesCount} conta(s) vencida(s)</strong> no total de
-                        R${' '}
-                        {kpis.totalOverduePayables.toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                        })}
-                        .
+                      <AlertCircle size={17} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--color-danger)' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '700', color: '#7f1d1d' }}>
+                          {kpis.overduePayablesCount} conta(s) vencida(s)
+                        </div>
+                        <div style={{ color: 'var(--color-danger-dark)', marginTop: '2px' }}>
+                          Total em atraso: R${' '}
+                          {kpis.totalOverduePayables.toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                          })}
+                        </div>
                       </div>
+                      <ArrowRight size={14} style={{ color: 'var(--color-danger)', flexShrink: 0, marginTop: '3px' }} />
                     </div>
                   )}
 
@@ -354,29 +417,35 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         setShowNotifications(false);
                       }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         background: '#fff7ed',
-                        borderRadius: 'var(--radius-sm)',
+                        borderRadius: 'var(--radius-md)',
                         fontSize: '12px',
                         color: '#9a3412',
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: '8px',
+                        gap: '10px',
                         cursor: 'pointer',
                         border: '1px solid #fed7aa',
+                        transition: 'all var(--transition-fast)',
                       }}
                     >
                       <Clock
-                        size={16}
+                        size={17}
                         style={{ flexShrink: 0, marginTop: '2px', color: '#ea580c' }}
                       />
-                      <div>
-                        <strong>{kpis.dueTodayPayablesCount} conta(s) vencem hoje</strong> (R${' '}
-                        {kpis.totalDueTodayPayables.toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                        })}
-                        ).
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '700', color: '#7c2d12' }}>
+                          {kpis.dueTodayPayablesCount} conta(s) vencem hoje
+                        </div>
+                        <div style={{ color: '#9a3412', marginTop: '2px' }}>
+                          R${' '}
+                          {kpis.totalDueTodayPayables.toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                          })} previstos para quitação imediata.
+                        </div>
                       </div>
+                      <ArrowRight size={14} style={{ color: '#ea580c', flexShrink: 0, marginTop: '3px' }} />
                     </div>
                   )}
 
@@ -388,26 +457,32 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         setShowNotifications(false);
                       }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         background: '#fefce8',
-                        borderRadius: 'var(--radius-sm)',
+                        borderRadius: 'var(--radius-md)',
                         fontSize: '12px',
                         color: '#854d0e',
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: '8px',
+                        gap: '10px',
                         cursor: 'pointer',
                         border: '1px solid #fef08a',
+                        transition: 'all var(--transition-fast)',
                       }}
                     >
                       <Calendar
-                        size={16}
+                        size={17}
                         style={{ flexShrink: 0, marginTop: '2px', color: '#ca8a04' }}
                       />
-                      <div>
-                        <strong>{kpis.dueIn3DaysPayablesCount} conta(s)</strong> vencem nos próximos
-                        3 dias.
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '700', color: '#713f12' }}>
+                          {kpis.dueIn3DaysPayablesCount} conta(s) nos próximos 3 dias
+                        </div>
+                        <div style={{ color: '#854d0e', marginTop: '2px' }}>
+                          Planejamento de liquidez imediata.
+                        </div>
                       </div>
+                      <ArrowRight size={14} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '3px' }} />
                     </div>
                   )}
 
@@ -419,35 +494,50 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         setShowNotifications(false);
                       }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         background: 'var(--color-warning-light)',
-                        borderRadius: 'var(--radius-sm)',
+                        borderRadius: 'var(--radius-md)',
                         fontSize: '12px',
                         color: 'var(--color-warning-dark)',
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: '8px',
+                        gap: '10px',
                         cursor: 'pointer',
+                        border: '1px solid #fde047',
+                        transition: 'all var(--transition-fast)',
                       }}
                     >
-                      <Package size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <div>
-                        <strong>{kpis.lowStockCount} insumo(s)</strong> abaixo do estoque de
-                        segurança.
+                      <Package size={17} style={{ flexShrink: 0, marginTop: '2px', color: '#ca8a04' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '700', color: '#713f12' }}>
+                          {kpis.lowStockCount} insumo(s) em nível crítico
+                        </div>
+                        <div style={{ color: 'var(--color-warning-dark)', marginTop: '2px' }}>
+                          Quantidade abaixo do estoque mínimo de segurança.
+                        </div>
                       </div>
+                      <ArrowRight size={14} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '3px' }} />
                     </div>
                   )}
 
                   {totalAlertCount === 0 && (
                     <div
                       style={{
-                        fontSize: '12px',
-                        color: 'var(--text-tertiary)',
-                        padding: '12px 0',
+                        padding: 'var(--space-6) var(--space-4)',
                         textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
                       }}
                     >
-                      Nenhum alerta pendente no momento.
+                      <CheckCircle2 size={32} color="var(--color-primary-600)" />
+                      <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                        Nenhum alerta pendente
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                        Suas contas, estoques e safras estão em dia!
+                      </div>
                     </div>
                   )}
                 </div>
@@ -456,18 +546,23 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
           </div>
 
           {/* User Avatar Menu */}
-          <div style={{ position: 'relative' }}>
+          <div ref={userMenuRef} style={{ position: 'relative' }}>
             <div
-              onClick={() => setShowUserMenu(!showUserMenu)}
+              onClick={() => {
+                setShowUserMenu(!showUserMenu);
+                if (showNotifications) setShowNotifications(false);
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 cursor: 'pointer',
                 userSelect: 'none',
-                padding: '4px 8px',
-                borderRadius: '8px',
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-lg)',
                 background: showUserMenu ? 'var(--bg-surface-2)' : 'transparent',
+                border: showUserMenu ? '1px solid rgba(212, 201, 186, 0.6)' : '1px solid transparent',
+                transition: 'all var(--transition-fast)',
               }}
             >
               <div className="avatar-initials avatar--sm">
@@ -477,89 +572,100 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                 <div
                   style={{
                     fontSize: 'var(--text-xs)',
-                    fontWeight: 'bold',
+                    fontWeight: '700',
+                    color: 'var(--text-primary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: '120px',
+                    maxWidth: '140px',
                   }}
                 >
                   {currentUser.name}
                 </div>
                 <div
                   style={{
-                    fontSize: '10px',
+                    fontSize: '11px',
                     color: 'var(--text-tertiary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: '120px',
+                    maxWidth: '140px',
                   }}
                 >
                   {currentUser.role} • Grupo Santa Fé
                 </div>
               </div>
+              <ChevronDown
+                size={14}
+                color="var(--text-tertiary)"
+                style={{
+                  transform: showUserMenu ? 'rotate(180deg)' : 'none',
+                  transition: 'transform var(--transition-fast)',
+                }}
+              />
             </div>
 
             {showUserMenu && (
-              <div className="dropdown__menu" style={{ width: '220px', right: 0 }}>
+              <div
+                className="dropdown__menu"
+                style={{
+                  width: '260px',
+                  right: 0,
+                  padding: 'var(--space-2)',
+                }}
+              >
+                {/* User Identity Card in Dropdown */}
                 <div
                   style={{
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    color: 'var(--text-secondary)',
+                    padding: 'var(--space-3)',
+                    background: 'var(--bg-surface-2)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--space-2)',
                   }}
                 >
-                  <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                  <div style={{ fontWeight: '700', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
                     {currentUser.name}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
                     {currentUser.email}
                   </div>
-                  <div
-                    style={{
-                      display: 'inline-block',
-                      marginTop: '6px',
-                      padding: '2px 8px',
-                      background: 'var(--color-primary-100)',
-                      color: 'var(--color-primary-800)',
-                      borderRadius: '12px',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                    }}
-                  >
-                    Perfil: {currentUser.role}
+                  <div style={{ marginTop: '8px' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        background: 'var(--color-primary-100)',
+                        color: 'var(--color-primary-800)',
+                        borderRadius: '12px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                      }}
+                    >
+                      Perfil: {currentUser.role}
+                    </span>
                   </div>
                 </div>
-                <div className="dropdown__divider" />
+
                 <button
+                  type="button"
                   className="dropdown__item"
-                  style={{
-                    fontSize: 'var(--text-xs)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
                   onClick={() => {
                     setShowUserMenu(false);
                     router.push('/configuracoes');
                   }}
                 >
-                  <Settings size={14} />
+                  <Settings size={15} color="var(--text-secondary)" />
                   <span>Configurações & RBAC</span>
                 </button>
+
+                <div className="dropdown__divider" />
+
                 <button
-                  className="dropdown__item"
-                  style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-danger)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
+                  type="button"
+                  className="dropdown__item dropdown__item--danger"
                   onClick={handleLogout}
                 >
-                  <LogOut size={14} />
+                  <LogOut size={15} />
                   <span>Sair (Encerrar Sessão)</span>
                 </button>
               </div>

@@ -8,6 +8,29 @@ import {
   DashboardWidgetConfig,
 } from '../dashboardWidgets';
 
+const storageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString();
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+
+if (typeof global.localStorage === 'undefined' || !global.localStorage?.clear) {
+  Object.defineProperty(global, 'localStorage', {
+    value: storageMock,
+    writable: true,
+  });
+}
+
 describe('Dashboard Widgets Registry & Configuration', () => {
   beforeEach(() => {
     localStorage.clear();

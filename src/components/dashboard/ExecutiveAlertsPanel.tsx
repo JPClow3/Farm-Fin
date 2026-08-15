@@ -311,11 +311,11 @@ export const ExecutiveAlertsPanel: React.FC<ExecutiveAlertsPanelProps> = ({ onPa
             return (
               <div
                 key={alert.id}
-                className="flex-between"
+                className="flex-between flex-wrap"
                 style={{
-                  padding: '10px 14px',
+                  padding: '12px 14px',
                   background: 'var(--bg-surface-2)',
-                  borderRadius: 'var(--radius-md)',
+                  borderRadius: 'var(--radius-lg)',
                   borderLeft: `4px solid ${badge.color}`,
                   gap: '12px',
                   transition: 'background var(--transition-fast)',
@@ -323,19 +323,17 @@ export const ExecutiveAlertsPanel: React.FC<ExecutiveAlertsPanelProps> = ({ onPa
               >
                 <div
                   className="flex-row items-center"
-                  style={{ gap: '12px', minWidth: 0, flex: 1 }}
+                  style={{ gap: '12px', minWidth: 'min(240px, 100%)', flex: 1 }}
                 >
                   <div style={{ flexShrink: 0 }}>{alert.icon}</div>
-                  <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
-                    <div className="flex-row items-center" style={{ gap: '6px' }}>
+                  <div className="flex-col" style={{ gap: '3px', minWidth: 0, flex: 1 }}>
+                    <div className="flex-row items-center flex-wrap" style={{ gap: '6px' }}>
                       <span
                         style={{
                           fontWeight: '600',
                           fontSize: 'var(--text-sm)',
                           color: 'var(--text-primary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          lineHeight: 'var(--leading-snug)',
                         }}
                       >
                         {alert.title}
@@ -360,9 +358,7 @@ export const ExecutiveAlertsPanel: React.FC<ExecutiveAlertsPanelProps> = ({ onPa
                       style={{
                         fontSize: 'var(--text-xs)',
                         color: 'var(--text-tertiary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
+                        lineHeight: 'var(--leading-snug)',
                       }}
                     >
                       {alert.subtitle}
@@ -370,7 +366,7 @@ export const ExecutiveAlertsPanel: React.FC<ExecutiveAlertsPanelProps> = ({ onPa
                   </div>
                 </div>
 
-                <div className="flex-row items-center" style={{ gap: '12px', flexShrink: 0 }}>
+                <div className="flex-row items-center" style={{ gap: '12px', flexShrink: 0, marginLeft: 'auto' }}>
                   {alert.amountOrQuantity && (
                     <div
                       style={{

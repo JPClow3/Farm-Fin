@@ -47,11 +47,12 @@ export const UpcomingReceivablesWidget: React.FC = () => {
           upcomingReceivables.map((item) => (
             <div
               key={item.id}
-              className="flex-between"
+              className="flex-between flex-wrap"
               style={{
                 padding: 'var(--space-3) var(--space-4)',
                 background: 'var(--bg-surface-2)',
                 borderRadius: 'var(--radius-lg)',
+                gap: '12px',
               }}
             >
               <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>

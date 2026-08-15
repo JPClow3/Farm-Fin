@@ -197,7 +197,7 @@ export const DueDateAlertsBanner: React.FC<DueDateAlertsBannerProps> = ({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: 'var(--space-2)',
         }}
       >
@@ -221,15 +221,33 @@ export const DueDateAlertsBanner: React.FC<DueDateAlertsBannerProps> = ({
                 gap: '8px',
                 transition: 'all 0.15s ease',
                 textAlign: 'left',
+                minWidth: 0,
               }}
             >
-              <div className="flex-row" style={{ alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: tier.text }}>{tier.icon}</span>
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: tier.text }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                <span style={{ color: tier.text, flexShrink: 0, display: 'flex' }}>{tier.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: tier.text,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     {tier.label}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: 'var(--text-tertiary)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     {tier.sublabel}
                   </div>
                 </div>
@@ -243,6 +261,7 @@ export const DueDateAlertsBanner: React.FC<DueDateAlertsBannerProps> = ({
                   borderRadius: 'var(--radius-full)',
                   background: isSelected ? tier.text : tier.bg,
                   color: isSelected ? '#ffffff' : tier.text,
+                  flexShrink: 0,
                 }}
               >
                 {tier.count}

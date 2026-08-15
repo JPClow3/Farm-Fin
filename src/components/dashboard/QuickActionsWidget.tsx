@@ -120,7 +120,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({ onOpenQu
               >
                 {act.icon}
               </div>
-              <div className="flex-col" style={{ gap: '2px', minWidth: 0 }}>
+              <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
                 <span
                   style={{
                     fontWeight: '600',

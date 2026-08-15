@@ -313,7 +313,7 @@ export function AgingAnalysisView<T extends Payable | Receivable>({
           boxShadow: 'var(--clay-shadow-md)',
         }}
       >
-        <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="clay-table">
           <thead>
             <tr>
               <th style={{ textAlign: 'left', padding: '12px 16px' }}>Documento / Descrição</th>

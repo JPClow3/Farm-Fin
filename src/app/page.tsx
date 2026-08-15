@@ -198,20 +198,14 @@ export default function DashboardPage() {
               value={`R$ ${liveKpis.totalReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               icon={<CircleDollarSign size={20} />}
               iconColor="green"
-              trend={{
-                value: `Receita no Mês: R$ ${liveKpis.totalReceitasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                direction: 'up',
-              }}
+              subtext={`Receita no Mês: R$ ${liveKpis.totalReceitasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             />
             <KpiCard
               label="Contas a Pagar (Período)"
               value={`R$ ${liveKpis.totalPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               icon={<CreditCard size={20} />}
               iconColor="red"
-              trend={{
-                value: `Despesa no Mês: R$ ${liveKpis.totalDespesasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                direction: 'down',
-              }}
+              subtext={`Despesa no Mês: R$ ${liveKpis.totalDespesasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             />
             <KpiCard
               label="Saldo Consolidado em Caixa"

@@ -178,7 +178,7 @@ export const CustomizeDashboardModal: React.FC<CustomizeDashboardModalProps> = (
                   <GripVertical size={18} />
                 </div>
 
-                <div className="flex-col" style={{ gap: '2px', minWidth: 0 }}>
+                <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
                   <div className="flex-row items-center" style={{ gap: '6px' }}>
                     <span
                       style={{
