@@ -284,7 +284,7 @@ NEWFILEUID:NONE
             conferência de saldo
           </p>
         </div>
-        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
+        <div className="flex-row flex-wrap" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="ghost" onClick={handleSimulateOfxUpload} disabled={isUploading}>
             <Download size={15} style={{ marginRight: '6px' }} />
             {isUploading ? 'Importando...' : 'Carregar Extrato Demo (OFX)'}

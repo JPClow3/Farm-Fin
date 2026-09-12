@@ -124,8 +124,9 @@ function LoginForm() {
         background: '#ffffff',
         borderRadius: '16px',
         boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-        padding: '36px',
+        padding: 'clamp(20px, 6vw, 36px)',
         color: '#1a2e22',
+        boxSizing: 'border-box',
       }}
     >
       {/* Header Branding */}
@@ -303,7 +304,7 @@ function LoginForm() {
       </div>
 
       {/* Quick Persona Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
         {SEED_USERS.map((user) => (
           <button
             key={user.id}

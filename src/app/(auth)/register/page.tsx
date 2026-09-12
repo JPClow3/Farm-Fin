@@ -155,8 +155,9 @@ function RegisterForm() {
         background: '#ffffff',
         borderRadius: '16px',
         boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-        padding: '36px',
+        padding: 'clamp(20px, 6vw, 36px)',
         color: '#1a2e22',
+        boxSizing: 'border-box',
       }}
     >
       {/* Header Branding */}
@@ -379,7 +380,7 @@ function RegisterForm() {
           >
             Perfil de Acesso Inicial (RBAC)
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
             {[
               { id: 'Produtor', label: 'Produtor Rural', icon: UserCheck, desc: 'Acesso total' },
               { id: 'Gestor', label: 'Gestor Fazenda', icon: Tractor, desc: 'Operações e safras' },
@@ -424,7 +425,7 @@ function RegisterForm() {
         </div>
 
         {/* Password & Confirm Password Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
           <div>
             <label
               style={{

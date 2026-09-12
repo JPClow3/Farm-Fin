@@ -470,12 +470,13 @@ export const ApportionmentMatrix: React.FC<ApportionmentMatrixProps> = ({
 
         {/* Total Overhead Summary Bar */}
         <div
-          className="flex-between"
+          className="flex-between flex-wrap"
           style={{
             marginTop: 'var(--space-4)',
             padding: '12px 16px',
             background: 'var(--bg-surface-2)',
             borderRadius: 'var(--radius-md)',
+            gap: '12px',
           }}
         >
           <div>

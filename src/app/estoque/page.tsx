@@ -584,7 +584,7 @@ export default function EstoquePage() {
             Gestão física e contábil com Custo Médio Ponderado (CMP), rastreabilidade ponta-a-ponta de lotes e alertas de ressuprimento
           </p>
         </div>
-        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
+        <div className="flex-row flex-wrap" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="secondary" onClick={() => setIsExitModalOpen(true)}>
             <ArrowUpFromLine size={15} style={{ marginRight: '6px' }} />
             Baixa / Aplicação no Talhão
@@ -621,7 +621,7 @@ export default function EstoquePage() {
                 </p>
               </div>
             </div>
-            <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
+            <div className="flex-row flex-wrap" style={{ gap: 'var(--space-2)' }}>
               <ClayButton size="sm" variant="ghost" onClick={() => setActiveTab('alertas')}>
                 Ver Central de Alertas ({alertSummary.totalAlertsCount})
               </ClayButton>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { BottomNavigation } from './BottomNavigation';
 import { AppShellSkeleton } from './AppShellSkeleton';
 import { Breadcrumbs } from './Breadcrumbs';
 import { ClayModal } from '../ui/ClayModal';
@@ -124,6 +125,9 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
           </>
         )}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNavigation onOpenSidebar={() => setIsSidebarOpen(true)} />
 
       {/* Quick Launch Modal */}
       <ClayModal

@@ -1,0 +1,64 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1500 >>
+stream
+BT
+/F1 11 Tf
+50 780 Td
+18 TL
+(DANFE - DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRONICA) '
+(NUMERO: 000.045.892 - SERIE: 1 - DATA DE EMISSAO: 10/09/2026) '
+(--------------------------------------------------------------------------------) '
+(EMITENTE / FORNECEDOR:) '
+(RAZAO SOCIAL: AUTO POSTO E DISTRIBUIDORA DE COMBUSTIVEIS RURAL LTDA) '
+(NOME FANTASIA: POSTO RURAL AGRO) '
+(CNPJ: 18.234.567/0001-89) '
+(ENDERECO: RODOVIA BR 163, KM 740 - DISTRITO INDUSTRIAL) '
+(--------------------------------------------------------------------------------) '
+(DESTINATARIO / REMETENTE \(FATURADO\):) '
+(NOME / RAZAO SOCIAL: JOAO CARLOS DA SILVA) '
+(CPF: 123.456.789-00) '
+(ENDERECO: FAZENDA BOA ESPERANCA - ZONA RURAL) '
+(--------------------------------------------------------------------------------) '
+(DADOS DA FATURA E DUPLICATAS \(PARCELAS\):) '
+(NUMERO PARCELA: 001) '
+(VENCIMENTO: 10/10/2026) '
+(VALOR DA PARCELA: R$ 12.100,00) '
+(QUANTIDADE DE PARCELAS: 1) '
+(--------------------------------------------------------------------------------) '
+(DADOS DOS PRODUTOS / SERVICOS:) '
+(1. COD: 101 - DESCRICAO: OLEO DIESEL S10 A GRANEL - QTD: 2000 L - TOTAL: 11.800,00) '
+(2. COD: 205 - DESCRICAO: FILTRO DE COMBUSTIVEL TRATOR JOHN DEERE - QTD: 2 UN - TOTAL: 300,00) '
+(--------------------------------------------------------------------------------) '
+(CALCULO DO IMPOSTO E VALOR TOTAL:) '
+(VALOR TOTAL DOS PRODUTOS: R$ 12.100,00) '
+(VALOR DO FRETE: R$ 0,00) '
+(VALOR TOTAL DA NOTA FISCAL: R$ 12.100,00) '
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001792 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1867
+%%EOF

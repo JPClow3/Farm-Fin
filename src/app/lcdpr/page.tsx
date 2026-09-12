@@ -135,7 +135,7 @@ export default function LcdprPage() {
             apuração direta do banco de dados
           </p>
         </div>
-        <div className="flex-row" style={{ gap: 'var(--space-2)' }}>
+        <div className="flex-row flex-wrap" style={{ gap: 'var(--space-2)' }}>
           <ClayButton variant="ghost" onClick={() => setIsPreviewModalOpen(true)}>
             <FileCode2 size={15} style={{ marginRight: '6px' }} />
             Visualizar Layout .TXT

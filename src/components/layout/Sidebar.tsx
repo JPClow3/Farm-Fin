@@ -21,6 +21,10 @@ import {
   FolderKanban,
   Settings,
   Tractor,
+  X,
+  Home,
+  Wheat,
+  Sparkles,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,7 +47,7 @@ interface NavSection {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
-  const { kpis } = useFarm();
+  const { kpis, activeFarm, activeSeason } = useFarm();
   const [role, setRole] = useState<UserRoleType | null>(null);
 
   useEffect(() => {
@@ -158,6 +162,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         },
       ],
     },
+    {
+      title: 'Atividades Acadêmicas',
+      items: [
+        {
+          href: '/atividades/processador-nf',
+          label: 'Processador de NF (IA)',
+          icon: <Sparkles size={18} strokeWidth={2.2} />,
+          module: 'processador-nf',
+        },
+      ],
+    },
   ];
 
   // Until the role resolves we don't know which modules are visible, so we
@@ -178,22 +193,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {isOpen && (
         <div
           className="modal-overlay"
-          style={{ zIndex: 'calc(var(--z-sticky) - 1)', backdropFilter: 'blur(3px)' }}
+          style={{ zIndex: 'calc(var(--z-sticky) - 1)', backdropFilter: 'blur(4px)' }}
           onClick={onClose}
         />
       )}
 
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-        {/* Logo */}
-        <div className="sidebar__logo">
-          <div className="sidebar__logo-icon">
-            <Tractor size={24} color="#ffffff" strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="sidebar__logo-text">Farm-Fin</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '500' }}>
-              Gestão Financeira Agro
+        {/* Logo & Mobile Close */}
+        <div className="sidebar__logo" style={{ justifyContent: 'space-between', width: '100%' }}>
+          <div className="flex-row" style={{ gap: 'var(--space-3)', alignItems: 'center' }}>
+            <div className="sidebar__logo-icon">
+              <Tractor size={24} color="#ffffff" strokeWidth={2.2} />
             </div>
+            <div>
+              <div className="sidebar__logo-text">Farm-Fin</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '500' }}>
+                Gestão Financeira Agro
+              </div>
+            </div>
+          </div>
+
+          {/* Close button on mobile */}
+          <button
+            type="button"
+            className="hide-desktop"
+            onClick={onClose}
+            aria-label="Fechar Menu Lateral"
+            style={{
+              background: 'var(--bg-surface-2)',
+              border: 'none',
+              borderRadius: 'var(--radius-full)',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              boxShadow: 'var(--clay-shadow-xs)',
+              marginLeft: 'auto',
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Mobile Farm & Safra context banner in drawer */}
+        <div
+          className="hide-desktop"
+          style={{
+            padding: '10px 12px',
+            background: 'var(--bg-surface-1)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--clay-shadow-xs)',
+            marginBottom: 'var(--space-2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            border: '1px solid rgba(212, 201, 186, 0.5)',
+          }}
+        >
+          <div className="flex-row items-center" style={{ gap: '6px', fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
+            <Home size={14} color="var(--color-primary-600)" />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeFarm?.name || 'Fazenda Principal'}
+            </span>
+          </div>
+          <div className="flex-row items-center" style={{ gap: '6px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            <Wheat size={13} color="var(--color-secondary-600)" />
+            <span>Safra {activeSeason?.name || '2025/2026'}</span>
           </div>
         </div>
 

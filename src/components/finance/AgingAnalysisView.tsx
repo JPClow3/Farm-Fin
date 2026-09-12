@@ -201,7 +201,7 @@ export function AgingAnalysisView<T extends Payable | Receivable>({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
           gap: 'var(--space-3)',
         }}
       >
@@ -219,7 +219,7 @@ export function AgingAnalysisView<T extends Payable | Receivable>({
                 background: isSelected ? colors.bg : 'var(--bg-surface-1)',
                 border: isSelected ? `2px solid ${colors.bar}` : '1px solid var(--border-color)',
                 borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
+                padding: 'var(--space-3) var(--space-4)',
                 textAlign: 'left',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -227,14 +227,18 @@ export function AgingAnalysisView<T extends Payable | Receivable>({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
+                minWidth: 0,
               }}
             >
-              <div className="flex-between" style={{ width: '100%' }}>
+              <div className="flex-between" style={{ width: '100%', gap: '4px' }}>
                 <span
                   style={{
                     fontSize: 'var(--text-xs)',
                     fontWeight: '700',
                     color: isSelected ? colors.text : 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
                   {bucket.label}
@@ -247,6 +251,7 @@ export function AgingAnalysisView<T extends Payable | Receivable>({
                     background: colors.bg,
                     color: colors.text,
                     fontWeight: 'bold',
+                    flexShrink: 0,
                   }}
                 >
                   {bucket.count}
@@ -254,17 +259,20 @@ export function AgingAnalysisView<T extends Payable | Receivable>({
               </div>
 
               <div
+                className="tabular-nums"
                 style={{
-                  fontSize: 'var(--text-base)',
+                  fontSize: 'clamp(0.95rem, 2.5vw, 1.15rem)',
                   fontWeight: '800',
                   color: isSelected ? colors.text : 'var(--text-primary)',
                   marginTop: '4px',
+                  overflowWrap: 'break-word',
+                  wordBreak: 'break-word',
                 }}
               >
                 R$ {bucket.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
 
-              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {bucket.rangeDescription}
               </div>
             </button>

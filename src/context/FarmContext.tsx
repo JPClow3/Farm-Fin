@@ -609,9 +609,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const averageCostPerHectare = estimatedCropCost / (totalArea || 1);
 
     const lowStockCount = activeStockItems.filter((s) => s.quantity <= s.minQuantity).length;
-    const pendingReconciliationCount = bankStatements.filter(
-      (s) => !s.matched && s.status !== 'conciliado'
-    ).length;
+    const pendingReconciliationCount = bankStatements.filter((s) => !s.matched).length;
 
     return {
       totalBankBalance,

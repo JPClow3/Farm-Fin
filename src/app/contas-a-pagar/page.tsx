@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
 import { KpiCard } from '../../components/ui/KpiCard';
@@ -42,6 +43,7 @@ import {
   Repeat,
   Layers,
   ListFilter,
+  Sparkles,
 } from 'lucide-react';
 
 export default function ContasAPagarPage() {
@@ -578,10 +580,18 @@ export default function ContasAPagarPage() {
             integradas
           </p>
         </div>
-        <ClayButton variant="primary" onClick={() => setIsNewModalOpen(true)}>
-          <Plus size={16} style={{ marginRight: '6px' }} />
-          Nova Conta a Pagar
-        </ClayButton>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Link href="/atividades/processador-nf">
+            <ClayButton variant="secondary">
+              <Sparkles size={16} style={{ marginRight: '6px' }} />
+              Processar NF (IA)
+            </ClayButton>
+          </Link>
+          <ClayButton variant="primary" onClick={() => setIsNewModalOpen(true)}>
+            <Plus size={16} style={{ marginRight: '6px' }} />
+            Nova Conta a Pagar
+          </ClayButton>
+        </div>
       </div>
 
       {/* KPIs Grid */}

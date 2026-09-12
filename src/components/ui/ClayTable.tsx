@@ -28,8 +28,15 @@ export function ClayTable<T>({
   onRowClick,
 }: ClayTableProps<T>) {
   return (
-    <div className={`clay-table-wrapper ${className}`.trim()}>
-      <table className="clay-table">
+    <div
+      className={`clay-table-wrapper ${className}`.trim()}
+      style={{
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        maxWidth: '100%',
+      }}
+    >
+      <table className="clay-table" style={{ width: '100%', minWidth: '560px' }}>
         <thead>
           <tr>
             {columns.map((col) => (
@@ -38,6 +45,7 @@ export function ClayTable<T>({
                 style={{
                   textAlign: col.align || 'left',
                   width: col.width,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {col.header}
@@ -54,6 +62,7 @@ export function ClayTable<T>({
                   textAlign: 'center',
                   padding: 'var(--space-8)',
                   color: 'var(--text-tertiary)',
+                  fontSize: 'var(--text-sm)',
                 }}
               >
                 {emptyMessage}
@@ -64,13 +73,17 @@ export function ClayTable<T>({
               <tr
                 key={keyExtractor(row, idx)}
                 onClick={() => onRowClick?.(row)}
-                style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                style={{
+                  cursor: onRowClick ? 'pointer' : 'default',
+                  transition: 'background-color var(--transition-fast)',
+                }}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
                     style={{
                       textAlign: col.align || 'left',
+                      verticalAlign: 'middle',
                     }}
                   >
                     {col.render

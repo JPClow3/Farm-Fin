@@ -77,7 +77,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({ onOpenQu
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
           gap: 'var(--space-3)',
         }}
       >
@@ -86,17 +86,19 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({ onOpenQu
             <div
               key={idx}
               onClick={act.onClick}
+              className="quick-action-item"
               style={{
                 display: 'flex',
-                alignItems: 'flex-start',
-                gap: '12px',
-                padding: '12px 14px',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
                 borderRadius: 'var(--radius-lg)',
                 background: 'var(--bg-surface-2)',
                 border: '1px solid var(--border-subtle)',
                 cursor: 'pointer',
                 transition: 'all var(--transition-fast)',
                 userSelect: 'none',
+                minWidth: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)';
@@ -108,14 +110,29 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({ onOpenQu
                 e.currentTarget.style.borderColor = 'var(--border-subtle)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'scale(0.96)';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'none';
+              }}
+              onTouchStart={(e) => {
+                e.currentTarget.style.transform = 'scale(0.96)';
+              }}
+              onTouchEnd={(e) => {
+                e.currentTarget.style.transform = 'none';
+              }}
             >
               <div
                 style={{
-                  padding: '8px',
+                  padding: '7px',
                   borderRadius: '8px',
                   background: 'var(--bg-surface)',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 {act.icon}
@@ -124,7 +141,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({ onOpenQu
                 <span
                   style={{
                     fontWeight: '600',
-                    fontSize: 'var(--text-sm)',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--text-primary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -135,7 +152,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({ onOpenQu
                 </span>
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '10px',
                     color: 'var(--text-tertiary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',

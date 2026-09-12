@@ -11,13 +11,19 @@ export const ClayCard: React.FC<ClayCardProps> = ({
   variant = 'default',
   className = '',
   children,
+  onClick,
   ...props
 }) => {
   const sizeClass = size !== 'md' ? `clay-card--${size}` : '';
   const variantClass = variant !== 'default' ? `clay-card--${variant}` : '';
+  const clickableClass = onClick ? 'clay-card--clickable' : '';
 
   return (
-    <div className={`clay-card ${sizeClass} ${variantClass} ${className}`.trim()} {...props}>
+    <div
+      className={`clay-card ${sizeClass} ${variantClass} ${clickableClass} ${className}`.trim()}
+      onClick={onClick}
+      {...props}
+    >
       {children}
     </div>
   );

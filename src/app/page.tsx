@@ -299,14 +299,15 @@ export default function DashboardPage() {
                 upcomingPayables.map((item) => (
                   <div
                     key={item.id}
-                    className="flex-between"
+                    className="flex-between flex-wrap"
                     style={{
                       padding: 'var(--space-3) var(--space-4)',
                       background: 'var(--bg-surface-2)',
                       borderRadius: 'var(--radius-lg)',
+                      gap: '8px',
                     }}
                   >
-                    <div className="flex-col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
+                    <div className="flex-col" style={{ gap: '2px', minWidth: 'min(220px, 100%)', flex: 1 }}>
                       <span
                         style={{
                           fontWeight: '600',
@@ -325,6 +326,7 @@ export default function DashboardPage() {
                           gap: '8px',
                           fontSize: 'var(--text-xs)',
                           color: 'var(--text-tertiary)',
+                          flexWrap: 'wrap',
                         }}
                       >
                         <span
@@ -343,10 +345,10 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="flex-row" style={{ gap: '12px', flexShrink: 0 }}>
+                    <div className="flex-row" style={{ gap: '12px', flexShrink: 0, marginLeft: 'auto' }}>
                       <div style={{ textAlign: 'right' }}>
                         <div
-                          className="td-money"
+                          className="td-money tabular-nums"
                           style={{ color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
                         >
                           R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -360,9 +362,10 @@ export default function DashboardPage() {
                           onClick={() => {
                             setSelectedPayable(item);
                             setPaymentAccount(bankAccounts[0]?.id || '');
+                            setPaymentDate(todayStr);
                           }}
                         >
-                          Pagar
+                          Baixar
                         </ClayButton>
                       )}
                     </div>

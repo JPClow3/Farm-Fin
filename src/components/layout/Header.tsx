@@ -150,19 +150,20 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
           </ClayButton>
 
           {/* Farm Selector */}
-          <div className="flex-row" style={{ gap: '6px', alignItems: 'center' }}>
-            <Home size={16} color="var(--color-primary-600)" />
+          <div className="flex-row" style={{ gap: '6px', alignItems: 'center', minWidth: 0 }}>
+            <Home size={16} color="var(--color-primary-600)" style={{ flexShrink: 0 }} />
             <select
               value={activeFarmId}
               onChange={(e) => setActiveFarmId(e.target.value)}
               disabled={isLoading}
               className="input select"
               style={{
-                padding: '6px 28px 6px 12px',
-                fontSize: 'var(--text-sm)',
+                padding: '6px 26px 6px 10px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: '600',
-                maxWidth: '220px',
+                maxWidth: 'clamp(120px, 34vw, 220px)',
                 height: '36px',
+                textOverflow: 'ellipsis',
               }}
               title="Selecionar Fazenda Ativa"
             >
@@ -298,7 +299,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
               <div
                 className="dropdown__menu"
                 style={{
-                  width: 'min(360px, 94vw)',
+                  width: 'min(360px, calc(100vw - 24px))',
+                  maxWidth: 'calc(100vw - 24px)',
                   right: 0,
                   padding: 'var(--space-4)',
                 }}
@@ -613,7 +615,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
               <div
                 className="dropdown__menu"
                 style={{
-                  width: '260px',
+                  width: 'min(260px, calc(100vw - 24px))',
+                  maxWidth: 'calc(100vw - 24px)',
                   right: 0,
                   padding: 'var(--space-2)',
                 }}

@@ -565,7 +565,7 @@ export default function CadastrosPage() {
             colaboradores e bancos
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex-row flex-wrap" style={{ gap: '8px' }}>
           {activeTab === 'fazendas' && (
             <ClayButton variant="primary" onClick={() => setIsNewFarmModal(true)}>
               <Plus size={16} style={{ marginRight: '6px' }} />

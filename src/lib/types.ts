@@ -450,6 +450,7 @@ export interface AgroKPIs {
   dueIn3DaysPayablesCount: number;
   dueIn7DaysPayablesCount: number;
   pendingApprovalPayablesCount: number;
+  pendingReconciliationCount?: number;
 }
 
 // ----------------------------------------------------

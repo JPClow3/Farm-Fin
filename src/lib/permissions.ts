@@ -15,7 +15,8 @@ export type AppModule =
   | 'custos'
   | 'dre'
   | 'lcdpr'
-  | 'configuracoes';
+  | 'configuracoes'
+  | 'processador-nf';
 
 export type PermissionLevel = 'none' | 'view' | 'manage';
 
@@ -43,6 +44,7 @@ const PERMISSION_MATRIX: Record<UserRoleType, Record<AppModule, PermissionLevel>
     dre: 'manage',
     lcdpr: 'manage',
     configuracoes: 'manage',
+    'processador-nf': 'manage',
   },
   Gestor: {
     dashboard: 'manage',
@@ -56,6 +58,7 @@ const PERMISSION_MATRIX: Record<UserRoleType, Record<AppModule, PermissionLevel>
     dre: 'manage',
     lcdpr: 'manage',
     configuracoes: 'view',
+    'processador-nf': 'manage',
   },
   Financeiro: {
     dashboard: 'manage',
@@ -69,6 +72,7 @@ const PERMISSION_MATRIX: Record<UserRoleType, Record<AppModule, PermissionLevel>
     dre: 'manage',
     lcdpr: 'manage',
     configuracoes: 'none',
+    'processador-nf': 'manage',
   },
   Contador: {
     dashboard: 'view',
@@ -82,6 +86,7 @@ const PERMISSION_MATRIX: Record<UserRoleType, Record<AppModule, PermissionLevel>
     dre: 'manage', // export/generate is allowed, it does not mutate business data
     lcdpr: 'manage',
     configuracoes: 'none',
+    'processador-nf': 'view',
   },
   Operador: {
     dashboard: 'view',
@@ -95,6 +100,7 @@ const PERMISSION_MATRIX: Record<UserRoleType, Record<AppModule, PermissionLevel>
     dre: 'none',
     lcdpr: 'none',
     configuracoes: 'none',
+    'processador-nf': 'none',
   },
 };
 
@@ -141,4 +147,5 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   dre: 'DRE Agrícola',
   lcdpr: 'LCDPR',
   configuracoes: 'Configurações',
+  'processador-nf': 'Processador de NF (IA)',
 };

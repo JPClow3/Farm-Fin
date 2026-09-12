@@ -45,14 +45,16 @@ export const ClayModal: React.FC<ClayModalProps> = ({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth }} onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <div>
+          <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
             <h3 className="modal__title">{title}</h3>
             {subtitle && (
               <p
                 style={{
                   fontSize: 'var(--text-xs)',
                   color: 'var(--text-tertiary)',
-                  marginTop: '2px',
+                  marginTop: '4px',
+                  lineHeight: 'var(--leading-normal)',
+                  wordBreak: 'break-word',
                 }}
               >
                 {subtitle}
@@ -64,10 +66,15 @@ export const ClayModal: React.FC<ClayModalProps> = ({
             size="sm"
             iconOnly
             onClick={onClose}
-            aria-label="Fechar"
-            style={{ borderRadius: 'var(--radius-full)' }}
+            aria-label="Fechar modal"
+            style={{
+              borderRadius: 'var(--radius-full)',
+              flexShrink: 0,
+              width: '38px',
+              height: '38px',
+            }}
           >
-            <X size={16} />
+            <X size={18} />
           </ClayButton>
         </div>
 
