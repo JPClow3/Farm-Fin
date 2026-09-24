@@ -48,13 +48,13 @@ describe('Mistral Invoice Agent', () => {
     vi.stubEnv('MISTRAL_API_KEY', 'test-key');
 
     try {
-      const result = await processInvoicePdfWithMistral(Buffer.from('pdf'));
+      const result = await processInvoicePdfWithMistral(Buffer.from('%PDF-1.4'));
 
       const [ocrUrl, ocrInit] = fetchMock.mock.calls[0];
       expect(ocrUrl).toBe('https://api.mistral.ai/v1/ocr');
       const ocrBody = JSON.parse(ocrInit.body);
       expect(ocrBody.model).toBe('mistral-ocr-latest');
-      expect(ocrBody.document.document_url).toBe(`data:application/pdf;base64,${Buffer.from('pdf').toString('base64')}`);
+      expect(ocrBody.document.document_url).toBe(`data:application/pdf;base64,${Buffer.from('%PDF-1.4').toString('base64')}`);
       expect(ocrInit.headers.Authorization).toBe('Bearer test-key');
 
       const chatBody = JSON.parse(fetchMock.mock.calls[1][1].body);

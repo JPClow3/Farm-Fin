@@ -3,10 +3,19 @@ import { processInvoicePdfWithMistral } from '@/lib/mistralInvoiceAgent';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Nenhum arquivo PDF foi enviado na requisição.' },
+        { status: 400 }
+      );
+    }
     const file = formData.get('file') as File | null;
     const apiKey = (formData.get('apiKey') as string | null)?.trim() || undefined;
 
@@ -29,6 +38,12 @@ export async function POST(request: NextRequest) {
     }
 
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+    if (file.size === 0) {
+      return NextResponse.json(
+        { success: false, error: 'O arquivo PDF está vazio.' },
+        { status: 400 }
+      );
+    }
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { success: false, error: 'O arquivo PDF excede o tamanho máximo de 20MB.' },
