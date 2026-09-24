@@ -42,22 +42,22 @@
 -- policies for those (e.g. `farm_id IN (SELECT id FROM farms WHERE
 -- organization_id = current_setting(...))`) as part of the same follow-up.
 
-ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "user_roles" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "audit_logs" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "farms" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "crop_seasons" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "categories" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "suppliers" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "customers" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "bank_accounts" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "payables" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "receivables" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "stock_items" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "stock_movements" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "machinery" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "employees" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "bank_statements" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "user_roles" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "audit_logs" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "farms" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "crop_seasons" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "categories" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "suppliers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "customers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "bank_accounts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "payables" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "receivables" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "stock_items" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "stock_movements" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "machinery" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "employees" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "bank_statements" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "input_products" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 

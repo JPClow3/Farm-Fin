@@ -1,5 +1,5 @@
 import { createAuthClient } from 'better-auth/react';
-import { magicLinkClient, twoFactorClient } from 'better-auth/client/plugins';
+import { magicLinkClient, twoFactorClient, usernameClient } from 'better-auth/client/plugins';
 
 export const authClient = createAuthClient({
   baseURL:
@@ -10,6 +10,7 @@ export const authClient = createAuthClient({
     magicLinkClient(),
     // The login page handles the second step itself (see `twoFactorRedirect`)
     twoFactorClient(),
+    usernameClient(),
   ],
 });
 

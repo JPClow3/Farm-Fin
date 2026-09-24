@@ -103,11 +103,15 @@ export function LoginScreen({ methods }: { methods: EnabledAuthMethods }) {
     setErrorMessage('');
     setPending('password');
     try {
-      const res = await authClient.signIn.email({ email: email.trim(), password });
+      // O mesmo campo aceita e-mail ou nome de usuário
+      const identifier = email.trim();
+      const res = identifier.includes('@')
+        ? await authClient.signIn.email({ email: identifier, password })
+        : await authClient.signIn.username({ username: identifier, password });
       if (res.error) {
         setErrorMessage(
           res.error.status === 401 || res.error.status === 400
-            ? 'E-mail ou senha incorretos. Confira e tente de novo.'
+            ? 'Usuário ou senha incorretos. Confira e tente de novo.'
             : 'Não foi possível entrar agora. Tente novamente em instantes.'
         );
         return;
@@ -345,7 +349,7 @@ export function LoginScreen({ methods }: { methods: EnabledAuthMethods }) {
                 <p className={styles.cardSubtitle}>
                   {mode === 'magicLink'
                     ? 'Receba um link de acesso por e-mail, sem precisar de senha.'
-                    : 'Use o e-mail e a senha da sua conta.'}
+                    : 'Use seu e-mail ou usuário e a senha da sua conta.'}
                 </p>
               </div>
 
@@ -357,14 +361,16 @@ export function LoginScreen({ methods }: { methods: EnabledAuthMethods }) {
               >
                 <div className={styles.field}>
                   <label htmlFor="login-email" className="input-label">
-                    E-mail
+                    {mode === 'magicLink' ? 'E-mail' : 'E-mail ou usuário'}
                   </label>
                   <input
                     id="login-email"
-                    type="email"
+                    type={mode === 'magicLink' ? 'email' : 'text'}
                     className="input"
-                    placeholder="seu.nome@fazenda.com.br"
-                    autoComplete="email"
+                    placeholder={mode === 'magicLink' ? 'seu.nome@fazenda.com.br' : 'seu.nome@fazenda.com.br ou usuário'}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required

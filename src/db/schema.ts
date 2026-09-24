@@ -30,6 +30,9 @@ export const users = pgTable('users', {
   organizationId: uuid('organization_id').references(() => organizations.id),
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
+  // Better Auth username plugin (login por usuário além do e-mail)
+  username: varchar('username', { length: 100 }).unique(),
+  displayUsername: varchar('display_username', { length: 100 }),
   emailVerified: boolean('email_verified').default(false),
   image: text('image'),
   role: varchar('role', { length: 50 }).default('Produtor').notNull(), // 'Produtor' | 'Gestor' | 'Financeiro' | 'Contador' | 'Operador'

@@ -56,6 +56,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
+    "db:create-user": "tsx src/db/create-user.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "deploy": "npx wrangler deploy",
