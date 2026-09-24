@@ -5,6 +5,13 @@
   "name": "farm-fin",
   "main": ".open-next/worker.js",
 
+  // ─── Build ──────────────────────────────────────────────────────────────────
+  // Generates .open-next/ before `wrangler deploy` / `wrangler versions upload`
+  // (Workers Builds runs the deploy command right after `npm ci`)
+  "build": {
+    "command": "npx opennextjs-cloudflare build"
+  },
+
   // ─── Compatibility ──────────────────────────────────────────────────────────
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
