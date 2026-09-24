@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { authClient } from '../../lib/auth-client';
+import { getAuthSessionAction } from '../../actions/auth';
 import { PeriodCashFlowSparkline } from '../finance/PeriodCashFlowSparkline';
 
 interface HeaderProps {
@@ -91,12 +92,26 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
   }, []);
 
   useEffect(() => {
+    // localStorage gives an instant first paint; the server session is the source of truth
     try {
       const savedUser = localStorage.getItem('farmfin_active_user');
       if (savedUser) {
         setCurrentUser(JSON.parse(savedUser));
       }
     } catch {}
+    let cancelled = false;
+    getAuthSessionAction()
+      .then((session) => {
+        if (cancelled) return;
+        setCurrentUser(session.user);
+        try {
+          localStorage.setItem('farmfin_active_user', JSON.stringify(session.user));
+        } catch {}
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -105,10 +120,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
     } catch (e) {
       console.warn('Neon Auth signOut error:', e);
     }
-    // Clear cookies & session
-    document.cookie = 'farmfin_session=; path=/; max-age=0';
-    document.cookie = 'better-auth.session_token=; path=/; max-age=0';
-    document.cookie = 'farmfin_demo_role=; path=/; max-age=0';
+    // Demo sessions live in an httpOnly cookie, so only the server can clear them
+    try {
+      await fetch('/api/session/demo', { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Demo session logout error:', e);
+    }
     try {
       localStorage.removeItem('farmfin_active_user');
     } catch {}

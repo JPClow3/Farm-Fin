@@ -158,15 +158,12 @@ function sanitizeExtraction(parsed: ExtractedInvoiceData): ExtractedInvoiceData 
   return parsed;
 }
 
-export async function processInvoicePdfWithMistral(
-  pdfBuffer: Buffer,
-  customApiKey?: string
-): Promise<ExtractedInvoiceData> {
-  const apiKey = customApiKey || process.env.MISTRAL_API_KEY;
+export async function processInvoicePdfWithMistral(pdfBuffer: Buffer): Promise<ExtractedInvoiceData> {
+  const apiKey = process.env.MISTRAL_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error(
-      'Chave da API da Mistral não configurada. Defina MISTRAL_API_KEY no arquivo .env.local ou informe a chave na interface.'
+      'Serviço de leitura de notas não configurado: defina o segredo MISTRAL_API_KEY no servidor (ou em .env.local no desenvolvimento).'
     );
   }
 

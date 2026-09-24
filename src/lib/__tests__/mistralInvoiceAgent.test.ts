@@ -13,7 +13,7 @@ describe('Mistral Invoice Agent', () => {
 
     await expect(
       processInvoicePdfWithMistral(dummyBuffer)
-    ).rejects.toThrow(/Chave da API da Mistral não configurada/i);
+    ).rejects.toThrow(/MISTRAL_API_KEY/);
 
     if (originalKey) {
       process.env.MISTRAL_API_KEY = originalKey;
@@ -45,9 +45,10 @@ describe('Mistral Invoice Agent', () => {
         )
       );
     vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
 
     try {
-      const result = await processInvoicePdfWithMistral(Buffer.from('pdf'), 'test-key');
+      const result = await processInvoicePdfWithMistral(Buffer.from('pdf'));
 
       const [ocrUrl, ocrInit] = fetchMock.mock.calls[0];
       expect(ocrUrl).toBe('https://api.mistral.ai/v1/ocr');
@@ -65,6 +66,7 @@ describe('Mistral Invoice Agent', () => {
       expect(result.classificacaoDespesa).toEqual(['MANUTENÇÃO E OPERAÇÃO']);
     } finally {
       vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
     }
   });
 
