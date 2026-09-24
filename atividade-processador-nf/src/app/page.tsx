@@ -129,7 +129,7 @@ export default function Home() {
 
     setIsLoading(true);
     setErrorMessage(null);
-    setStatusMessage('Enviando documento e acionando Agente Gemini...');
+    setStatusMessage('Enviando documento e acionando Mistral OCR...');
 
     try {
       const formData = new FormData();
@@ -138,7 +138,7 @@ export default function Home() {
         formData.append('apiKey', apiKey.trim());
       }
 
-      setStatusMessage('Gemini analisando visão do PDF e classificando despesas...');
+      setStatusMessage('Mistral OCR lendo o PDF e classificando despesas...');
 
       const response = await fetch('/api/extrair-nf', {
         method: 'POST',
@@ -230,7 +230,7 @@ export default function Home() {
               Processador de PDF de Nota Fiscal (Contas a Pagar)
             </h1>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              Extração de dados fiscais com Agents (Gemini) e classificação semântica de despesas com retorno estrito em JSON na tela.
+              Extração de dados fiscais com Mistral OCR e Agents (Mistral) e classificação semântica de despesas com retorno estrito em JSON na tela.
             </p>
           </div>
 
@@ -268,7 +268,7 @@ export default function Home() {
           <strong>Campos obrigatórios extraídos:</strong> Fornecedor (Razão Social / Fantasia / CNPJ), Faturado (Nome Completo / CPF), Número da Nota Fiscal, Data de Emissão, Descrição dos produtos, Quantidade de Parcelas, Data de Vencimento e Valor Total.
         </div>
         <div style={{ marginTop: '0.35rem' }}>
-          <strong>Classificação inteligente de DESPESA:</strong> O campo Despesa NÃO é extraído do texto físico, mas interpretado pelo Gemini conforme os produtos. Exemplo: <em>Compra de Óleo Diesel</em> &rarr; <strong>MANUTENÇÃO E OPERAÇÃO</strong> | <em>Compra de Material Hidráulico</em> &rarr; <strong>INFRAESTRUTURA E UTILIDADES</strong>.
+          <strong>Classificação inteligente de DESPESA:</strong> O campo Despesa NÃO é extraído do texto físico, mas interpretado pela IA (Mistral) conforme os produtos. Exemplo: <em>Compra de Óleo Diesel</em> &rarr; <strong>MANUTENÇÃO E OPERAÇÃO</strong> | <em>Compra de Material Hidráulico</em> &rarr; <strong>INFRAESTRUTURA E UTILIDADES</strong>.
         </div>
       </div>
 
@@ -277,14 +277,14 @@ export default function Home() {
         <div className="card" style={{ marginBottom: '1.5rem', borderStyle: 'dashed', backgroundColor: '#f8fafc' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <KeyRound size={14} />
-            Chave da API do Google Gemini (GEMINI_API_KEY)
+            Chave da API da Mistral (MISTRAL_API_KEY)
           </div>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
             A chave padrão já está pré-configurada no arquivo <code>.env</code> do projeto. Você só precisa digitar aqui caso queira testar com outra chave.
           </p>
           <input
             type="password"
-            placeholder="Cole sua GEMINI_API_KEY aqui..."
+            placeholder="Cole sua MISTRAL_API_KEY aqui..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             style={{
@@ -435,7 +435,7 @@ export default function Home() {
             style={{ width: '100%', justifyContent: 'center' }}
           >
             {isLoading ? <div className="spinner" /> : <Sparkles size={18} />}
-            {isLoading ? 'Extraindo e Classificando com Gemini...' : 'Extrair Dados da Nota Fiscal'}
+            {isLoading ? 'Extraindo e Classificando com Mistral...' : 'Extrair Dados da Nota Fiscal'}
           </button>
 
           {isLoading && statusMessage && (

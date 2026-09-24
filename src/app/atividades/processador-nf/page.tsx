@@ -7,7 +7,7 @@ import { ClayInput } from '@/components/ui/ClayInput';
 import { useToast } from '@/context/ToastContext';
 import { useModuleGuard } from '@/lib/useModuleGuard';
 import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
-import { ExtractedInvoiceData } from '@/lib/geminiInvoiceAgent';
+import { ExtractedInvoiceData } from '@/lib/mistralInvoiceAgent';
 import {
   Sparkles,
   UploadCloud,
@@ -112,7 +112,7 @@ export default function ProcessadorNfPage() {
 
     setIsLoading(true);
     setErrorMessage(null);
-    setStatusMessage('Enviando documento e acionando Agente Gemini...');
+    setStatusMessage('Enviando documento e acionando Mistral OCR...');
 
     try {
       const formData = new FormData();
@@ -121,7 +121,7 @@ export default function ProcessadorNfPage() {
         formData.append('apiKey', apiKey.trim());
       }
 
-      setStatusMessage('Gemini analisando visão do PDF e classificando despesas...');
+      setStatusMessage('Mistral OCR lendo o PDF e classificando despesas...');
 
       const response = await fetch('/api/ai/extrair-nf', {
         method: 'POST',
@@ -141,7 +141,7 @@ export default function ProcessadorNfPage() {
       addToast({
         type: 'success',
         title: 'Extração Concluída!',
-        message: 'Dados fiscais extraídos e classificados com sucesso pelo Gemini.',
+        message: 'Dados fiscais extraídos e classificados com sucesso pela Mistral.',
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido durante o processamento.';
@@ -209,7 +209,7 @@ export default function ProcessadorNfPage() {
             Processador de PDF de Nota Fiscal (Contas a Pagar)
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] mt-1">
-            Extração inteligente de dados fiscais com agentes de IA (Gemini) e classificação semântica de despesas com retorno estrito em JSON.
+            Extração inteligente de dados fiscais com Mistral OCR e agentes de IA (Mistral) e classificação semântica de despesas com retorno estrito em JSON.
           </p>
         </div>
 
@@ -236,7 +236,7 @@ export default function ProcessadorNfPage() {
           <strong>Campos obrigatórios extraídos:</strong> Fornecedor (Razão Social / Fantasia / CNPJ), Faturado (Nome / CPF), Número da NF, Data de Emissão, Descrição dos produtos, Quantidade de Parcelas, Data de Vencimento e Valor Total.
         </p>
         <p className="text-xs text-[var(--color-primary-900)] leading-relaxed">
-          <strong>Classificação inteligente de DESPESA:</strong> O campo Despesa não existe na nota fiscal e é interpretado pelo Gemini com base nos produtos.
+          <strong>Classificação inteligente de DESPESA:</strong> O campo Despesa não existe na nota fiscal e é interpretado pela IA (Mistral) com base nos produtos.
           Exemplo: <em>Óleo Diesel</em> &rarr; <strong>MANUTENÇÃO E OPERAÇÃO</strong> | <em>Material Hidráulico</em> &rarr; <strong>INFRAESTRUTURA E UTILIDADES</strong>.
         </p>
       </div>
@@ -246,14 +246,14 @@ export default function ProcessadorNfPage() {
         <ClayCard className="p-4 space-y-2 border-dashed border-[var(--color-border-subtle)] bg-[var(--color-surface-sunken)]">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-secondary)]">
             <KeyRound size={14} />
-            Chave da API do Google Gemini (Google AI Studio)
+            Chave da API da Mistral (La Plateforme)
           </div>
           <p className="text-xs text-[var(--color-text-muted)]">
-            Se já configurada no arquivo <code>.env.local</code> (variável <code>GEMINI_API_KEY</code>), você não precisa preencher este campo. Use apenas se desejar usar uma chave customizada para testes ou avaliação.
+            Se já configurada no arquivo <code>.env.local</code> (variável <code>MISTRAL_API_KEY</code>), você não precisa preencher este campo. Use apenas se desejar usar uma chave customizada para testes ou avaliação.
           </p>
           <ClayInput
             type="password"
-            placeholder="AIzaSy..."
+            placeholder="Sua chave da Mistral..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="text-sm font-mono"
@@ -348,7 +348,7 @@ export default function ProcessadorNfPage() {
                   className="w-full flex items-center justify-center gap-2 font-semibold"
                 >
                   <Sparkles size={18} />
-                  {isLoading ? 'Extraindo e Classificando com Gemini...' : 'Extrair Dados da Nota Fiscal'}
+                  {isLoading ? 'Extraindo e Classificando com Mistral...' : 'Extrair Dados da Nota Fiscal'}
                 </ClayButton>
 
                 {isLoading && statusMessage && (
@@ -422,7 +422,7 @@ export default function ProcessadorNfPage() {
                   </h2>
                 </div>
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                  Conforme exigido na atividade, o Gemini extraiu os dados do PDF e classificou a despesa devolvendo o JSON puro abaixo.
+                  Conforme exigido na atividade, o Mistral OCR extraiu os dados do PDF e classificou a despesa devolvendo o JSON puro abaixo.
                 </p>
               </div>
 
