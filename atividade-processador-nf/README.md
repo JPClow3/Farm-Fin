@@ -1,110 +1,121 @@
-# Prática de Engenharia de Software — Atividade 1° Etapa
+# Atividade 1° Etapa — Processador de PDF de Nota Fiscal (Contas a Pagar)
 
-## Processador Inteligente de PDF de Nota Fiscal (Contas a Pagar) com Agents Gemini
+Página única e simples: o usuário anexa o PDF da nota fiscal, clica em **Extrair dados** e o sistema devolve o resultado em **JSON na tela**, usando Google Gemini.
 
-Demonstração funcional desenvolvida exclusivamente para a entrega da **ATIVIDADE 1° ETAPA** da disciplina de **Prática de Engenharia de Software**.
+> **Para rodar o projeto, siga o passo a passo detalhado em [COMO_EXECUTAR.md](./COMO_EXECUTAR.md).**
 
-O sistema implementa um processador inteligente de documentos fiscais em PDF utilizando o modelo multimodal **Google Gemini (Vision)** para extrair os dados de uma nota fiscal (Contas a Pagar), interpretar semanticamente a despesa e devolver o resultado estritamente em formato **JSON na tela**.
+## Como executar
 
----
+Pré-requisitos: Node.js 18+ e npm.
 
-## 📋 Requisitos e Campos Extraídos
-
-Conforme as especificações obrigatórias da atividade:
-
-1. **Fornecedor**: Razão Social / Fantasia / CNPJ
-2. **Faturado**: Nome Completo / CPF
-3. **Número da Nota Fiscal**: Identificador oficial do documento
-4. **Data de Emissão**: Formato `AAAA-MM-DD`
-5. **Descrição dos produtos**: Lista com as descrições dos itens/serviços faturados (sem necessidade de entidade complexa)
-6. **Quantidade de Parcelas**: Número de parcelas (com estrutura para receber múltiplas parcelas)
-7. **Data de Vencimento**: Vencimento da fatura/parcela
-8. **Valor Total**: Montante total da nota fiscal
-9. **Tipo de Despesa (Classificação Semântica Inteligente)**:
-   - **A despesa NÃO é um campo extraído do texto físico da nota.**
-   - O agente **Gemini** analisa a natureza dos produtos faturados e infere a categoria adequada.
-   - *Exemplos atendidos conforme o enunciado:*
-     - **Compra de Óleo Diesel** &rarr; Classifica-se na categoria `MANUTENÇÃO E OPERAÇÃO`
-     - **Compra de Material Hidráulico** &rarr; Classifica-se na categoria `INFRAESTRUTURA E UTILIDADES`
-     - Outras categorias: `INSUMOS AGRÍCOLAS`, `COMBUSTÍVEIS E ENERGIA`, `SERVIÇOS E MÃO DE OBRA`, `ADMINISTRATIVO E TRIBUTÁRIO`, `OUTROS`.
-
----
-
-## 🚀 Como Executar o Projeto
-
-### Pré-requisitos
-- **Node.js**: Versão 18 ou superior instalada.
-- **NPM**: Gerenciador de pacotes padrão.
-
-### Passo 1: Instalar dependências
-Abra o terminal na pasta do projeto e execute:
 ```bash
 npm install
-```
-
-### Passo 2: Configuração da Chave de API
-O arquivo `.env` já está incluso na raiz do projeto com a chave da API do Gemini pronta para uso:
-```env
-GEMINI_API_KEY="AQ.Ab8RN6JKGPkySYhtciwzp7VprS_RlYu6-vIV_OatV7XbZTvHVw"
-```
-*(Caso queira utilizar outra chave, basta alterar o `.env` ou informá-la diretamente na interface gráfica).*
-
-### Passo 3: Iniciar o servidor de desenvolvimento
-```bash
 npm run dev
 ```
 
-### Passo 4: Acessar a aplicação
-Abra o navegador no endereço:
+Acesse `http://localhost:3000`.
+
+O arquivo `.env` já vai incluso no ZIP com a `GEMINI_API_KEY` configurada. Sem ele o professor não terá acesso ao Gemini. Não é preciso digitar chave na tela.
+
+## Como testar
+
+1. Selecione o PDF da nota fiscal (ex.: `exemplo-nota-fiscal/DANFE_000084682_IGUACU_teste_professor.pdf` — DANFE 000.084.682 da Iguacu Maquinas Agricolas Ltda).
+2. Clique em **Extrair dados**.
+3. O JSON aparece na tela, com botão **Copiar JSON**.
+
+## Campos extraídos (obrigatórios)
+
+- Fornecedor: Razão Social / Fantasia / CNPJ
+- Faturado: Nome Completo / CPF
+- Número da Nota Fiscal
+- Data de Emissão (AAAA-MM-DD)
+- Descrição dos produtos (lista de strings)
+- Quantidade de Parcelas (estrutura preparada para N parcelas; hoje 1)
+- Parcelas: `[{ numero, dataVencimento, valor }]`
+- Data de Vencimento (AAAA-MM-DD)
+- ValorTotal (número)
+- Classificação da DESPESA (interpretada pelo Gemini, estrutura em array para N classificações)
+
+A DESPESA não é extraída do texto: o Gemini interpreta os produtos e classifica em uma das 9 categorias oficiais:
+
+- INSUMOS AGRÍCOLAS
+- MANUTENÇÃO E OPERAÇÃO
+- RECURSOS HUMANOS
+- SERVIÇOS OPERACIONAIS
+- INFRAESTRUTURA E UTILIDADES
+- ADMINISTRATIVAS
+- SEGUROS E PROTEÇÃO
+- IMPOSTOS E TAXAS
+- INVESTIMENTOS
+
+Ex.: Óleo Diesel → MANUTENÇÃO E OPERAÇÃO. Material Hidráulico → INFRAESTRUTURA E UTILIDADES.
+
+## Retorno esperado — DANFE 000.084.682 (teste do professor)
+
+```json
+{
+  "fornecedor": {
+    "razaoSocial": "IGUACU MAQUINAS AGRICOLAS LTDA",
+    "nomeFantasia": null,
+    "cnpj": "33.656.729/0023-85"
+  },
+  "faturado": {
+    "nomeCompleto": "CICLANO DA SILVA",
+    "cpf": "999.999.999-99"
+  },
+  "numeroNotaFiscal": "000.084.682",
+  "dataEmissao": "2025-09-19",
+  "descricaoProdutos": [
+    "GRAXA DE POLIUREIA MP SD 400G",
+    "ANEL O",
+    "KIT DA BUCHA",
+    "APOIO",
+    "ANEL",
+    "ROLAMENTO DE ESFERAS",
+    "ROLAMENTO DE ROLOS CONICOS",
+    "ESTOPA",
+    "PANO PARA LIMPEZA",
+    "LIMPADOR PREMIUM 115"
+  ],
+  "quantidadeParcelas": 1,
+  "parcelas": [
+    {
+      "numero": 1,
+      "dataVencimento": "2025-10-17",
+      "valor": 3086.75
+    }
+  ],
+  "dataVencimento": "2025-10-17",
+  "valorTotal": 3086.75,
+  "tipoDespesa": "MANUTENÇÃO E OPERAÇÃO",
+  "classificacaoDespesa": ["MANUTENÇÃO E OPERAÇÃO"]
+}
 ```
-http://localhost:3000
-```
 
----
+Peças de máquinas agrícolas (rolamento, bucha, anel, graxa) → MANUTENÇÃO E OPERAÇÃO.
 
-## 🧪 Como Testar a Extração
-
-1. Na tela inicial, clique no botão **"Carregar PDF de Exemplo (Teste Rápido)"** para testar instantaneamente com a DANFE inclusa (compra de Óleo Diesel e Filtro de Combustível).
-   - *Ou arraste/selecione qualquer outro PDF de nota fiscal do seu computador.*
-2. Clique no botão **"Extrair Dados da Nota Fiscal"**.
-3. O agente aciona o Google Gemini, que processa a visão do documento PDF, extrai os campos e classifica a despesa.
-4. O resultado é exibido **estritamente em formato JSON na tela**, com botões para **Copiar JSON** e **Baixar .json**.
-
----
-
-## 📂 Estrutura do Projeto
+## Estrutura
 
 ```
 atividade-processador-nf/
-├── .env                       # Chave da API do Gemini pré-configurada
-├── .env.example               # Exemplo de configuração de variáveis
-├── package.json               # Dependências do Next.js e @google/genai
-├── tsconfig.json              # Configuração do compilador TypeScript
-├── next.config.ts             # Configuração do Next.js
-├── README.md                  # Este guia de execução
-├── exemplo-nota-fiscal/       # Arquivo PDF de exemplo (DANFE Óleo Diesel)
-│   └── DANFE_Oleo_Diesel_Exemplo.pdf
-├── public/                    # Arquivos públicos estáticos
-│   └── exemplo-danfe.pdf
+├── COMO_EXECUTAR.md              # Passo a passo em português para rodar
+├── README.md                     # Documentação técnica do projeto
+├── .env                          # GEMINI_API_KEY (vai no ZIP)
+├── .env.example
+├── package.json
+├── next.config.ts
+├── tsconfig.json
+├── exemplo-nota-fiscal/        # PDFs de teste
+├── public/
 └── src/
     ├── app/
-    │   ├── layout.tsx         # Layout base da aplicação
-    │   ├── page.tsx           # Interface gráfica Web com dropzone e visualizador JSON
-    │   ├── globals.css        # Estilos modernos e responsivos
-    │   └── api/
-    │       └── extrair-nf/    # Endpoint backend para upload e acionamento da IA
-    │           └── route.ts
-    └── lib/
-        └── geminiInvoiceAgent.ts  # Agente Gemini com prompt, schema e lógica semântica
+    │   ├── page.tsx            # Página única: upload + botão + JSON
+    │   ├── layout.tsx
+    │   ├── globals.css
+    │   └── api/extrair-nf/route.ts
+    └── lib/geminiInvoiceAgent.ts
 ```
 
----
+## Tecnologias
 
-## 🛠️ Tecnologias Utilizadas
-
-- **Next.js 15 (App Router)** &mdash; Framework React fullstack para Web UI e API Routes.
-- **React 19** &mdash; Biblioteca de componentes de interface de usuário.
-- **TypeScript** &mdash; Tipagem estrita para schemas fiscais e integração.
-- **Google Gen AI SDK (`@google/genai`)** &mdash; SDK oficial do Google para modelos multimodais Gemini.
-- **Gemini 3.6 Flash / Vision** &mdash; Processamento nativo de documentos PDF e inferência semântica.
-- **Lucide React** &mdash; Ícones da interface gráfica.
+Next.js 15 (App Router), React 19, TypeScript, `@google/genai` (Gemini Flash + fallbacks lite com retry).
