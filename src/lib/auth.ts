@@ -26,11 +26,18 @@ const socialProviders = {
     : {}),
 };
 
+const authSecret = process.env.BETTER_AUTH_SECRET;
+
 export const auth = betterAuth({
   appName: 'Farm-Fin',
-  secret: process.env.BETTER_AUTH_SECRET || 'farmfin_super_secret_better_auth_key_2026',
+  // Never fall back to a predictable key. Production must set this secret so
+  // sessions remain valid across Worker isolates and restarts.
+  secret: authSecret || crypto.randomUUID(),
   baseURL:
-    process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    process.env.BETTER_AUTH_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    'http://localhost:3000',
   // Extra origins allowed to call the auth API, e.g. preview deploys:
   // BETTER_AUTH_TRUSTED_ORIGINS="https://*-farm-fin.<conta>.workers.dev"
   trustedOrigins: (process.env.BETTER_AUTH_TRUSTED_ORIGINS || '')
