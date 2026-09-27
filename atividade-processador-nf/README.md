@@ -15,7 +15,7 @@ npm run dev
 
 Acesse `http://localhost:3000`.
 
-O arquivo `.env` já vai incluso no ZIP com a `MISTRAL_API_KEY` configurada. Sem ele o professor não terá acesso à Mistral. Não é preciso digitar chave na tela.
+A chave da Mistral fica no arquivo `.env`, que **não** vai no repositório nem no ZIP. Copie `.env.example` para `.env` e preencha `MISTRAL_API_KEY` (ou entregue o `.env` ao professor separadamente). Não é preciso digitar chave na tela.
 
 ## Como testar
 
@@ -100,7 +100,7 @@ Peças de máquinas agrícolas (rolamento, bucha, anel, graxa) → MANUTENÇÃO 
 atividade-processador-nf/
 ├── COMO_EXECUTAR.md              # Passo a passo em português para rodar
 ├── README.md                     # Documentação técnica do projeto
-├── .env                          # MISTRAL_API_KEY (vai no ZIP)
+├── .env                          # MISTRAL_API_KEY (criar a partir do .env.example; não versionado)
 ├── .env.example
 ├── package.json
 ├── next.config.ts

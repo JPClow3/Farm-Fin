@@ -21,7 +21,7 @@ Tempo estimado: 5 minutos.
    ```
    cd "C:\Users\SeuNome\Downloads\atividade-processador-nf"
    ```
-3. Confirme que você está na pasta certa: o comando abaixo deve listar `package.json` e `.env`:
+3. Confirme que você está na pasta certa: o comando abaixo deve listar `package.json` e `.env.example`:
    ```
    dir
    ```
@@ -37,16 +37,21 @@ npm install
 
 Aguarde concluir (leva cerca de 1 minuto). Mensagens de `npm warn` podem ser ignoradas.
 
-## 4. Conferir a chave da API (já vem pronta)
+## 4. Configurar a chave da API
 
-O arquivo `.env` já vem dentro do ZIP com a chave da Mistral configurada.
-Só confira que ele existe:
+Por segurança, a chave da Mistral não vem dentro do ZIP. Se você recebeu o arquivo `.env` junto com o projeto, coloque-o nesta pasta. Caso contrário, crie-o a partir do exemplo:
+
+```
+copy .env.example .env
+```
+
+Abra o `.env` e troque `sua_chave_mistral_aqui` pela chave da Mistral. Confira que ele existe:
 
 ```
 dir .env
 ```
 
-Se existir, **não precisa fazer mais nada**. Não é necessário digitar chave em nenhum lugar.
+Não é necessário digitar chave na tela do sistema.
 
 ## 5. Iniciar o sistema
 
