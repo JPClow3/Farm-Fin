@@ -326,6 +326,31 @@ export const CrossSeasonChart: React.FC<CrossSeasonChartProps> = ({ seasons }) =
                   onMouseEnter={() => setHoveredIdx(idx)}
                   onMouseLeave={() => setHoveredIdx(null)}
                 >
+                  {isHovered && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        background: 'var(--bg-surface)',
+                        boxShadow: 'var(--shadow-clay-card)',
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '11px',
+                        zIndex: 10,
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <strong style={{ color: 'var(--color-primary-700)' }}>
+                        {season.seasonName}
+                      </strong>
+                      <div>Insumos: R$ {insumosHa.toFixed(2)}/ha</div>
+                      <div>Maquinário: R$ {maquinasHa.toFixed(2)}/ha</div>
+                      <div>Mão de Obra: R$ {maoDeObraHa.toFixed(2)}/ha</div>
+                      <div>Overhead: R$ {overheadHa.toFixed(2)}/ha</div>
+                    </div>
+                  )}
+
                   <div
                     className="flex-col-reverse"
                     style={{
@@ -380,6 +405,39 @@ export const CrossSeasonChart: React.FC<CrossSeasonChartProps> = ({ seasons }) =
                 onMouseEnter={() => setHoveredIdx(idx)}
                 onMouseLeave={() => setHoveredIdx(null)}
               >
+                {isHovered && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      background: 'var(--bg-surface)',
+                      boxShadow: 'var(--shadow-clay-card)',
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '11px',
+                      zIndex: 10,
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <strong style={{ color: 'var(--color-primary-700)' }}>
+                      {season.seasonName}
+                    </strong>
+                    <div>Produtividade: {season.productivityScHa} sc/ha</div>
+                    <div>Ponto de Equilíbrio: {season.breakevenYieldScHa} sc/ha</div>
+                    <div
+                      style={{
+                        color:
+                          marginBags >= 0
+                            ? 'var(--color-success-700)'
+                            : 'var(--color-danger-700)',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      Margem: {marginBags > 0 ? `+${marginBags.toFixed(1)}` : marginBags.toFixed(1)} sc/ha
+                    </div>
+                  </div>
+                )}
                 <div
                   className="flex-row"
                   style={{ gap: '6px', alignItems: 'flex-end', height: '100%' }}

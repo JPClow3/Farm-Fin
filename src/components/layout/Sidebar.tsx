@@ -47,7 +47,7 @@ interface NavSection {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
-  const { kpis, activeFarm, activeSeason } = useFarm();
+  const { kpis, activeFarm, activeSeason, seasons, activeSeasonId, setActiveSeasonId } = useFarm();
   const [role, setRole] = useState<UserRoleType | null>(null);
 
   useEffect(() => {
@@ -242,15 +242,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div
           className="hide-desktop"
           style={{
-            padding: '10px 12px',
+            padding: '12px',
             background: 'var(--bg-surface-1)',
             borderRadius: 'var(--radius-lg)',
             boxShadow: 'var(--clay-shadow-xs)',
-            marginBottom: 'var(--space-2)',
+            marginBottom: 'var(--space-3)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px',
-            border: '1px solid rgba(212, 201, 186, 0.5)',
+            gap: '8px',
+            border: '1px solid var(--border-color)',
           }}
         >
           <div className="flex-row items-center" style={{ gap: '6px', fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
@@ -259,9 +259,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               {activeFarm?.name || 'Fazenda Principal'}
             </span>
           </div>
-          <div className="flex-row items-center" style={{ gap: '6px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-            <Wheat size={13} color="var(--color-secondary-600)" />
-            <span>Safra {activeSeason?.name || '2025/2026'}</span>
+
+          <div className="flex-col" style={{ gap: '4px' }}>
+            <label
+              htmlFor="mobile-drawer-safra-select"
+              style={{
+                fontSize: '11px',
+                fontWeight: '600',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <Wheat size={13} color="var(--color-secondary-600)" />
+              Safra Ativa:
+            </label>
+            <select
+              id="mobile-drawer-safra-select"
+              value={activeSeasonId}
+              onChange={(e) => setActiveSeasonId(e.target.value)}
+              className="input select"
+              style={{
+                width: '100%',
+                padding: '6px 28px 6px 10px',
+                fontSize: 'var(--text-xs)',
+                height: '34px',
+                background: 'var(--bg-surface-2)',
+                borderColor: 'var(--border-subtle)',
+              }}
+              title="Selecionar Safra Agrícola no Celular"
+            >
+              {seasons.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} {s.isCurrent ? '★' : ''}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

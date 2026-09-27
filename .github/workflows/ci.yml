@@ -32,3 +32,9 @@ jobs:
 
       - name: Unit & Integration Tests (Vitest)
         run: npm test
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Login end-to-end tests
+        run: npm run test:e2e

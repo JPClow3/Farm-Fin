@@ -11,6 +11,8 @@ import { ClayModal } from '../../components/ui/ClayModal';
 import { uploadAndParseBankStatement, autoMatchTransactions } from '../../actions/conciliacao';
 import { useModuleGuard } from '../../lib/useModuleGuard';
 import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { BankStatementItem } from '../../lib/types';
 import {
   Download,
@@ -40,6 +42,7 @@ export default function ConciliacaoPage() {
   const [matchModalStatement, setMatchModalStatement] = useState<BankStatementItem | null>(null);
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [isConfirmingMatch, setIsConfirmingMatch] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   const selectedBank = useMemo(() => {
     return bankAccounts.find((b) => b.id === selectedBankId) || bankAccounts[0];
@@ -233,9 +236,20 @@ NEWFILEUID:NONE
           message: `${res.count} lançamentos bancários carregados e salvos no banco.`,
         });
         await reloadFromDB();
+      } else {
+        addToast({
+          type: 'danger',
+          title: 'Falha na Importação',
+          message: res.error || 'Não foi possível carregar o extrato simulado.',
+        });
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
+      addToast({
+        type: 'danger',
+        title: 'Erro de Conexão',
+        message: 'Não foi possível importar o extrato. Verifique o servidor.',
+      });
     } finally {
       setIsUploading(false);
     }
@@ -252,9 +266,20 @@ NEWFILEUID:NONE
           message: res.message || 'Lançamentos bancários conferidos com sucesso.',
         });
         await reloadFromDB();
+      } else {
+        addToast({
+          type: 'danger',
+          title: 'Falha no Auto-Match',
+          message: res.error || 'Não foi possível concluir o auto-matching.',
+        });
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
+      addToast({
+        type: 'danger',
+        title: 'Erro no Auto-Match',
+        message: 'Falha ao processar conciliação automática.',
+      });
     } finally {
       setIsMatching(false);
     }
@@ -303,6 +328,22 @@ NEWFILEUID:NONE
           </ClayButton>
         </div>
       </div>
+
+      {pageError && (
+        <ErrorState
+          title="Erro na conciliação bancária"
+          description={pageError}
+          onRetry={async () => {
+            setPageError(null);
+            try {
+              await reloadFromDB();
+            } catch (err: unknown) {
+              setPageError(err instanceof Error ? err.message : 'Falha ao recarregar dados.');
+            }
+          }}
+          retryLabel="Recarregar Dados"
+        />
+      )}
 
       {/* Bank Selector Bar */}
       <ClayCard size="sm">
@@ -432,105 +473,103 @@ NEWFILEUID:NONE
           </div>
         </div>
 
-        <div className="clay-table-wrapper">
-          <table className="clay-table">
-            <thead>
-              <tr>
-                <th>Data Extrato</th>
-                <th>Histórico no Banco</th>
-                <th style={{ textAlign: 'right' }}>Valor</th>
-                <th>Correspondência Identificada</th>
-                <th style={{ textAlign: 'center' }}>Grau de Confiança</th>
-                <th style={{ textAlign: 'center' }}>Status</th>
-                <th style={{ textAlign: 'right' }}>Ação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bankItems.map((item) => (
-                <tr key={item.id}>
-                  <td className="td-date">{item.date}</td>
-                  <td
-                    style={{
-                      fontWeight: '600',
-                      maxWidth: '240px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {item.description}
-                  </td>
-                  <td
-                    className="td-money"
-                    style={{
-                      textAlign: 'right',
-                      color:
-                        item.amount >= 0
-                          ? 'var(--color-primary-700)'
-                          : 'var(--color-secondary-700)',
-                    }}
-                  >
-                    {item.amount >= 0 ? '+' : ''} R${' '}
-                    {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td>
-                    {item.matchedTransactionIds && item.matchedTransactionIds.length > 1 ? (
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                        <Link2 size={11} style={{ verticalAlign: '-1px', marginRight: '4px' }} />
-                        {item.matchedTransactionIds.length} lançamentos combinados (N:M)
-                      </span>
-                    ) : item.matchedTransactionId ? (
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                        ✓ Lançamento #{item.matchedTransactionId.slice(0, 8)}... (Correspondência
-                        encontrada)
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                        Sem vínculo direto
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {item.confidenceScore ? (
-                      <span className="badge badge--success" style={{ fontSize: '10px' }}>
-                        Match {item.confidenceScore}%
-                      </span>
-                    ) : (
-                      <span className="badge badge--neutral" style={{ fontSize: '10px' }}>
-                        Manual
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {item.matched ? (
-                      <span className="badge badge--pago">Conciliado</span>
-                    ) : (
-                      <span className="badge badge--pendente">Pendente</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {!item.matched && (
-                      <ClayButton variant="primary" size="sm" onClick={() => openMatchModal(item)}>
-                        Vincular
-                      </ClayButton>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {bankItems.length === 0 && (
+        {bankItems.length === 0 ? (
+          <EmptyState
+            title="Nenhum extrato importado para esta conta"
+            description="Importe um arquivo .OFX ou .CSV do seu banco para visualizar as transações e conciliar com os lançamentos."
+            actionLabel="Carregar Extrato Demo (OFX)"
+            onAction={handleSimulateOfxUpload}
+          />
+        ) : (
+          <div className="clay-table-wrapper">
+            <table className="clay-table">
+              <thead>
                 <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: 'center', padding: '24px', color: 'var(--text-tertiary)' }}
-                  >
-                    Nenhum extrato importado para esta conta bancária. Importe um arquivo .OFX ou
-                    .CSV para iniciar.
-                  </td>
+                  <th>Data Extrato</th>
+                  <th>Histórico no Banco</th>
+                  <th style={{ textAlign: 'right' }}>Valor</th>
+                  <th>Correspondência Identificada</th>
+                  <th style={{ textAlign: 'center' }}>Grau de Confiança</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
+                  <th style={{ textAlign: 'right' }}>Ação</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {bankItems.map((item) => (
+                  <tr key={item.id}>
+                    <td className="td-date">{item.date}</td>
+                    <td
+                      style={{
+                        fontWeight: '600',
+                        maxWidth: '240px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.description}
+                    </td>
+                    <td
+                      className="td-money"
+                      style={{
+                        textAlign: 'right',
+                        color:
+                          item.amount >= 0
+                            ? 'var(--color-primary-700)'
+                            : 'var(--color-secondary-700)',
+                      }}
+                    >
+                      {item.amount >= 0 ? '+' : ''} R${' '}
+                      {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td>
+                      {item.matchedTransactionIds && item.matchedTransactionIds.length > 1 ? (
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                          <Link2 size={11} style={{ verticalAlign: '-1px', marginRight: '4px' }} />
+                          {item.matchedTransactionIds.length} lançamentos combinados (N:M)
+                        </span>
+                      ) : item.matchedTransactionId ? (
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                          ✓ Lançamento #{item.matchedTransactionId.slice(0, 8)}... (Correspondência
+                          encontrada)
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                          Sem vínculo direto
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {item.confidenceScore ? (
+                        <span className="badge badge--success" style={{ fontSize: '10px' }}>
+                          Match {item.confidenceScore}%
+                        </span>
+                      ) : (
+                        <span className="badge badge--neutral" style={{ fontSize: '10px' }}>
+                          Manual
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {item.matched ? (
+                        <span className="badge badge--pago">Conciliado</span>
+                      ) : (
+                        <span className="badge badge--pendente">Pendente</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {!item.matched && (
+                        <ClayButton variant="primary" size="sm" onClick={() => openMatchModal(item)}>
+                          Vincular
+                        </ClayButton>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </ClayCard>
 
       {/* Manual N:M Match Modal */}

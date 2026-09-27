@@ -47,6 +47,14 @@ export const SEED_USERS: User[] = [
     email: 'juliana.financeiro@fazendasantafe.com.br',
     role: 'Financeiro',
   },
+  {
+    id: 'u0000000-0000-4000-8000-000000000005',
+    organizationId: DEFAULT_ORG_ID,
+    name: 'Professor Paraíba',
+    username: 'paraiba',
+    email: 'paraiba@farm-fin.com',
+    role: 'Produtor',
+  },
 ];
 
 export const SEED_ORGANIZATION: Organization = {

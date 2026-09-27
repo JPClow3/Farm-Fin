@@ -11,6 +11,7 @@ import { ClayModal } from '../../components/ui/ClayModal';
 import { ClayInput } from '../../components/ui/ClayInput';
 import { ClaySelect } from '../../components/ui/ClaySelect';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { Employee, Machinery } from '../../lib/types';
 import { useModuleGuard } from '../../lib/useModuleGuard';
 import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
@@ -84,6 +85,18 @@ export default function CadastrosPage() {
   const [deletingMachine, setDeletingMachine] = useState<Machinery | null>(null);
   const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    if (formErrors[field]) {
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
 
   // New Farm State
   const [farmName, setFarmName] = useState('');
@@ -150,6 +163,7 @@ export default function CadastrosPage() {
 
   // Open Machine Modal for Create
   const handleOpenNewMachineModal = () => {
+    setFormErrors({});
     setEditingMachineId(null);
     setMachineName('');
     setMachineType('Trator Pesado');
@@ -166,6 +180,7 @@ export default function CadastrosPage() {
 
   // Open Machine Modal for Edit
   const handleOpenEditMachineModal = (m: Machinery) => {
+    setFormErrors({});
     setEditingMachineId(m.id);
     setMachineName(m.name);
     setMachineType(m.type);
@@ -182,6 +197,7 @@ export default function CadastrosPage() {
 
   // Open Employee Modal for Create
   const handleOpenNewEmployeeModal = () => {
+    setFormErrors({});
     setEditingEmployeeId(null);
     setEmployeeName('');
     setEmployeeDocument('');
@@ -199,6 +215,7 @@ export default function CadastrosPage() {
 
   // Open Employee Modal for Edit
   const handleOpenEditEmployeeModal = (emp: Employee) => {
+    setFormErrors({});
     setEditingEmployeeId(emp.id);
     setEmployeeName(emp.name);
     setEmployeeDocument(emp.document || '');
@@ -225,11 +242,22 @@ export default function CadastrosPage() {
 
   const handleSaveFarm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!farmName) return;
+    const errors: Record<string, string> = {};
+    if (!farmName.trim()) {
+      errors.farmName = 'Nome da fazenda é obrigatório.';
+    }
+    if (!farmArea.trim() || isNaN(Number(farmArea)) || Number(farmArea) <= 0) {
+      errors.farmArea = 'Informe uma área válida maior que zero.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       await addFarm({
-        name: farmName,
+        name: farmName.trim(),
         cnpjCpf: farmCnpjCpf || undefined,
         address: farmAddress || undefined,
         location: farmLocation || 'Mato Grosso - MT',
@@ -259,7 +287,18 @@ export default function CadastrosPage() {
 
   const handleSaveField = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fieldName) return;
+    const errors: Record<string, string> = {};
+    if (!fieldName.trim()) {
+      errors.fieldName = 'Identificação do talhão é obrigatória.';
+    }
+    if (!fieldArea.trim() || isNaN(Number(fieldArea)) || Number(fieldArea) <= 0) {
+      errors.fieldArea = 'Informe uma área válida maior que zero.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       let lat: number | undefined;
@@ -272,7 +311,7 @@ export default function CadastrosPage() {
 
       await addField({
         farmId: activeFarmId,
-        name: fieldName,
+        name: fieldName.trim(),
         area: parseFloat(fieldArea) || 0,
         soilType: fieldSoil,
         currentCrop: fieldCrop,
@@ -303,11 +342,19 @@ export default function CadastrosPage() {
 
   const handleSaveSeason = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!seasonName) return;
+    const errors: Record<string, string> = {};
+    if (!seasonName.trim()) {
+      errors.seasonName = 'Nome da safra é obrigatório.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       await addCropSeason({
-        name: seasonName,
+        name: seasonName.trim(),
         startDate: seasonStartDate,
         endDate: seasonEndDate,
         plantingDate: seasonPlantingDate || undefined,
@@ -334,14 +381,25 @@ export default function CadastrosPage() {
 
   const handleSaveSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supplierName) return;
+    const errors: Record<string, string> = {};
+    if (!supplierName.trim()) {
+      errors.supplierName = 'Nome ou Razão Social é obrigatório.';
+    }
+    if (!supplierDocument.trim()) {
+      errors.supplierDocument = 'CNPJ ou CPF é obrigatório.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       await addSupplier({
-        name: supplierName,
+        name: supplierName.trim(),
         category: supplierCategory,
-        document: supplierDocument || 'N/A',
-        contact: supplierContact || 'N/A',
+        document: supplierDocument.trim() || 'N/A',
+        contact: supplierContact.trim() || 'N/A',
       });
       addToast({
         type: 'success',
@@ -365,14 +423,25 @@ export default function CadastrosPage() {
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName) return;
+    const errors: Record<string, string> = {};
+    if (!customerName.trim()) {
+      errors.customerName = 'Razão Social ou Nome do cliente é obrigatório.';
+    }
+    if (!customerDocument.trim()) {
+      errors.customerDocument = 'CNPJ ou CPF é obrigatório.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       await addCustomer({
-        name: customerName,
+        name: customerName.trim(),
         segment: customerSegment,
-        document: customerDocument || 'N/A',
-        contact: customerContact || 'N/A',
+        document: customerDocument.trim() || 'N/A',
+        contact: customerContact.trim() || 'N/A',
       });
       addToast({
         type: 'success',
@@ -396,12 +465,20 @@ export default function CadastrosPage() {
 
   const handleSaveMachine = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!machineName) return;
+    const errors: Record<string, string> = {};
+    if (!machineName.trim()) {
+      errors.machineName = 'Nome ou identificação da máquina é obrigatório.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       const payload = {
         farmId: activeFarmId,
-        name: machineName,
+        name: machineName.trim(),
         type: machineType,
         brand: machineBrand || undefined,
         model: machineModel || undefined,
@@ -464,7 +541,18 @@ export default function CadastrosPage() {
 
   const handleSaveEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employeeName || !employeeRole) return;
+    const errors: Record<string, string> = {};
+    if (!employeeName.trim()) {
+      errors.employeeName = 'Nome do colaborador é obrigatório.';
+    }
+    if (!employeeRole.trim()) {
+      errors.employeeRole = 'Função / cargo é obrigatório.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setIsSubmitting(true);
     try {
       const payload = {
@@ -567,30 +655,60 @@ export default function CadastrosPage() {
         </div>
         <div className="flex-row flex-wrap" style={{ gap: '8px' }}>
           {activeTab === 'fazendas' && (
-            <ClayButton variant="primary" onClick={() => setIsNewFarmModal(true)}>
+            <ClayButton
+              variant="primary"
+              onClick={() => {
+                setFormErrors({});
+                setIsNewFarmModal(true);
+              }}
+            >
               <Plus size={16} style={{ marginRight: '6px' }} />
               Nova Fazenda
             </ClayButton>
           )}
           {activeTab === 'talhoes' && (
-            <ClayButton variant="primary" onClick={() => setIsNewFieldModal(true)}>
+            <ClayButton
+              variant="primary"
+              onClick={() => {
+                setFormErrors({});
+                setIsNewFieldModal(true);
+              }}
+            >
               <Plus size={16} style={{ marginRight: '6px' }} />
               Novo Talhão
             </ClayButton>
           )}
           {activeTab === 'safras' && (
-            <ClayButton variant="primary" onClick={() => setIsNewSeasonModal(true)}>
+            <ClayButton
+              variant="primary"
+              onClick={() => {
+                setFormErrors({});
+                setIsNewSeasonModal(true);
+              }}
+            >
               <Plus size={16} style={{ marginRight: '6px' }} />
               Nova Safra
             </ClayButton>
           )}
           {activeTab === 'fornecedores' && (
             <>
-              <ClayButton variant="secondary" onClick={() => setIsNewCustomerModal(true)}>
+              <ClayButton
+                variant="secondary"
+                onClick={() => {
+                  setFormErrors({});
+                  setIsNewCustomerModal(true);
+                }}
+              >
                 <Plus size={16} style={{ marginRight: '6px' }} />
                 Novo Cliente
               </ClayButton>
-              <ClayButton variant="primary" onClick={() => setIsNewSupplierModal(true)}>
+              <ClayButton
+                variant="primary"
+                onClick={() => {
+                  setFormErrors({});
+                  setIsNewSupplierModal(true);
+                }}
+              >
                 <Plus size={16} style={{ marginRight: '6px' }} />
                 Novo Fornecedor
               </ClayButton>
@@ -610,6 +728,16 @@ export default function CadastrosPage() {
           )}
         </div>
       </div>
+
+      {/* Page Error State */}
+      {pageError && (
+        <ErrorState
+          title="Erro ao processar cadastros"
+          description={pageError}
+          onRetry={() => setPageError(null)}
+          retryLabel="Tentar Novamente"
+        />
+      )}
 
       {/* Tabs Navigation */}
       <ClayTabs
@@ -1475,8 +1603,12 @@ export default function CadastrosPage() {
             label="Nome da Fazenda"
             placeholder="Ex: Fazenda Boa Esperança"
             value={farmName}
-            onChange={(e) => setFarmName(e.target.value)}
+            onChange={(e) => {
+              setFarmName(e.target.value);
+              clearFieldError('farmName');
+            }}
             required
+            error={formErrors.farmName}
           />
           <div className="form-grid-2">
             <ClayInput
@@ -1489,8 +1621,12 @@ export default function CadastrosPage() {
               label="Área Total (Hectares)"
               type="number"
               value={farmArea}
-              onChange={(e) => setFarmArea(e.target.value)}
+              onChange={(e) => {
+                setFarmArea(e.target.value);
+                clearFieldError('farmArea');
+              }}
               required
+              error={formErrors.farmArea}
             />
           </div>
           <ClayInput
@@ -1536,16 +1672,24 @@ export default function CadastrosPage() {
             label="Nome / Identificação do Talhão"
             placeholder="Ex: Talhão 06 - Chapadão Sul"
             value={fieldName}
-            onChange={(e) => setFieldName(e.target.value)}
+            onChange={(e) => {
+              setFieldName(e.target.value);
+              clearFieldError('fieldName');
+            }}
             required
+            error={formErrors.fieldName}
           />
           <div className="form-grid-2">
             <ClayInput
               label="Área Útil (Hectares)"
               type="number"
               value={fieldArea}
-              onChange={(e) => setFieldArea(e.target.value)}
+              onChange={(e) => {
+                setFieldArea(e.target.value);
+                clearFieldError('fieldArea');
+              }}
               required
+              error={formErrors.fieldArea}
             />
             <ClaySelect
               label="Cultura Atual"
@@ -1624,8 +1768,12 @@ export default function CadastrosPage() {
             label="Nome da Safra / Ciclo"
             placeholder="Ex: Safra 2026/2027 (Principal)"
             value={seasonName}
-            onChange={(e) => setSeasonName(e.target.value)}
+            onChange={(e) => {
+              setSeasonName(e.target.value);
+              clearFieldError('seasonName');
+            }}
             required
+            error={formErrors.seasonName}
           />
           <div className="form-grid-2">
             <ClayInput
@@ -1690,8 +1838,12 @@ export default function CadastrosPage() {
             label="Razão Social / Nome do Fornecedor"
             placeholder="Ex: Agrodefesas & Sementes MT"
             value={supplierName}
-            onChange={(e) => setSupplierName(e.target.value)}
+            onChange={(e) => {
+              setSupplierName(e.target.value);
+              clearFieldError('supplierName');
+            }}
             required
+            error={formErrors.supplierName}
           />
           <div className="form-grid-2">
             <ClaySelect
@@ -1712,8 +1864,12 @@ export default function CadastrosPage() {
               label="CNPJ ou CPF (com verificação de duplicidade)"
               placeholder="00.000.000/0001-00"
               value={supplierDocument}
-              onChange={(e) => setSupplierDocument(e.target.value)}
+              onChange={(e) => {
+                setSupplierDocument(e.target.value);
+                clearFieldError('supplierDocument');
+              }}
               required
+              error={formErrors.supplierDocument}
             />
           </div>
           <ClayInput
@@ -1745,8 +1901,12 @@ export default function CadastrosPage() {
             label="Razão Social / Nome do Comprador"
             placeholder="Ex: Cargill Agrícola S.A."
             value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
+            onChange={(e) => {
+              setCustomerName(e.target.value);
+              clearFieldError('customerName');
+            }}
             required
+            error={formErrors.customerName}
           />
           <div className="form-grid-2">
             <ClaySelect
@@ -1765,8 +1925,12 @@ export default function CadastrosPage() {
               label="CNPJ ou CPF (com verificação de duplicidade)"
               placeholder="00.000.000/0001-00"
               value={customerDocument}
-              onChange={(e) => setCustomerDocument(e.target.value)}
+              onChange={(e) => {
+                setCustomerDocument(e.target.value);
+                clearFieldError('customerDocument');
+              }}
               required
+              error={formErrors.customerDocument}
             />
           </div>
           <ClayInput
@@ -1801,8 +1965,12 @@ export default function CadastrosPage() {
             label="Nome / Identificação do Equipamento"
             placeholder="Ex: Colheitadeira Case IH Axial-Flow 8250"
             value={machineName}
-            onChange={(e) => setMachineName(e.target.value)}
+            onChange={(e) => {
+              setMachineName(e.target.value);
+              clearFieldError('machineName');
+            }}
             required
+            error={formErrors.machineName}
           />
           <div className="form-grid-2">
             <ClaySelect
@@ -1934,8 +2102,12 @@ export default function CadastrosPage() {
             label="Nome Completo do Colaborador"
             placeholder="Ex: José Carlos Ribeiro"
             value={employeeName}
-            onChange={(e) => setEmployeeName(e.target.value)}
+            onChange={(e) => {
+              setEmployeeName(e.target.value);
+              clearFieldError('employeeName');
+            }}
             required
+            error={formErrors.employeeName}
           />
 
           <div className="form-grid-2">
@@ -1943,8 +2115,12 @@ export default function CadastrosPage() {
               label="Cargo / Função no Campo"
               placeholder="Ex: Tratorista Sênior, Operador de Colheitadeira, Agrônomo"
               value={employeeRole}
-              onChange={(e) => setEmployeeRole(e.target.value)}
+              onChange={(e) => {
+                setEmployeeRole(e.target.value);
+                clearFieldError('employeeRole');
+              }}
               required
+              error={formErrors.employeeRole}
             />
             <ClaySelect
               label="Regime de Trabalho"

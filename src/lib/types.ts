@@ -5,6 +5,7 @@ export interface User {
   organizationId?: string | null;
   name: string;
   email: string;
+  username?: string | null;
   role: UserRoleType;
   image?: string | null;
 }
