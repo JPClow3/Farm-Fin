@@ -30,9 +30,13 @@ export const users = pgTable('users', {
   organizationId: uuid('organization_id').references(() => organizations.id),
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
+  // Better Auth username plugin (login por usuário além do e-mail)
+  username: varchar('username', { length: 100 }).unique(),
+  displayUsername: varchar('display_username', { length: 100 }),
   emailVerified: boolean('email_verified').default(false),
   image: text('image'),
   role: varchar('role', { length: 50 }).default('Produtor').notNull(), // 'Produtor' | 'Gestor' | 'Financeiro' | 'Contador' | 'Operador'
+  twoFactorEnabled: boolean('two_factor_enabled').default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -59,6 +63,10 @@ export const accounts = pgTable('accounts', {
   providerId: varchar('provider_id', { length: 255 }).notNull(),
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at'),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+  scope: text('scope'),
   expiresAt: timestamp('expires_at'),
   password: text('password'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -72,6 +80,16 @@ export const verifications = pgTable('verifications', {
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Better Auth two-factor plugin (TOTP secret + backup codes, both encrypted by Better Auth)
+export const twoFactors = pgTable('two_factors', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  secret: text('secret').notNull(),
+  backupCodes: text('backup_codes').notNull(),
 });
 
 export const userRoles = pgTable('user_roles', {

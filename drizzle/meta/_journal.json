@@ -29,6 +29,20 @@
       "when": 1786761900000,
       "tag": "0003_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790255137821,
+      "tag": "0004_auth_methods",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790256435632,
+      "tag": "0005_username_login",
+      "breakpoints": true
     }
   ]
 }

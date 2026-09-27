@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useModuleGuard } from '../../lib/useModuleGuard';
 import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
+import { TwoFactorCard } from '../../components/settings/TwoFactorCard';
 
 export default function ConfiguracoesPage() {
   const moduleAllowed = useModuleGuard('configuracoes');
@@ -295,18 +296,38 @@ export default function ConfiguracoesPage() {
                   { value: 'Operador', label: 'Operador de Campo (Estoque / Maquinário)' },
                 ]}
                 value={activeRole}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const newRole = e.target.value;
+                  const previousRole = activeRole;
                   setActiveRole(newRole);
+                  let user: { name?: string; email?: string; role?: string } = {};
                   try {
                     const saved = localStorage.getItem('farmfin_active_user');
-                    const user = saved
-                      ? JSON.parse(saved)
-                      : { name: 'Usuário', email: 'user@agro.com' };
-                    user.role = newRole;
-                    localStorage.setItem('farmfin_active_user', JSON.stringify(user));
+                    if (saved) user = JSON.parse(saved);
                   } catch {}
-                  window.document.cookie = `farmfin_demo_role=${newRole}; path=/; max-age=604800; SameSite=Lax`;
+
+                  // The simulated role lives in a server-signed session cookie
+                  const res = await fetch('/api/session/demo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole, email: user.email, name: user.name }),
+                  }).catch(() => null);
+                  if (!res?.ok) {
+                    setActiveRole(previousRole);
+                    addToast({
+                      type: 'error',
+                      title: 'Não foi possível alterar o perfil',
+                      message: 'Tente novamente em instantes.',
+                    });
+                    return;
+                  }
+
+                  try {
+                    localStorage.setItem(
+                      'farmfin_active_user',
+                      JSON.stringify({ ...user, role: newRole })
+                    );
+                  } catch {}
                   addToast({
                     type: 'info',
                     title: 'Perfil RBAC Alterado',
@@ -338,6 +359,8 @@ export default function ConfiguracoesPage() {
           </ClayCard>
 
           {/* Gerenciamento de Dados Mock */}
+          <TwoFactorCard />
+
           <ClayCard className="clay-card--secondary">
             <div className="card-header">
               <div>

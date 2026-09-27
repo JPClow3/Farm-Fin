@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processInvoicePdfWithGemini } from '@/lib/geminiInvoiceAgent';
+import { processInvoicePdfWithMistral } from '@/lib/mistralInvoiceAgent';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const data = await processInvoicePdfWithGemini(buffer, apiKey);
+    const data = await processInvoicePdfWithMistral(buffer, apiKey);
 
     return NextResponse.json({
       success: true,

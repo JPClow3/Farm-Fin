@@ -86,8 +86,11 @@ function RegisterForm() {
     // best-effort — if it's unreachable we still proceed to the real DB write
     // below, since that's what actually creates the account. A genuine
     // "already registered" response, though, should stop the flow.
+    let hasAuthSession = false;
     try {
       const authRes = await authClient.signUp.email({ email, password, name });
+      // autoSignIn is enabled, so a successful sign-up also creates the session
+      hasAuthSession = !authRes?.error;
       if (authRes?.error) {
         if (authRes.error.message?.includes('already exists') || authRes.error.status === 422) {
           setErrorMessage('Este e-mail já está cadastrado. Tente fazer login.');
@@ -114,10 +117,18 @@ function RegisterForm() {
       const assignedOrgId = tenantRes.organization?.id || `org-${Date.now()}`;
       const assignedUserId = tenantRes.user?.id || `u-${Date.now()}`;
 
-      // Set Session Cookies
-      const token = `farmfin-token-${Date.now()}`;
-      document.cookie = `farmfin_session=${token}; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `better-auth.session_token=${token}; path=/; max-age=604800; SameSite=Lax`;
+      // Without a Better Auth session (provider unreachable), fall back to a
+      // server-signed demo session so the user can still enter the app
+      if (!hasAuthSession) {
+        const demoRes = await fetch('/api/session/demo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role, email, name }),
+        });
+        if (!demoRes.ok) {
+          throw new Error('Não foi possível iniciar a sessão.');
+        }
+      }
 
       // Save active user in localStorage
       const activeUser = {
@@ -128,7 +139,6 @@ function RegisterForm() {
         role,
       };
       localStorage.setItem('farmfin_active_user', JSON.stringify(activeUser));
-      document.cookie = `farmfin_demo_role=${role}; path=/; max-age=604800; SameSite=Lax`;
 
       setSuccessMessage('Conta criada com sucesso! Inicializando ambiente...');
 

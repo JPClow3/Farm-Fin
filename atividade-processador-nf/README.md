@@ -1,6 +1,6 @@
 # Atividade 1° Etapa — Processador de PDF de Nota Fiscal (Contas a Pagar)
 
-Página única e simples: o usuário anexa o PDF da nota fiscal, clica em **Extrair dados** e o sistema devolve o resultado em **JSON na tela**, usando Google Gemini.
+Página única e simples: o usuário anexa o PDF da nota fiscal, clica em **Extrair dados** e o sistema devolve o resultado em **JSON na tela**, usando Mistral OCR (leitura do PDF) e um modelo de chat da Mistral (extração e classificação).
 
 > **Para rodar o projeto, siga o passo a passo detalhado em [COMO_EXECUTAR.md](./COMO_EXECUTAR.md).**
 
@@ -15,7 +15,7 @@ npm run dev
 
 Acesse `http://localhost:3000`.
 
-O arquivo `.env` já vai incluso no ZIP com a `GEMINI_API_KEY` configurada. Sem ele o professor não terá acesso ao Gemini. Não é preciso digitar chave na tela.
+A chave da Mistral fica no arquivo `.env`, que **não** vai no repositório nem no ZIP. Copie `.env.example` para `.env` e preencha `MISTRAL_API_KEY` (ou entregue o `.env` ao professor separadamente). Não é preciso digitar chave na tela.
 
 ## Como testar
 
@@ -34,9 +34,9 @@ O arquivo `.env` já vai incluso no ZIP com a `GEMINI_API_KEY` configurada. Sem 
 - Parcelas: `[{ numero, dataVencimento, valor }]`
 - Data de Vencimento (AAAA-MM-DD)
 - ValorTotal (número)
-- Classificação da DESPESA (interpretada pelo Gemini, estrutura em array para N classificações)
+- Classificação da DESPESA (interpretada pela IA da Mistral, estrutura em array para N classificações)
 
-A DESPESA não é extraída do texto: o Gemini interpreta os produtos e classifica em uma das 9 categorias oficiais:
+A DESPESA não é extraída do texto: a IA da Mistral interpreta os produtos e classifica em uma das 9 categorias oficiais:
 
 - INSUMOS AGRÍCOLAS
 - MANUTENÇÃO E OPERAÇÃO
@@ -100,7 +100,7 @@ Peças de máquinas agrícolas (rolamento, bucha, anel, graxa) → MANUTENÇÃO 
 atividade-processador-nf/
 ├── COMO_EXECUTAR.md              # Passo a passo em português para rodar
 ├── README.md                     # Documentação técnica do projeto
-├── .env                          # GEMINI_API_KEY (vai no ZIP)
+├── .env                          # MISTRAL_API_KEY (criar a partir do .env.example; não versionado)
 ├── .env.example
 ├── package.json
 ├── next.config.ts
@@ -113,9 +113,9 @@ atividade-processador-nf/
     │   ├── layout.tsx
     │   ├── globals.css
     │   └── api/extrair-nf/route.ts
-    └── lib/geminiInvoiceAgent.ts
+    └── lib/mistralInvoiceAgent.ts
 ```
 
 ## Tecnologias
 
-Next.js 15 (App Router), React 19, TypeScript, `@google/genai` (Gemini Flash + fallbacks lite com retry).
+Next.js 15 (App Router), React 19, TypeScript, API REST da Mistral via `fetch`: `mistral-ocr-latest` para ler o PDF e `mistral-medium-latest` (com `mistral-small-latest` como alternativa e nova tentativa em sobrecarga) para gerar o JSON.

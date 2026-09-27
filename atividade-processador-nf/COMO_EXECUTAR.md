@@ -21,7 +21,7 @@ Tempo estimado: 5 minutos.
    ```
    cd "C:\Users\SeuNome\Downloads\atividade-processador-nf"
    ```
-3. Confirme que você está na pasta certa: o comando abaixo deve listar `package.json` e `.env`:
+3. Confirme que você está na pasta certa: o comando abaixo deve listar `package.json` e `.env.example`:
    ```
    dir
    ```
@@ -37,16 +37,21 @@ npm install
 
 Aguarde concluir (leva cerca de 1 minuto). Mensagens de `npm warn` podem ser ignoradas.
 
-## 4. Conferir a chave da API (já vem pronta)
+## 4. Configurar a chave da API
 
-O arquivo `.env` já vem dentro do ZIP com a chave do Gemini configurada.
-Só confira que ele existe:
+Por segurança, a chave da Mistral não vem dentro do ZIP. Se você recebeu o arquivo `.env` junto com o projeto, coloque-o nesta pasta. Caso contrário, crie-o a partir do exemplo:
+
+```
+copy .env.example .env
+```
+
+Abra o `.env` e troque `sua_chave_mistral_aqui` pela chave da Mistral. Confira que ele existe:
 
 ```
 dir .env
 ```
 
-Se existir, **não precisa fazer mais nada**. Não é necessário digitar chave em nenhum lugar.
+Não é necessário digitar chave na tela do sistema.
 
 ## 5. Iniciar o sistema
 
@@ -112,6 +117,6 @@ No terminal onde o `npm run dev` está rodando, pressione `Ctrl + C` e confirme 
 | `node` não é reconhecido | Node.js não instalado | Instale em https://nodejs.org e reabra o terminal |
 | `npm error` na pasta errada | Terminal fora da pasta do projeto | Use `cd` até a pasta `atividade-processador-nf` e repita |
 | `Port 3000 is in use` | Porta ocupada | Feche o outro programa ou rode com `npm run dev -- -p 3001` e acesse `http://localhost:3001` |
-| Erro de chave / `GEMINI_API_KEY` | Arquivo `.env` ausente | Verifique com `dir .env` se o arquivo existe na pasta do projeto |
+| Erro de chave / `MISTRAL_API_KEY` | Arquivo `.env` ausente | Verifique com `dir .env` se o arquivo existe na pasta do projeto |
 | Extração demora na 1ª vez | Servidor compilando / IA processando | Aguarde até 1 minuto; as próximas são mais rápidas |
 | `Formato inválido` | Arquivo não é PDF | Selecione um arquivo com extensão `.pdf` |
