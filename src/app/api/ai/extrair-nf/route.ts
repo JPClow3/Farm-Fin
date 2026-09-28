@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
   const session = await getVerifiedSession();
   if (!session) {
     return NextResponse.json(
-      { success: false, error: 'Sua sessão expirou. Faça login novamente para processar notas fiscais.' },
+      {
+        success: false,
+        error: 'Sua sessão expirou. Faça login novamente para processar notas fiscais.',
+      },
       { status: 401 }
     );
   }
@@ -63,13 +66,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isPdf =
-      file.type === 'application/pdf' ||
-      file.name.toLowerCase().endsWith('.pdf');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
     if (!isPdf) {
       return NextResponse.json(
-        { success: false, error: 'Formato de arquivo inválido. Apenas arquivos PDF (.pdf) são suportados.' },
+        {
+          success: false,
+          error: 'Formato de arquivo inválido. Apenas arquivos PDF (.pdf) são suportados.',
+        },
         { status: 400 }
       );
     }
@@ -84,11 +88,12 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const extractedData = await processInvoicePdfWithMistral(buffer);
+    const extracted = await processInvoicePdfWithMistral(buffer);
 
     return NextResponse.json({
       success: true,
-      data: extractedData,
+      data: extracted.data,
+      review: extracted.review,
     });
   } catch (error) {
     console.error('Erro ao processar PDF da Nota Fiscal:', error);

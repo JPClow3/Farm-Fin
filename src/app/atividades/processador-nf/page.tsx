@@ -9,6 +9,7 @@ import { useToast } from '@/context/ToastContext';
 import { useModuleGuard } from '@/lib/useModuleGuard';
 import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
 import type { ExtractedInvoiceData } from '@/lib/mistralInvoiceAgent';
+import type { InvoiceReview } from '@/lib/invoiceQuality';
 import {
   Sparkles,
   UploadCloud,
@@ -75,6 +76,7 @@ export default function ProcessadorNfPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [extractedData, setExtractedData] = useState<ExtractedInvoiceData | null>(null);
+  const [review, setReview] = useState<InvoiceReview | null>(null);
   const [rawJsonString, setRawJsonString] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [error, setError] = useState<ProcessingError | null>(null);
@@ -112,6 +114,7 @@ export default function ProcessadorNfPage() {
     setError(null);
     // Um novo arquivo invalida o resultado anterior
     setExtractedData(null);
+    setReview(null);
     setRawJsonString('');
   };
 
@@ -124,6 +127,7 @@ export default function ProcessadorNfPage() {
   const handleReset = () => {
     setSelectedFile(null);
     setExtractedData(null);
+    setReview(null);
     setRawJsonString('');
     setError(null);
     if (fileInputRef.current) {
@@ -147,6 +151,9 @@ export default function ProcessadorNfPage() {
 
     setIsLoading(true);
     setError(null);
+    setExtractedData(null);
+    setReview(null);
+    setRawJsonString('');
 
     try {
       const formData = new FormData();
@@ -176,14 +183,17 @@ export default function ProcessadorNfPage() {
       }
 
       setExtractedData(result.data);
-      setRawJsonString(JSON.stringify(result.data, null, 2));
+      setReview(result.review ?? null);
+      setRawJsonString(JSON.stringify({ data: result.data, review: result.review }, null, 2));
       addToast({
-        type: 'success',
-        title: 'Extração concluída',
-        message: 'Confira os dados abaixo antes de lançar em Contas a Pagar.',
+        type: result.review?.required ? 'warning' : 'success',
+        title: result.review?.required ? 'Confira os campos sinalizados' : 'Extração concluída',
+        message: 'Confira os dados com o PDF antes de lançar em Contas a Pagar.',
       });
     } catch {
-      setError({ message: 'Sem conexão com o servidor. Verifique sua internet e tente novamente.' });
+      setError({
+        message: 'Sem conexão com o servidor. Verifique sua internet e tente novamente.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -392,16 +402,32 @@ export default function ProcessadorNfPage() {
             <summary>Sobre a atividade</summary>
             <p>
               Atividade da 1ª etapa de Prática de Engenharia de Software: extrair do PDF os campos
-              obrigatórios (fornecedor, faturado, número da NF, data de emissão, produtos,
-              parcelas, vencimento e valor total), classificar a despesa e exibir o resultado em
-              JSON na tela.
+              obrigatórios (fornecedor, faturado, número da NF, data de emissão, produtos, parcelas,
+              vencimento e valor total), classificar a despesa e exibir o resultado em JSON na tela.
             </p>
           </details>
         </ClayCard>
       </div>
 
       {extractedData && (
-        <div ref={resultRef} className="flex-col" style={{ gap: 'var(--space-6)', scrollMarginTop: 'var(--space-6)' }}>
+        <div
+          ref={resultRef}
+          className="flex-col"
+          style={{ gap: 'var(--space-6)', scrollMarginTop: 'var(--space-6)' }}
+        >
+          {review?.required && (
+            <div className={styles.reviewAlert} role="alert">
+              <AlertTriangle size={20} aria-hidden="true" />
+              <div>
+                <strong>Revisão necessária antes de usar estes dados</strong>
+                <ul>
+                  {review.issues.map((issue, index) => (
+                    <li key={`${issue.field}-${index}`}>{issue.message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           <ClayCard>
             <div className={styles.resultHeader}>
               <div>
@@ -434,7 +460,10 @@ export default function ProcessadorNfPage() {
                   {extractedData.fornecedor?.razaoSocial || '—'}
                 </span>
                 <span className={styles.fieldSub}>
-                  {[extractedData.fornecedor?.nomeFantasia, extractedData.fornecedor?.cnpj && `CNPJ ${extractedData.fornecedor.cnpj}`]
+                  {[
+                    extractedData.fornecedor?.nomeFantasia,
+                    extractedData.fornecedor?.cnpj && `CNPJ ${extractedData.fornecedor.cnpj}`,
+                  ]
                     .filter(Boolean)
                     .join(' • ') || '—'}
                 </span>
@@ -489,9 +518,7 @@ export default function ProcessadorNfPage() {
 
             {produtos.length > 0 && (
               <div className={styles.section}>
-                <h3 className={styles.sectionTitle}>
-                  Produtos e serviços ({produtos.length})
-                </h3>
+                <h3 className={styles.sectionTitle}>Produtos e serviços ({produtos.length})</h3>
                 <ul className={styles.productList}>
                   {produtos.map((produto, i) => (
                     <li key={`${produto}-${i}`} className={styles.productItem}>
@@ -507,11 +534,15 @@ export default function ProcessadorNfPage() {
             <div className={styles.resultHeader}>
               <div>
                 <h2 className="card-title">Resultado em JSON</h2>
-                <p className="card-subtitle">Saída exata devolvida pela extração.</p>
+                <p className="card-subtitle">Dados extraídos e alertas de revisão.</p>
               </div>
               <div className={styles.actions}>
                 <ClayButton variant="secondary" size="sm" onClick={handleCopyJson}>
-                  {isCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                  {isCopied ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Copy size={14} aria-hidden="true" />
+                  )}
                   <span aria-live="polite">{isCopied ? 'Copiado!' : 'Copiar JSON'}</span>
                 </ClayButton>
                 <ClayButton variant="outline" size="sm" onClick={handleDownloadJson}>

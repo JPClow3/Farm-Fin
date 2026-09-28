@@ -9,22 +9,28 @@ export interface ExtractedInvoiceFaturado {
   cpf: string;
 }
 
+import {
+  evaluateInvoiceQuality,
+  type InvoiceReview,
+  type OcrPageConfidence,
+} from './invoiceQuality';
+
 export interface ExtractedInvoiceParcela {
   numero: number;
-  dataVencimento: string; // Formato AAAA-MM-DD
-  valor: number;
+  dataVencimento: string | null; // Formato AAAA-MM-DD
+  valor: number | null;
 }
 
 export interface ExtractedInvoiceData {
   fornecedor: ExtractedInvoiceFornecedor;
   faturado: ExtractedInvoiceFaturado;
   numeroNotaFiscal: string;
-  dataEmissao: string; // Formato AAAA-MM-DD
+  dataEmissao: string | null; // Formato AAAA-MM-DD
   descricaoProdutos: string[];
-  quantidadeParcelas: number;
+  quantidadeParcelas: number | null;
   parcelas: ExtractedInvoiceParcela[];
-  dataVencimento: string; // Formato AAAA-MM-DD da primeira/principal parcela
-  valorTotal: number;
+  dataVencimento: string | null; // Formato AAAA-MM-DD da primeira/principal parcela
+  valorTotal: number | null;
   tipoDespesa: string;
   classificacaoDespesa: string[];
 }
@@ -41,10 +47,13 @@ export const CATEGORIAS_DESPESA_OFICIAIS = [
   'INVESTIMENTOS',
 ] as const;
 
-export function parseValorBR(valor: unknown): number {
+export function parseValorBR(valor: unknown): number | null {
   if (typeof valor === 'number' && Number.isFinite(valor)) return valor;
-  if (typeof valor !== 'string') return Number(valor) || 0;
-  let v = valor.trim().replace(/^R\$\s*/i, '').trim();
+  if (typeof valor !== 'string' || !valor.trim()) return null;
+  let v = valor
+    .trim()
+    .replace(/^R\$\s*/i, '')
+    .trim();
   // "3.086,75" (BR) -> "3086.75" | "3086.75" (US) mantido | "3086,75" -> "3086.75"
   if (/^-?[\d.]+,\d{1,2}$/.test(v)) {
     v = v.replace(/\./g, '').replace(',', '.');
@@ -52,12 +61,13 @@ export function parseValorBR(valor: unknown): number {
     v = v.replace(',', '.');
   }
   const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : null;
 }
 
-export function normalizarDataBR(valor: unknown): string {
-  if (typeof valor !== 'string') return String(valor ?? '');
+export function normalizarDataBR(valor: unknown): string | null {
+  if (typeof valor !== 'string') return null;
   const v = valor.trim();
+  if (!v) return null;
   // Já está em AAAA-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
   // DD/MM/AAAA -> AAAA-MM-DD
@@ -75,19 +85,23 @@ export function normalizarCategoria(valor: unknown): string | null {
   // Mapeia variações comuns / sem acento para a categoria oficial.
   // Os testes de palavra-chave usam a forma sem acento (semAcento),
   // pois /i não iguala "á" a "a".
-  const semAcento = v
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  const semAcento = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   for (const oficial of CATEGORIAS_DESPESA_OFICIAIS) {
-    const oficialSemAcento = oficial
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+    const oficialSemAcento = oficial.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (semAcento === oficialSemAcento) return oficial;
   }
-  if (/MANUTENCAO|OPERACAO|COMBUSTIVEL|LUBRIFICANTE|PECA|PNEU|FILTRO|CORREIA|FERRAMENTA|OFICINA|OLEO DIESEL/.test(semAcento)) {
+  if (
+    /MANUTENCAO|OPERACAO|COMBUSTIVEL|LUBRIFICANTE|PECA|PNEU|FILTRO|CORREIA|FERRAMENTA|OFICINA|OLEO DIESEL/.test(
+      semAcento
+    )
+  ) {
     return 'MANUTENÇÃO E OPERAÇÃO';
   }
-  if (/HIDRAULICO|INFRAESTRUTURA|UTILIDADE|ENERGIA|ARRENDAMENTO|CONSTRUCAO|CIMENTO|TUBO PVC|CONEXAO/.test(semAcento)) {
+  if (
+    /HIDRAULICO|INFRAESTRUTURA|UTILIDADE|ENERGIA|ARRENDAMENTO|CONSTRUCAO|CIMENTO|TUBO PVC|CONEXAO/.test(
+      semAcento
+    )
+  ) {
     return 'INFRAESTRUTURA E UTILIDADES';
   }
   if (/INSUMO|SEMENTE|FERTILIZANTE|DEFENSIVO|CORRETIVO|ADUBO/.test(semAcento)) {
@@ -124,11 +138,13 @@ REGRAS DE EXTRAÇÃO:
 3. numeroNotaFiscal: número da NF (ex: "000.084.682").
 4. dataEmissao: sempre "AAAA-MM-DD" (converta DD/MM/AAAA).
 5. descricaoProdutos: array de strings com as descrições dos itens do corpo da nota.
-6. Parcelas: identifique fatura/duplicatas. Se houver uma ou nada explícito, use 1 parcela.
-   - quantidadeParcelas: inteiro (mínimo 1)
+6. Parcelas: identifique apenas faturas/duplicatas com valor ou vencimento explícito. Se não houver, use array vazio e quantidadeParcelas null. Não invente vencimento ou valor.
+   - quantidadeParcelas: inteiro ou null
    - parcelas: array de { numero: inteiro, dataVencimento: "AAAA-MM-DD", valor: número }
-   - dataVencimento: vencimento geral "AAAA-MM-DD"
-7. valorTotal: número (ex: 3086.75, sem R$, sem separador de milhar).
+   - dataVencimento: vencimento geral "AAAA-MM-DD", ou null se ausente
+7. valorTotal: número (ex: 3086.75, sem R$, sem separador de milhar), ou null se ilegível.
+
+Não adivinhe campos ausentes. Use null para datas/valores desconhecidos e string vazia para identificadores não encontrados. O documento do destinatário pode ser CPF ou CNPJ no campo cpf.
 
 CLASSIFICAÇÃO SEMÂNTICA (TIPO DE DESPESA) — INTERPRETAR, NÃO extrair:
 Use EXCLUSIVAMENTE uma destas 9 categorias oficiais (grafia exata, com acentos):
@@ -156,8 +172,78 @@ const MISTRAL_OCR_MODEL = 'mistral-ocr-latest';
 // Modelos de chat que estruturam o texto do OCR, em ordem de preferência
 const EXTRACTION_MODELS = ['mistral-medium-latest', 'mistral-small-latest'];
 
+// Missing values are nullable so the model can report uncertainty instead of inventing data.
+export const INVOICE_RESPONSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    fornecedor: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        razaoSocial: { type: 'string' },
+        nomeFantasia: { type: ['string', 'null'] },
+        cnpj: { type: 'string' },
+      },
+      required: ['razaoSocial', 'nomeFantasia', 'cnpj'],
+    },
+    faturado: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { nomeCompleto: { type: 'string' }, cpf: { type: 'string' } },
+      required: ['nomeCompleto', 'cpf'],
+    },
+    numeroNotaFiscal: { type: 'string' },
+    dataEmissao: { type: ['string', 'null'] },
+    descricaoProdutos: { type: 'array', items: { type: 'string' } },
+    quantidadeParcelas: { type: ['integer', 'null'] },
+    parcelas: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          numero: { type: 'integer' },
+          dataVencimento: { type: ['string', 'null'] },
+          valor: { type: ['number', 'null'] },
+        },
+        required: ['numero', 'dataVencimento', 'valor'],
+      },
+    },
+    dataVencimento: { type: ['string', 'null'] },
+    valorTotal: { type: ['number', 'null'] },
+    tipoDespesa: { type: 'string' },
+    classificacaoDespesa: { type: 'array', items: { type: 'string' } },
+  },
+  required: [
+    'fornecedor',
+    'faturado',
+    'numeroNotaFiscal',
+    'dataEmissao',
+    'descricaoProdutos',
+    'quantidadeParcelas',
+    'parcelas',
+    'dataVencimento',
+    'valorTotal',
+    'tipoDespesa',
+    'classificacaoDespesa',
+  ],
+} as const;
+
+export interface InvoiceExtractionResult {
+  data: ExtractedInvoiceData;
+  review: InvoiceReview;
+}
+
 interface MistralOcrResponse {
-  pages?: { index: number; markdown: string }[];
+  pages?: {
+    index: number;
+    markdown: string;
+    confidence_scores?: {
+      average_page_confidence_score?: number;
+      minimum_page_confidence_score?: number;
+    } | null;
+  }[];
 }
 
 interface MistralChatResponse {
@@ -178,7 +264,9 @@ async function callMistral<T>(apiKey: string, path: string, body: unknown): Prom
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
-    throw new Error(`Mistral API ${path} respondeu ${response.status}: ${errorText || response.statusText}`);
+    throw new Error(
+      `Mistral API ${path} respondeu ${response.status}: ${errorText || response.statusText}`
+    );
   }
 
   return (await response.json()) as T;
@@ -197,7 +285,10 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-async function extractPdfTextWithMistralOcr(apiKey: string, pdfBuffer: Buffer): Promise<string> {
+async function extractPdfTextWithMistralOcr(
+  apiKey: string,
+  pdfBuffer: Buffer
+): Promise<{ text: string; pages: OcrPageConfidence[] }> {
   const ocr = await withRetry(() =>
     callMistral<MistralOcrResponse>(apiKey, '/ocr', {
       model: MISTRAL_OCR_MODEL,
@@ -206,6 +297,7 @@ async function extractPdfTextWithMistralOcr(apiKey: string, pdfBuffer: Buffer): 
         document_url: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
       },
       include_image_base64: false,
+      confidence_scores_granularity: 'page',
     })
   );
 
@@ -219,17 +311,22 @@ async function extractPdfTextWithMistralOcr(apiKey: string, pdfBuffer: Buffer): 
     throw new Error('O Mistral OCR não retornou texto para o documento enviado.');
   }
 
-  return markdown;
+  const pages = (ocr.pages ?? []).map((page) => ({
+    index: page.index,
+    average: page.confidence_scores?.average_page_confidence_score ?? null,
+    minimum: page.confidence_scores?.minimum_page_confidence_score ?? null,
+  }));
+  return { text: markdown, pages };
 }
 
 /** Normaliza tipos, datas, valores e categorias do JSON devolvido pelo modelo. */
 export function sanitizeExtraction(parsed: ExtractedInvoiceData): ExtractedInvoiceData {
   // Sanitizações de integridade
   if (!parsed.fornecedor) {
-    parsed.fornecedor = { razaoSocial: 'Não identificado', nomeFantasia: null, cnpj: '' };
+    parsed.fornecedor = { razaoSocial: '', nomeFantasia: null, cnpj: '' };
   }
   if (typeof parsed.fornecedor.razaoSocial !== 'string') {
-    parsed.fornecedor.razaoSocial = String(parsed.fornecedor.razaoSocial ?? 'Não identificado');
+    parsed.fornecedor.razaoSocial = String(parsed.fornecedor.razaoSocial ?? '');
   }
   if (typeof parsed.fornecedor.cnpj !== 'string') {
     parsed.fornecedor.cnpj = String(parsed.fornecedor.cnpj ?? '');
@@ -238,10 +335,10 @@ export function sanitizeExtraction(parsed: ExtractedInvoiceData): ExtractedInvoi
     parsed.fornecedor.nomeFantasia = null;
   }
   if (!parsed.faturado) {
-    parsed.faturado = { nomeCompleto: 'Não identificado', cpf: '' };
+    parsed.faturado = { nomeCompleto: '', cpf: '' };
   }
   if (typeof parsed.faturado.nomeCompleto !== 'string') {
-    parsed.faturado.nomeCompleto = String(parsed.faturado.nomeCompleto ?? 'Não identificado');
+    parsed.faturado.nomeCompleto = String(parsed.faturado.nomeCompleto ?? '');
   }
   if (typeof parsed.faturado.cpf !== 'string') {
     parsed.faturado.cpf = String(parsed.faturado.cpf ?? '');
@@ -256,21 +353,14 @@ export function sanitizeExtraction(parsed: ExtractedInvoiceData): ExtractedInvoi
   }
   parsed.descricaoProdutos = parsed.descricaoProdutos.map((d) => String(d));
   parsed.valorTotal = parseValorBR(parsed.valorTotal);
-  if (!Array.isArray(parsed.parcelas)) {
-    parsed.parcelas = [
-      {
-        numero: 1,
-        dataVencimento: parsed.dataVencimento || '',
-        valor: Number(parsed.valorTotal) || 0,
-      },
-    ];
-  }
+  if (!Array.isArray(parsed.parcelas)) parsed.parcelas = [];
   parsed.parcelas = parsed.parcelas.map((p, idx) => ({
     numero: Number.parseInt(String(p.numero), 10) || idx + 1,
-    dataVencimento: normalizarDataBR(p.dataVencimento || parsed.dataVencimento),
+    dataVencimento: normalizarDataBR(p.dataVencimento),
     valor: parseValorBR(p.valor),
   }));
-  parsed.quantidadeParcelas = Number.parseInt(String(parsed.quantidadeParcelas), 10) || parsed.parcelas.length || 1;
+  parsed.quantidadeParcelas =
+    Number.parseInt(String(parsed.quantidadeParcelas), 10) || parsed.parcelas.length || null;
   if (!parsed.dataVencimento && parsed.parcelas.length > 0) {
     parsed.dataVencimento = parsed.parcelas[0].dataVencimento;
   }
@@ -279,29 +369,25 @@ export function sanitizeExtraction(parsed: ExtractedInvoiceData): ExtractedInvoi
     parsed.tipoDespesa = String(parsed.tipoDespesa ?? '');
   }
   const tipoNormalizado = normalizarCategoria(parsed.tipoDespesa);
-  if (tipoNormalizado) parsed.tipoDespesa = tipoNormalizado;
+  parsed.tipoDespesa = tipoNormalizado || '';
   if (!Array.isArray(parsed.classificacaoDespesa)) {
-    parsed.classificacaoDespesa = parsed.tipoDespesa ? [parsed.tipoDespesa] : ['OUTROS'];
+    parsed.classificacaoDespesa = parsed.tipoDespesa ? [parsed.tipoDespesa] : [];
   }
   parsed.classificacaoDespesa = parsed.classificacaoDespesa
     .map((c) => normalizarCategoria(c) || '')
     .filter(Boolean);
-  if (parsed.classificacaoDespesa.length === 0 && parsed.tipoDespesa) {
-    const fallback = normalizarCategoria(parsed.tipoDespesa);
-    parsed.classificacaoDespesa = [fallback || parsed.tipoDespesa];
-  }
+  if (parsed.classificacaoDespesa.length === 0 && parsed.tipoDespesa)
+    parsed.classificacaoDespesa = [parsed.tipoDespesa];
   if (!parsed.tipoDespesa && parsed.classificacaoDespesa.length > 0) {
     parsed.tipoDespesa = parsed.classificacaoDespesa[0];
-  }
-  if (!CATEGORIAS_DESPESA_OFICIAIS.includes(parsed.tipoDespesa as (typeof CATEGORIAS_DESPESA_OFICIAIS)[number])) {
-    const corrigido = normalizarCategoria(parsed.tipoDespesa);
-    if (corrigido) parsed.tipoDespesa = corrigido;
   }
   return parsed;
 }
 
 // A chave fica só no servidor: nunca é aceita do navegador
-export async function processInvoicePdfWithMistral(pdfBuffer: Buffer): Promise<ExtractedInvoiceData> {
+export async function processInvoicePdfWithMistral(
+  pdfBuffer: Buffer
+): Promise<InvoiceExtractionResult> {
   const apiKey = process.env.MISTRAL_API_KEY?.trim();
 
   if (!apiKey) {
@@ -318,9 +404,9 @@ export async function processInvoicePdfWithMistral(pdfBuffer: Buffer): Promise<E
     throw new Error('Arquivo inválido: o conteúdo não é um PDF.');
   }
 
-  let ocrText: string;
+  let ocr: { text: string; pages: OcrPageConfidence[] };
   try {
-    ocrText = await extractPdfTextWithMistralOcr(apiKey, pdfBuffer);
+    ocr = await extractPdfTextWithMistralOcr(apiKey, pdfBuffer);
   } catch (err) {
     throw new Error(
       `Falha ao ler a nota fiscal com o Mistral OCR: ${err instanceof Error ? err.message : String(err)}`
@@ -343,7 +429,7 @@ Devolva rigorosamente o JSON contendo:
 - classificacaoDespesa (array de strings)
 
 TEXTO DO DOCUMENTO:
-${ocrText}`;
+${ocr.text}`;
 
   let lastError: unknown = null;
 
@@ -356,7 +442,14 @@ ${ocrText}`;
             { role: 'system', content: INVOICE_EXTRACTION_SYSTEM_PROMPT },
             { role: 'user', content: prompt },
           ],
-          response_format: { type: 'json_object' },
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'invoice_extraction',
+              schema: INVOICE_RESPONSE_SCHEMA,
+              strict: true,
+            },
+          },
           temperature: 0.1,
         })
       );
@@ -369,10 +462,14 @@ ${ocrText}`;
         .replace(/\s*```$/i, '')
         .trim();
 
-      return sanitizeExtraction(JSON.parse(cleanedJson) as ExtractedInvoiceData);
+      const data = sanitizeExtraction(JSON.parse(cleanedJson) as ExtractedInvoiceData);
+      return { data, review: evaluateInvoiceQuality(data, ocr.pages) };
     } catch (err) {
       lastError = err;
-      console.warn(`Tentativa com o modelo ${modelName} falhou, tentando próximo modelo se disponível...`, err);
+      console.warn(
+        `Tentativa com o modelo ${modelName} falhou, tentando próximo modelo se disponível...`,
+        err
+      );
     }
   }
 
