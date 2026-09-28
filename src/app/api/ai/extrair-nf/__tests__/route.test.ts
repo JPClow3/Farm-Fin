@@ -36,7 +36,10 @@ describe('POST /api/ai/extrair-nf', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     consumeRateLimit.mockResolvedValue({ allowed: true, retryAfter: 0 });
-    processInvoicePdfWithMistral.mockResolvedValue({ numeroNotaFiscal: '1' });
+    processInvoicePdfWithMistral.mockResolvedValue({
+      data: { numeroNotaFiscal: '1' },
+      review: { required: false, issues: [], ocrMinimumPageConfidence: null },
+    });
   });
 
   it('retorna 401 sem sessão verificada e não chama a Mistral', async () => {
@@ -66,7 +69,11 @@ describe('POST /api/ai/extrair-nf', () => {
     getVerifiedSession.mockResolvedValue(session('Produtor'));
     const res = await POST(buildRequest({ apiKey: 'client-key' }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, data: { numeroNotaFiscal: '1' } });
+    expect(await res.json()).toEqual({
+      success: true,
+      data: { numeroNotaFiscal: '1' },
+      review: { required: false, issues: [], ocrMinimumPageConfidence: null },
+    });
     expect(processInvoicePdfWithMistral).toHaveBeenCalledTimes(1);
     expect(consumeRateLimit.mock.calls[0][0][0].key).toBe('ocr:demo:abc');
   });

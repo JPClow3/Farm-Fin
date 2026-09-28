@@ -1,0 +1,26 @@
+[
+  {
+    "name": "diesel-sample",
+    "pdf": "public/exemplo-danfe.pdf",
+    "expected": {
+      "numeroNotaFiscal": "000045892",
+      "dataEmissao": "2026-09-10",
+      "fornecedorCnpj": "18234567000189",
+      "faturadoDocumento": "12345678900",
+      "dataVencimento": "2026-10-10",
+      "valorTotal": 12100
+    }
+  },
+  {
+    "name": "parts-sample",
+    "pdf": "atividade-processador-nf/exemplo-nota-fiscal/DANFE_000084682_IGUACU_teste_professor.pdf",
+    "expected": {
+      "numeroNotaFiscal": "000084682",
+      "dataEmissao": "2025-09-19",
+      "fornecedorCnpj": "33656729002385",
+      "faturadoDocumento": "99999999999",
+      "dataVencimento": "2025-10-17",
+      "valorTotal": 3086.75
+    }
+  }
+]

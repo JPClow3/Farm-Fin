@@ -1,8 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  processInvoicePdfWithMistral,
-  ExtractedInvoiceData,
-} from '../mistralInvoiceAgent';
+import { processInvoicePdfWithMistral, ExtractedInvoiceData } from '../mistralInvoiceAgent';
 
 describe('Mistral Invoice Agent', () => {
   it('deve lançar erro se a chave da API não estiver definida nem no env nem por parâmetro', async () => {
@@ -11,9 +8,7 @@ describe('Mistral Invoice Agent', () => {
 
     const dummyBuffer = Buffer.from('dummy-pdf-content');
 
-    await expect(
-      processInvoicePdfWithMistral(dummyBuffer)
-    ).rejects.toThrow(/MISTRAL_API_KEY/);
+    await expect(processInvoicePdfWithMistral(dummyBuffer)).rejects.toThrow(/MISTRAL_API_KEY/);
 
     if (originalKey) {
       process.env.MISTRAL_API_KEY = originalKey;
@@ -24,7 +19,9 @@ describe('Mistral Invoice Agent', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ pages: [{ index: 0, markdown: 'DANFE Oleo Diesel S10 R$ 100,00' }] }))
+        new Response(
+          JSON.stringify({ pages: [{ index: 0, markdown: 'DANFE Oleo Diesel S10 R$ 100,00' }] })
+        )
       )
       .mockResolvedValueOnce(
         new Response(
@@ -54,16 +51,23 @@ describe('Mistral Invoice Agent', () => {
       expect(ocrUrl).toBe('https://api.mistral.ai/v1/ocr');
       const ocrBody = JSON.parse(ocrInit.body);
       expect(ocrBody.model).toBe('mistral-ocr-latest');
-      expect(ocrBody.document.document_url).toBe(`data:application/pdf;base64,${Buffer.from('%PDF-1.4').toString('base64')}`);
+      expect(ocrBody.document.document_url).toBe(
+        `data:application/pdf;base64,${Buffer.from('%PDF-1.4').toString('base64')}`
+      );
       expect(ocrInit.headers.Authorization).toBe('Bearer test-key');
 
       const chatBody = JSON.parse(fetchMock.mock.calls[1][1].body);
       expect(chatBody.messages[1].content).toContain('DANFE Oleo Diesel S10');
 
-      expect(result.numeroNotaFiscal).toBe('123');
-      expect(result.quantidadeParcelas).toBe(1);
-      expect(result.parcelas).toEqual([{ numero: 1, dataVencimento: '2026-10-10', valor: 100 }]);
-      expect(result.classificacaoDespesa).toEqual(['MANUTENÇÃO E OPERAÇÃO']);
+      expect(result.data.numeroNotaFiscal).toBe('123');
+      expect(result.data.quantidadeParcelas).toBeNull();
+      expect(result.data.parcelas).toEqual([]);
+      expect(result.data.classificacaoDespesa).toEqual(['MANUTENÇÃO E OPERAÇÃO']);
+      expect(result.review.required).toBe(true);
+      expect(result.review.issues.some((issue) => issue.field === 'parcelas')).toBe(true);
+      expect(ocrBody.confidence_scores_granularity).toBe('page');
+      expect(chatBody.response_format.type).toBe('json_schema');
+      expect(chatBody.response_format.json_schema.schema.required).toContain('valorTotal');
     } finally {
       vi.unstubAllGlobals();
       vi.unstubAllEnvs();

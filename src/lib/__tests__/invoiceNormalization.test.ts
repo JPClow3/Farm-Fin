@@ -13,7 +13,8 @@ describe('normalização da extração de NF', () => {
     expect(parseValorBR('3086,75')).toBe(3086.75);
     expect(parseValorBR('3086.75')).toBe(3086.75);
     expect(parseValorBR(1250.5)).toBe(1250.5);
-    expect(parseValorBR('abc')).toBe(0);
+    expect(parseValorBR('abc')).toBeNull();
+    expect(parseValorBR(null)).toBeNull();
   });
 
   it('converte datas DD/MM/AAAA para AAAA-MM-DD', () => {
@@ -24,7 +25,9 @@ describe('normalização da extração de NF', () => {
   it('mapeia categorias para as 9 oficiais', () => {
     expect(normalizarCategoria('manutencao e operacao')).toBe('MANUTENÇÃO E OPERAÇÃO');
     expect(normalizarCategoria('Compra de óleo diesel')).toBe('MANUTENÇÃO E OPERAÇÃO');
-    expect(normalizarCategoria('Material hidráulico / tubo PVC')).toBe('INFRAESTRUTURA E UTILIDADES');
+    expect(normalizarCategoria('Material hidráulico / tubo PVC')).toBe(
+      'INFRAESTRUTURA E UTILIDADES'
+    );
     expect(normalizarCategoria('Sementes de soja')).toBe('INSUMOS AGRÍCOLAS');
     expect(normalizarCategoria('algo desconhecido')).toBeNull();
   });
