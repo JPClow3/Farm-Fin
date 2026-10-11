@@ -76,8 +76,8 @@ async function isServerRunning(urlStr: string): Promise<boolean> {
       const u = new URL(urlStr);
       const req = http.request(
         {
-          hostname: u.hostname,
-          port: u.port || 3000,
+          hostname: u.hostname.replace(/^\[|\]$/g, ''),
+          port: u.port || 80,
           path: '/login',
           method: 'GET',
           timeout: 3000,
@@ -116,8 +116,8 @@ async function warmupRoute(urlStr: string, headers?: Record<string, string>): Pr
       const u = new URL(urlStr);
       const req = http.request(
         {
-          hostname: u.hostname,
-          port: u.port || 3000,
+          hostname: u.hostname.replace(/^\[|\]$/g, ''),
+          port: u.port || 80,
           path: u.pathname,
           method: 'GET',
           timeout: 10000,
@@ -200,6 +200,9 @@ async function main() {
     base.protocol !== 'http:' ||
     base.username ||
     base.password ||
+    base.pathname !== '/' ||
+    base.search ||
+    base.hash ||
     !['localhost', '127.0.0.1', '[::1]'].includes(base.hostname.toLowerCase())
   ) {
     throw new Error(
@@ -214,57 +217,63 @@ async function main() {
   console.log(`[stress-test] Initializing benchmark suite against: ${BASE_URL}`);
 
   let devServerProcess: ChildProcess | null = null;
-  const running = await isServerRunning(BASE_URL);
-
-  if (!running) {
-    console.log('[stress-test] Server not detected on port 3000. Launching Next.js dev server...');
-    devServerProcess = spawn('npx', ['next', 'dev', '--port', '3000', '--hostname', '127.0.0.1'], {
-      shell: process.platform === 'win32',
-      stdio: 'ignore',
-      detached: process.platform !== 'win32',
-      env: {
-        ...process.env,
-        PORT: '3000',
-        NODE_ENV: 'development',
-        BETTER_AUTH_SECRET: 'farm-fin-e2e-only-secret-at-least-32-characters',
-        BETTER_AUTH_URL: BASE_URL,
-      },
-    });
-
-    console.log('[stress-test] Waiting for Next.js to start serving...');
-    await waitForServer(BASE_URL, 60000);
-    console.log('[stress-test] Next.js dev server ready.');
-  } else {
-    console.log('[stress-test] Connected to running instance.');
-  }
-
-  const authScenario = SCENARIOS[1];
-  const login = await fetch(`${BASE_URL}${authScenario.urlPath}`, {
-    method: 'POST',
-    headers: authScenario.headers,
-    body: authScenario.body,
-    redirect: 'manual',
-  });
-  const cookies = login.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(';')[0])
-    .join('; ');
-  await login.body?.cancel();
-  if (login.status !== 200 || !cookies) {
-    killProcessTree(devServerProcess?.pid);
-    throw new Error('The dedicated local account did not authenticate with a session cookie.');
-  }
-  for (const scenario of SCENARIOS.slice(2))
-    scenario.headers = { ...scenario.headers, cookie: cookies };
-  console.log('[stress-test] Warming up routes before benchmarking...');
-  for (const scenario of SCENARIOS) {
-    await warmupRoute(`${BASE_URL}${scenario.urlPath}`, scenario.headers);
-  }
-  console.log('[stress-test] Warm-up complete. Starting benchmark runs...');
-
-  const collectedMetrics = [];
-
   try {
+    const running = await isServerRunning(BASE_URL);
+
+    if (!running) {
+      const port = base.port || '80';
+      console.log(
+        `[stress-test] Server not detected on port ${port}. Launching Next.js dev server...`
+      );
+      devServerProcess = spawn(
+        'npx',
+        ['next', 'dev', '--port', port, '--hostname', base.hostname.replace(/^\[|\]$/g, '')],
+        {
+          shell: process.platform === 'win32',
+          stdio: 'ignore',
+          detached: process.platform !== 'win32',
+          env: {
+            ...process.env,
+            PORT: port,
+            NODE_ENV: 'development',
+            BETTER_AUTH_SECRET: 'farm-fin-e2e-only-secret-at-least-32-characters',
+            BETTER_AUTH_URL: BASE_URL,
+          },
+        }
+      );
+
+      console.log('[stress-test] Waiting for Next.js to start serving...');
+      await waitForServer(BASE_URL, 60000);
+      console.log('[stress-test] Next.js dev server ready.');
+    } else {
+      console.log('[stress-test] Connected to running instance.');
+    }
+
+    const authScenario = SCENARIOS[1];
+    const login = await fetch(`${BASE_URL}${authScenario.urlPath}`, {
+      method: 'POST',
+      headers: authScenario.headers,
+      body: authScenario.body,
+      redirect: 'manual',
+    });
+    const cookies = login.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(';')[0])
+      .join('; ');
+    await login.body?.cancel();
+    if (login.status !== 200 || !cookies) {
+      throw new Error('The dedicated local account did not authenticate with a session cookie.');
+    }
+    for (const scenario of SCENARIOS.slice(2))
+      scenario.headers = { ...scenario.headers, cookie: cookies };
+    console.log('[stress-test] Warming up routes before benchmarking...');
+    for (const scenario of SCENARIOS) {
+      await warmupRoute(`${BASE_URL}${scenario.urlPath}`, scenario.headers);
+    }
+    console.log('[stress-test] Warm-up complete. Starting benchmark runs...');
+
+    const collectedMetrics = [];
+
     for (const scenario of SCENARIOS) {
       console.log(
         `\n[stress-test] Running: ${scenario.name} (connections: ${scenario.connections}, duration: ${scenario.duration}s)...`
