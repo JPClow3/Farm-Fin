@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
   Sprout,
   LogIn,
@@ -33,7 +33,9 @@ const CALLBACK_ERRORS: Record<string, string> = {
 
 /** Aceita apenas caminhos internos, evitando redirecionamento para outros sites */
 function safeReturnTo(value: string | null): string {
-  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/';
+  return value && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')
+    ? value
+    : '/';
 }
 
 function saveActiveUser(user: {
@@ -49,7 +51,6 @@ function saveActiveUser(user: {
 }
 
 export function LoginScreen({ methods }: { methods: EnabledAuthMethods }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = safeReturnTo(searchParams.get('from'));
   const callbackError = searchParams.get('error');
@@ -72,8 +73,7 @@ export function LoginScreen({ methods }: { methods: EnabledAuthMethods }) {
   const hasSocial = methods.google || methods.microsoft;
 
   const finishLogin = () => {
-    router.push(returnTo);
-    router.refresh();
+    window.location.assign(returnTo);
   };
 
   const switchMode = (next: Mode) => {

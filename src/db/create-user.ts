@@ -92,6 +92,19 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
     db.query.users.findFirst({
       where: (u, { or: orOp, eq: eqOp }) => orOp(eqOp(u.username, username), eqOp(u.email, email)),
     });
+  const attachVerifiedAccount = async (existing: {
+    id: string;
+    username?: string | null;
+    email: string;
+  }) => {
+    if (existing.username?.toLowerCase() !== username || existing.email.toLowerCase() !== email) {
+      throw new Error('O nome de usuário e o e-mail devem corresponder à mesma conta existente.');
+    }
+    const verified = await auth.api.signInEmail({ body: { email, password } });
+    if (verified.user.id !== existing.id)
+      throw new Error('A credencial não corresponde à conta existente.');
+    return await attachAccount(existing.id);
+  };
   // Query/update failures must cause the CLI to fail instead of reporting readiness.
   const existingUser = await findAccount();
   if (existingUser) {
@@ -101,7 +114,7 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
     ) {
       throw new Error('O nome de usuário e o e-mail devem corresponder à mesma conta existente.');
     }
-    return await attachAccount(existingUser.id);
+    return await attachVerifiedAccount(existingUser);
   }
   let userId: string | undefined;
   try {
@@ -115,7 +128,7 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
         recovered?.username?.toLowerCase() === username &&
         recovered.email.toLowerCase() === email
       ) {
-        return await attachAccount(recovered.id);
+        return await attachVerifiedAccount(recovered);
       }
     }
     throw authErr;

@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { DEMO_SESSION_COOKIE, signDemoSession } from '../src/lib/demoSession';
 
 test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () => {
-  test('1. Verify absolute absence of demo persona selector cards ("Conhecer o sistema")', async ({ page }) => {
+  test('1. Verify absolute absence of demo persona selector cards ("Conhecer o sistema")', async ({
+    page,
+  }) => {
     await page.goto('/login');
 
     // Confirm core login credential elements are present
@@ -35,10 +38,30 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     await expect(personaGrid).toHaveCount(0);
   });
 
-  test('2. Verify login with username "paraiba" and password "melhorprofessor"', async ({ page }) => {
+  test('2. Verify login with username "paraiba" and password "melhorprofessor"', async ({
+    page,
+  }) => {
     let capturedPayload: Record<string, unknown> | undefined;
     await page.route('**/api/auth/sign-in/username*', async (route) => {
       capturedPayload = route.request().postDataJSON();
+      const value = await signDemoSession(
+        {
+          sid: 'login-flow-fixture',
+          email: 'paraiba@farm-fin.com',
+          name: 'Professor Paraíba',
+          role: 'Produtor',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+        'farm-fin-e2e-only-secret-at-least-32-characters'
+      );
+      await page.context().addCookies([
+        {
+          name: DEMO_SESSION_COOKIE,
+          value,
+          url: new URL(route.request().url()).origin,
+          httpOnly: true,
+        },
+      ]);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -69,19 +92,40 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     await passwordInput.fill('melhorprofessor');
     await submitButton.click();
 
-    await expect.poll(() => capturedPayload).toMatchObject({
-      username: 'paraiba',
-      password: 'melhorprofessor',
-    });
+    await expect
+      .poll(() => capturedPayload)
+      .toMatchObject({
+        username: 'paraiba',
+        password: 'melhorprofessor',
+      });
 
-    // Successfully transitioned to dashboard or home page
-    await expect(page).toHaveURL(/\/(login)?/);
+    await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 30000 });
   });
 
-  test('3. Verify login with email "paraiba@farm-fin.com" and password "melhorprofessor"', async ({ page }) => {
+  test('3. Verify login with email "paraiba@farm-fin.com" and password "melhorprofessor"', async ({
+    page,
+  }) => {
     let capturedPayload: Record<string, unknown> | undefined;
     await page.route('**/api/auth/sign-in/email*', async (route) => {
       capturedPayload = route.request().postDataJSON();
+      const value = await signDemoSession(
+        {
+          sid: 'login-flow-fixture',
+          email: 'paraiba@farm-fin.com',
+          name: 'Professor Paraíba',
+          role: 'Produtor',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+        'farm-fin-e2e-only-secret-at-least-32-characters'
+      );
+      await page.context().addCookies([
+        {
+          name: DEMO_SESSION_COOKIE,
+          value,
+          url: new URL(route.request().url()).origin,
+          httpOnly: true,
+        },
+      ]);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -112,12 +156,14 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     await passwordInput.fill('melhorprofessor');
     await submitButton.click();
 
-    await expect.poll(() => capturedPayload).toMatchObject({
-      email: 'paraiba@farm-fin.com',
-      password: 'melhorprofessor',
-    });
+    await expect
+      .poll(() => capturedPayload)
+      .toMatchObject({
+        email: 'paraiba@farm-fin.com',
+        password: 'melhorprofessor',
+      });
 
-    await expect(page).toHaveURL(/\/(login)?/);
+    await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 30000 });
   });
 
   test('4. Verify username-based registration workflow', async ({ page }) => {
@@ -151,7 +197,9 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     // Fill valid registration fields
     await page.getByPlaceholder('Ex: Carlos Eduardo').fill('Carlos Eduardo Silva');
     await usernameInput.fill('carlos.silva');
-    await page.getByPlaceholder('carlos@fazendasantaclara.com.br').fill('carlos.silva@fazendateste.com.br');
+    await page
+      .getByPlaceholder('carlos@fazendasantaclara.com.br')
+      .fill('carlos.silva@fazendateste.com.br');
     await page.getByPlaceholder('Ex: Fazenda Santa Clara').fill('Fazenda Santa Clara');
 
     // Fill password fields
@@ -164,6 +212,8 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     await submitBtn.click();
 
     // Verify submission triggered without client-side error blocks
-    await expect(page.locator('[role="alert"]').filter({ hasText: /Verifique os campos/i })).toHaveCount(0);
+    await expect(
+      page.locator('[role="alert"]').filter({ hasText: /Verifique os campos/i })
+    ).toHaveCount(0);
   });
 });

@@ -1,10 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  getCurrentSession,
-  getVerifiedSession,
-  getEffectiveOrganizationId,
-} from '../session';
+import { getCurrentSession, getVerifiedSession, getEffectiveOrganizationId } from '../session';
 import { DEFAULT_ORG_ID, SEED_USERS } from '@/db/seed';
 import { DEMO_SESSION_COOKIE } from '../demoSession';
 
@@ -80,7 +76,7 @@ describe('Session Retrieval & Verification Engine (src/lib/session.ts)', () => {
       });
     });
 
-    it('falls back to DEFAULT_ORG_ID when user.organizationId is omitted', async () => {
+    it('keeps an unprovisioned account separate from the seed organization', async () => {
       mockGetSession.mockResolvedValueOnce({
         user: {
           id: 'usr-no-org',
@@ -91,9 +87,19 @@ describe('Session Retrieval & Verification Engine (src/lib/session.ts)', () => {
       });
 
       const session = await getVerifiedSession();
-      expect(session?.organizationId).toBe(DEFAULT_ORG_ID);
-      expect(session?.user.organizationId).toBe(DEFAULT_ORG_ID);
+      expect(session?.organizationId).toBe('');
+      expect(session?.user.organizationId).toBe('');
       expect(session?.role).toBe('Financeiro');
+      expect(mockGetSession).toHaveBeenCalledWith(
+        expect.objectContaining({ query: { disableCookieCache: true } })
+      );
+    });
+
+    it('blocks tenant-scoped access until registration is complete', async () => {
+      mockGetSession.mockResolvedValue({
+        user: { id: 'new-user', email: 'new@example.com', name: 'New User' },
+      });
+      await expect(getCurrentSession()).rejects.toThrow('Conclua o cadastro');
     });
 
     it('falls back to Produtor role when user.role is omitted', async () => {

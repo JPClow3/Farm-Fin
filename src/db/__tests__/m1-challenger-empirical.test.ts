@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   dbInsert: vi.fn(),
   dbUpdate: vi.fn(),
   signUpEmail: vi.fn(),
+  signInEmail: vi.fn(),
   verifiedSession: vi.fn(),
 }));
 
@@ -70,6 +71,7 @@ vi.mock('../../lib/auth', () => ({
   auth: {
     api: {
       signUpEmail: mocks.signUpEmail,
+      signInEmail: mocks.signInEmail,
     },
   },
 }));
@@ -77,6 +79,7 @@ vi.mock('../../lib/auth', () => ({
 describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Auth Collisions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.signInEmail.mockImplementation(async () => ({ user: await mocks.findUser() }));
     mocks.verifiedSession.mockResolvedValue({
       kind: 'auth',
       isAuthenticated: true,
