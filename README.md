@@ -10,7 +10,7 @@ O **Farm-Fin** é uma plataforma moderna desenvolvida especificamente para o agr
 
 - **Cadastros Base (EP-01)**: Gestão de Fazendas (com CAR), Talhões (com GPS e tipos de solo), Safras e Culturas, Fornecedores e Clientes (com validação de duplicidade de CNPJ/CPF), Maquinário e Funcionários/Colaboradores com custos por hora.
 - **Contas a Pagar (EP-02)**: Lançamento de despesas, parcelamentos, gestão de anexos/NF-e, fluxo de aprovação de diretoria, gestão de recorrência periódica, Aging List de atrasos e cockpit de alertas de vencimento (3d, 7d, hoje, vencidas).
-- **Contas a Receber, Barter & Hedge (EP-03)**: Vendas spot, entregas futuras, contratos de **Barter de Insumos** com liquidação física simultânea do título a pagar, operações de **Hedge** cambial/commodities com workflow de fixação de preço (*A Fixar* ➔ *Fixar Preço*) e rastreamento em múltiplas unidades (Sacas, Toneladas, Arrobas, Kg).
+- **Contas a Receber, Barter & Hedge (EP-03)**: Vendas spot, entregas futuras, contratos de **Barter de Insumos** com liquidação física simultânea do título a pagar, operações de **Hedge** cambial/commodities com workflow de fixação de preço (_A Fixar_ ➔ _Fixar Preço_) e rastreamento em múltiplas unidades (Sacas, Toneladas, Arrobas, Kg).
 - **Fluxo de Caixa & Simulação de Cenários (EP-04)**: Visão consolidada ou filtrada por conta bancária, periodicidade diária/semanal/mensal/safra anual, motor de stress testing (cenários Realista, Otimista, Pessimista e Personalizado) com comparador lado a lado e **exportação nativa para .XLSX (Excel)**.
 - **Conciliação Bancária (EP-05)**: Importação de arquivos OFX/CSV, correspondência automática com algoritmo de similaridade, conciliação manual e controle de pendências.
 - **Estoque de Insumos & Livro Kardex (EP-06)**: Controle de almoxarifado, Custo Médio Ponderado (CMP), rastreabilidade por número de lote e data de validade, alertas de estoque mínimo e livro Kardex com saldo contábil em tempo real.
@@ -34,17 +34,20 @@ O **Farm-Fin** é uma plataforma moderna desenvolvida especificamente para o agr
 ## 📦 Instalação e Execução
 
 1. **Clonar o repositório**:
+
    ```bash
    git clone https://github.com/usuario/farm-fin.git
    cd farm-fin
    ```
 
 2. **Instalar as dependências**:
+
    ```bash
    npm install
    ```
 
 3. **Configurar variáveis de ambiente**:
+
    ```bash
    cp .env.example .env.local
    ```
@@ -60,19 +63,37 @@ O **Farm-Fin** é uma plataforma moderna desenvolvida especificamente para o agr
 ## 🧪 Testes e Validação de Código
 
 - **Executar todos os testes automatizados**:
+
   ```bash
   npm test
   ```
 
 - **Verificação de tipagem TypeScript**:
+
   ```bash
   npx tsc --noEmit
   ```
 
 - **Executar linter**:
+
   ```bash
   npm run lint
   ```
+
+- **Executar os testes E2E de login** (instale o Chromium uma vez com `npx playwright install chromium`):
+
+  ```bash
+  npm run test:e2e
+  ```
+
+- **Fazer uma carga controlada em uma instância local**: cadastre uma conta exclusiva de teste com nome de usuário e senha no banco local. Não use credenciais nem banco de produção.
+  ```bash
+  FARMFIN_STRESS_BASE_URL=http://127.0.0.1:3000 \
+    FARMFIN_STRESS_IDENTIFIER=usuario-teste-local \
+    FARMFIN_STRESS_PASSWORD='<senha-da-conta-local>' \
+    npm run test:stress
+  ```
+  O teste usa cinco cenários com dez conexões por cinco segundos cada. Somente HTTP em loopback é permitido; staging e hosts remotos são bloqueados. Uma porta local alternativa é aceita em `FARMFIN_STRESS_BASE_URL`; o servidor iniciado pelo script é encerrado também em caso de falha na inicialização ou autenticação.
 
 ---
 

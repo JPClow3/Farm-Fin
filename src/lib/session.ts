@@ -20,14 +20,17 @@ export interface VerifiedSessionContext extends SessionContext {
 
 async function resolveBetterAuthSession(): Promise<VerifiedSessionContext | null> {
   const reqHeaders = await headers();
-  const session = await auth.api.getSession({ headers: reqHeaders });
+  const session = await auth.api.getSession({
+    headers: reqHeaders,
+    query: { disableCookieCache: true },
+  });
   if (!session?.user) return null;
 
   const user = session.user as typeof session.user & {
     organizationId?: string;
     role?: UserRoleType;
   };
-  const orgId = user.organizationId || DEFAULT_ORG_ID;
+  const orgId = user.organizationId || '';
   const role = (user.role as UserRoleType) || 'Produtor';
 
   return {
@@ -104,6 +107,9 @@ export async function getVerifiedSession(): Promise<VerifiedSessionContext | nul
 export async function getCurrentSession(): Promise<SessionContext> {
   const verified = await getVerifiedSession();
   if (verified) {
+    if (verified.kind === 'auth' && !verified.organizationId) {
+      throw new Error('Conclua o cadastro da organização antes de acessar seus dados.');
+    }
     const { kind: _kind, subject: _subject, ...session } = verified;
     return session;
   }

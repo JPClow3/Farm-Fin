@@ -4,7 +4,10 @@ export default [
   {
     ignores: [
       ".next/**",
+      "**/.next/**",
       ".open-next/**",
+      ".wrangler/**",
+      "**/.wrangler/**",
       "node_modules/**",
       "drizzle/**",
       "temp-app/**",

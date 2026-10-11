@@ -24,6 +24,8 @@ import { AgingAnalysisView } from '../../components/finance/AgingAnalysisView';
 import { useModuleGuard } from '../../lib/useModuleGuard';
 import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import {
   Plus,
   CircleDollarSign,
@@ -82,6 +84,9 @@ export default function ContasAReceberPage() {
   const [barterSettlingItem, setBarterSettlingItem] = useState<Receivable | null>(null);
   const [deletingReceivable, setDeletingReceivable] = useState<Receivable | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // New Receivable Form State
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
@@ -213,67 +218,84 @@ export default function ContasAReceberPage() {
 
   const handleCreateReceivable = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description || totalCalc <= 0) {
-      addToast({
-        type: 'warning',
-        title: 'Erro',
-        message: 'Preencha os dados da venda de forma válida.',
-      });
+    const errors: Record<string, string> = {};
+    if (!description.trim()) {
+      errors.description = 'Informe a identificação do contrato ou lote.';
+    }
+    const rawQty = parseFloat(quantity) || 0;
+    if (rawQty <= 0) {
+      errors.quantity = 'Informe uma quantidade válida maior que zero.';
+    }
+    const parsedUnitPrice = parseFloat(unitPrice.replace(',', '.')) || 0;
+    if (parsedUnitPrice <= 0) {
+      errors.unitPrice = 'Informe um preço unitário válido maior que zero.';
+    }
+    if (!dueDate) {
+      errors.dueDate = 'Informe a data de vencimento / liquidação.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
+    setFormErrors({});
 
     const selectedCust = customers.find((c) => c.id === customerId) || customers[0];
     const totalInst = parseInt(installmentsCount, 10) || 1;
-    const rawQty = parseFloat(quantity) || 0;
-    const parsedUnitPrice = parseFloat(unitPrice.replace(',', '.')) || 0;
 
     setIsSubmitting(true);
     try {
-    await addReceivable({
-      farmId: activeFarmId,
-      cropSeasonId: activeSeasonId,
-      customerId: selectedCust?.id || '',
-      customerName: selectedCust?.name || 'Cliente',
-      crop,
-      description,
-      commodityUnit,
-      quantity: rawQty,
-      bagsQuantity: equivalentBagsPreview,
-      unitPrice: parsedUnitPrice,
-      totalAmount: totalCalc,
-      dueDate,
-      status: 'pendente',
-      contractType,
-      linkedPayableId:
-        contractType === 'Barter Insumos' && linkedPayableId ? linkedPayableId : undefined,
-      barterStatus:
-        contractType === 'Barter Insumos' ? (linkedPayableId ? 'vinculado' : 'aberto') : 'nenhum',
-      hedgeType:
-        contractType === 'Hedge' || contractType === 'Contrato Futuro' ? hedgeType : 'Nenhum',
-      priceFixingStatus:
-        contractType === 'Hedge' || contractType === 'Contrato Futuro'
-          ? priceFixingStatus
-          : 'fixado',
-      referenceIndex:
-        contractType === 'Hedge' || contractType === 'Contrato Futuro' ? referenceIndex : undefined,
-      basis: contractType === 'Hedge' ? parseFloat(basis) || undefined : undefined,
-      targetPrice: contractType === 'Hedge' ? parseFloat(targetPrice) || undefined : undefined,
-      installmentsCount: totalInst,
-      recurrencePattern,
-    });
+      await addReceivable({
+        farmId: activeFarmId,
+        cropSeasonId: activeSeasonId,
+        customerId: selectedCust?.id || '',
+        customerName: selectedCust?.name || 'Cliente',
+        crop,
+        description: description.trim(),
+        commodityUnit,
+        quantity: rawQty,
+        bagsQuantity: equivalentBagsPreview,
+        unitPrice: parsedUnitPrice,
+        totalAmount: totalCalc,
+        dueDate,
+        status: 'pendente',
+        contractType,
+        linkedPayableId:
+          contractType === 'Barter Insumos' && linkedPayableId ? linkedPayableId : undefined,
+        barterStatus:
+          contractType === 'Barter Insumos' ? (linkedPayableId ? 'vinculado' : 'aberto') : 'nenhum',
+        hedgeType:
+          contractType === 'Hedge' || contractType === 'Contrato Futuro' ? hedgeType : 'Nenhum',
+        priceFixingStatus:
+          contractType === 'Hedge' || contractType === 'Contrato Futuro'
+            ? priceFixingStatus
+            : 'fixado',
+        referenceIndex:
+          contractType === 'Hedge' || contractType === 'Contrato Futuro' ? referenceIndex : undefined,
+        basis: contractType === 'Hedge' ? parseFloat(basis) || undefined : undefined,
+        targetPrice: contractType === 'Hedge' ? parseFloat(targetPrice) || undefined : undefined,
+        installmentsCount: totalInst,
+        recurrencePattern,
+      });
 
-    const recMsg = recurrencePattern !== 'none' ? ` (${recurrencePattern})` : '';
+      const recMsg = recurrencePattern !== 'none' ? ` (${recurrencePattern})` : '';
 
-    addToast({
-      type: 'success',
-      title: 'Venda / Contrato Registrado!',
-      message: `Contrato de R$ ${totalCalc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${recMsg} com ${selectedCust?.name || 'Cliente'} persistido com sucesso.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Venda / Contrato Registrado!',
+        message: `Contrato de R$ ${totalCalc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${recMsg} com ${selectedCust?.name || 'Cliente'} persistido com sucesso.`,
+      });
 
-    setIsNewModalOpen(false);
-    setDescription('');
-    setLinkedPayableId('');
-    setRecurrencePattern('none');
+      setIsNewModalOpen(false);
+      setDescription('');
+      setLinkedPayableId('');
+      setRecurrencePattern('none');
+    } catch (err: unknown) {
+      console.error(err);
+      addToast({
+        type: 'error',
+        title: 'Erro ao Salvar Contrato',
+        message: 'Não foi possível cadastrar o contrato no banco de dados. Tente novamente.',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -297,42 +319,67 @@ export default function ContasAReceberPage() {
     e.preventDefault();
     if (!editingReceivable) return;
 
-    const rawQty =
-      parseFloat(editQuantity) || editingReceivable.quantity || editingReceivable.bagsQuantity;
-    const price = parseFloat(editUnitPrice.replace(',', '.')) || editingReceivable.unitPrice;
+    const errors: Record<string, string> = {};
+    if (!editDescription.trim()) {
+      errors.description = 'Informe a identificação do contrato ou lote.';
+    }
+    const rawQty = parseFloat(editQuantity) || 0;
+    if (rawQty <= 0) {
+      errors.quantity = 'Informe uma quantidade válida maior que zero.';
+    }
+    const price = parseFloat(editUnitPrice.replace(',', '.')) || 0;
+    if (price <= 0) {
+      errors.unitPrice = 'Informe um preço unitário válido maior que zero.';
+    }
+    if (!editDueDate) {
+      errors.dueDate = 'Informe a data de vencimento / liquidação.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+    setEditFormErrors({});
+
     const newTotal = rawQty * price;
     const normalizedBags = calculateNormalizedBags(rawQty, editCommodityUnit);
 
     setIsSubmitting(true);
     try {
-    await updateReceivable(editingReceivable.id, {
-      description: editDescription,
-      commodityUnit: editCommodityUnit,
-      quantity: rawQty,
-      bagsQuantity: normalizedBags,
-      unitPrice: price,
-      totalAmount: newTotal,
-      dueDate: editDueDate,
-      contractType: editContractType,
-      linkedPayableId: editLinkedPayableId || undefined,
-      barterStatus:
-        editContractType === 'Barter Insumos'
-          ? editLinkedPayableId
-            ? 'vinculado'
-            : 'aberto'
-          : 'nenhum',
-      hedgeType: editHedgeType,
-      priceFixingStatus: editPriceFixingStatus,
-      referenceIndex: editReferenceIndex || undefined,
-    });
+      await updateReceivable(editingReceivable.id, {
+        description: editDescription.trim(),
+        commodityUnit: editCommodityUnit,
+        quantity: rawQty,
+        bagsQuantity: normalizedBags,
+        unitPrice: price,
+        totalAmount: newTotal,
+        dueDate: editDueDate,
+        contractType: editContractType,
+        linkedPayableId: editLinkedPayableId || undefined,
+        barterStatus:
+          editContractType === 'Barter Insumos'
+            ? editLinkedPayableId
+              ? 'vinculado'
+              : 'aberto'
+            : 'nenhum',
+        hedgeType: editHedgeType,
+        priceFixingStatus: editPriceFixingStatus,
+        referenceIndex: editReferenceIndex || undefined,
+      });
 
-    addToast({
-      type: 'success',
-      title: 'Contrato Atualizado!',
-      message: `Alterações em "${editDescription}" salvas com sucesso.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Contrato Atualizado!',
+        message: `Alterações em "${editDescription}" salvas com sucesso.`,
+      });
 
-    setEditingReceivable(null);
+      setEditingReceivable(null);
+    } catch (err: unknown) {
+      console.error(err);
+      addToast({
+        type: 'error',
+        title: 'Erro ao Atualizar',
+        message: 'Não foi possível salvar as alterações no banco de dados. Tente novamente.',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -692,6 +739,16 @@ export default function ContasAReceberPage() {
         </ClayButton>
       </div>
 
+      {/* Page Error State */}
+      {pageError && (
+        <ErrorState
+          title="Erro ao processar contas a receber"
+          description={pageError}
+          onRetry={() => setPageError(null)}
+          retryLabel="Tentar Novamente"
+        />
+      )}
+
       {/* KPIs Grid */}
       <div className="grid-4">
         <KpiCard
@@ -828,13 +885,39 @@ export default function ContasAReceberPage() {
             </div>
           </ClayCard>
 
-          {/* Table */}
-          <ClayTable
-            columns={columns}
-            data={filteredReceivables}
-            keyExtractor={(r) => r.id}
-            emptyMessage="Nenhum contrato a receber encontrado com os filtros selecionados."
-          />
+          {/* Table or EmptyState */}
+          {filteredReceivables.length === 0 ? (
+            <EmptyState
+              title={
+                activeReceivables.length === 0
+                  ? 'Nenhum contrato a receber encontrado'
+                  : 'Nenhum registro encontrado'
+              }
+              description={
+                activeReceivables.length === 0
+                  ? 'Não há contratos ou vendas cadastrados nesta safra. Registre um novo contrato de produção ou barter.'
+                  : 'Nenhum contrato corresponde aos filtros aplicados. Tente ajustar os filtros ou busca.'
+              }
+              actionLabel={
+                activeReceivables.length === 0 ? 'Nova Venda / Contrato' : 'Limpar Filtros'
+              }
+              onAction={() => {
+                if (activeReceivables.length === 0) {
+                  setIsNewModalOpen(true);
+                } else {
+                  setFilterMode('todos');
+                  setCustomerFilter('');
+                  setSearchTerm('');
+                }
+              }}
+            />
+          ) : (
+            <ClayTable
+              columns={columns}
+              data={filteredReceivables}
+              keyExtractor={(r) => r.id}
+            />
+          )}
         </>
       )}
 
@@ -861,12 +944,17 @@ export default function ContasAReceberPage() {
           onSubmit={handleCreateReceivable}
           className="flex-col"
           style={{ gap: 'var(--space-4)' }}
+          noValidate
         >
           <ClayInput
             label="Identificação do Contrato / Lote"
             placeholder="Ex: Contrato Futuro Soja Safra 25/26 - Lote Bunge"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (formErrors.description) setFormErrors((prev) => ({ ...prev, description: '' }));
+            }}
+            error={formErrors.description}
             required
           />
 
@@ -911,7 +999,11 @@ export default function ContasAReceberPage() {
               label={`Quantidade (${commodityUnit})`}
               type="number"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={(e) => {
+                setQuantity(e.target.value);
+                if (formErrors.quantity) setFormErrors((prev) => ({ ...prev, quantity: '' }));
+              }}
+              error={formErrors.quantity}
               required
             />
             <ClayInput
@@ -919,7 +1011,11 @@ export default function ContasAReceberPage() {
               type="number"
               step="0.01"
               value={unitPrice}
-              onChange={(e) => setUnitPrice(e.target.value)}
+              onChange={(e) => {
+                setUnitPrice(e.target.value);
+                if (formErrors.unitPrice) setFormErrors((prev) => ({ ...prev, unitPrice: '' }));
+              }}
+              error={formErrors.unitPrice}
               required
             />
           </div>
@@ -963,7 +1059,11 @@ export default function ContasAReceberPage() {
               label="Previsão de Liquidação"
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e) => {
+                setDueDate(e.target.value);
+                if (formErrors.dueDate) setFormErrors((prev) => ({ ...prev, dueDate: '' }));
+              }}
+              error={formErrors.dueDate}
               required
             />
           </div>
@@ -1347,11 +1447,15 @@ export default function ContasAReceberPage() {
           title="Editar Contrato de Venda"
           subtitle={`Atualizar dados de ${editingReceivable.description}`}
         >
-          <form onSubmit={handleConfirmEdit} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+          <form onSubmit={handleConfirmEdit} className="flex-col" style={{ gap: 'var(--space-4)' }} noValidate>
             <ClayInput
               label="Descrição"
               value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
+              onChange={(e) => {
+                setEditDescription(e.target.value);
+                if (editFormErrors.description) setEditFormErrors((prev) => ({ ...prev, description: '' }));
+              }}
+              error={editFormErrors.description}
               required
             />
             <div
@@ -1373,7 +1477,11 @@ export default function ContasAReceberPage() {
                 label="Quantidade"
                 type="number"
                 value={editQuantity}
-                onChange={(e) => setEditQuantity(e.target.value)}
+                onChange={(e) => {
+                  setEditQuantity(e.target.value);
+                  if (editFormErrors.quantity) setEditFormErrors((prev) => ({ ...prev, quantity: '' }));
+                }}
+                error={editFormErrors.quantity}
                 required
               />
               <ClayInput
@@ -1381,7 +1489,11 @@ export default function ContasAReceberPage() {
                 type="number"
                 step="0.01"
                 value={editUnitPrice}
-                onChange={(e) => setEditUnitPrice(e.target.value)}
+                onChange={(e) => {
+                  setEditUnitPrice(e.target.value);
+                  if (editFormErrors.unitPrice) setEditFormErrors((prev) => ({ ...prev, unitPrice: '' }));
+                }}
+                error={editFormErrors.unitPrice}
                 required
               />
             </div>
@@ -1401,7 +1513,11 @@ export default function ContasAReceberPage() {
                 label="Previsão de Liquidação"
                 type="date"
                 value={editDueDate}
-                onChange={(e) => setEditDueDate(e.target.value)}
+                onChange={(e) => {
+                  setEditDueDate(e.target.value);
+                  if (editFormErrors.dueDate) setEditFormErrors((prev) => ({ ...prev, dueDate: '' }));
+                }}
+                error={editFormErrors.dueDate}
                 required
               />
             </div>

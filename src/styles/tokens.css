@@ -75,8 +75,24 @@
   --color-info: #4a90c4;
   --color-info-dark: #2f6a9e;
 
+  /* ── Semantic Numeric Variables ── */
+  --color-success-500: var(--color-success);
+  --color-success-600: #4a8d2f;
+  --color-success-700: var(--color-success-dark);
+
+  --color-danger-500: var(--color-danger);
+  --color-danger-600: #bc3e28;
+  --color-danger-700: var(--color-danger-dark);
+
+  --color-warning-500: var(--color-warning);
+  --color-warning-600: #cf930e;
+  --color-warning-700: var(--color-warning-dark);
+
+  --color-info-500: var(--color-info);
+
   /* ── Background Surfaces ── */
   --bg-page: #faf8f5;
+  --bg-surface: #ffffff;
   --bg-surface-1: #ffffff;
   --bg-surface-2: #f5f0e8;
   --bg-surface-3: #ede6db;
@@ -192,6 +208,8 @@
     6px 6px 12px rgba(212, 168, 85, 0.2), inset -3px -3px 6px rgba(255, 255, 255, 0.65),
     inset 3px 3px 6px rgba(212, 168, 85, 0.12);
 
+  --shadow-clay-card: var(--clay-shadow-md);
+
   /* ──────────────────────────────────────────────────────────
      BORDER RADIUS (generous for clay look)
      ────────────────────────────────────────────────────────── */
@@ -205,6 +223,8 @@
   /* ──────────────────────────────────────────────────────────
      BORDERS
      ────────────────────────────────────────────────────────── */
+  --border-color: rgba(212, 201, 186, 0.5);
+  --border-subtle: rgba(212, 201, 186, 0.4);
   --border-light: 1px solid rgba(212, 201, 186, 0.4);
   --border-medium: 1px solid rgba(212, 201, 186, 0.6);
   --border-focus: 2px solid var(--color-primary-400);

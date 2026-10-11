@@ -26,6 +26,8 @@ import { sendDueDateAlertsNotificationAction } from '../../actions/finance';
 import { useModuleGuard } from '../../lib/useModuleGuard';
 import { AppShellSkeleton } from '../../components/layout/AppShellSkeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import {
   Plus,
   CreditCard,
@@ -112,6 +114,11 @@ export default function ContasAPagarPage() {
   const [paymentDate, setPaymentDate] = useState(todayStr);
   const [discountInterest, setDiscountInterest] = useState('0');
 
+  // Form Validation & Page Error States
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
+  const [pageError, setPageError] = useState<string | null>(null);
+
   // Consolidated Due Date Alerts
   const alertsSummary = useMemo(() => {
     return calculateDueDateAlertSummary(activePayables, [], todayStr);
@@ -158,55 +165,71 @@ export default function ContasAPagarPage() {
   // Handlers
   const handleCreatePayable = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+    if (!description.trim()) {
+      errors.description = 'Informe a descrição da despesa.';
+    }
     const numAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0;
-    if (!description || numAmount <= 0) {
-      addToast({
-        type: 'warning',
-        title: 'Erro',
-        message: 'Preencha a descrição e valor válidos.',
-      });
+    if (numAmount <= 0) {
+      errors.amount = 'Informe um valor maior que zero.';
+    }
+    if (!dueDate) {
+      errors.dueDate = 'Informe a data de vencimento.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
+    setFormErrors({});
 
     const selectedSup = suppliers.find((s) => s.id === supplierId) || suppliers[0];
     const totalInst = parseInt(installmentsCount, 10) || 1;
 
-    await addPayable({
-      farmId: activeFarmId,
-      cropSeasonId: activeSeasonId,
-      fieldId: fieldId || undefined,
-      supplierId: selectedSup?.id || '',
-      supplierName: selectedSup?.name || 'Fornecedor',
-      category,
-      description,
-      amount: numAmount,
-      dueDate,
-      status: requiresApproval ? 'pendente' : 'pendente',
-      installmentsCount: totalInst,
-      recurrencePattern,
-      requiresApproval,
-      approvalStatus: requiresApproval ? 'pendente' : 'aprovado',
-      hasAttachment: true,
-    });
+    try {
+      await addPayable({
+        farmId: activeFarmId,
+        cropSeasonId: activeSeasonId,
+        fieldId: fieldId || undefined,
+        supplierId: selectedSup?.id || '',
+        supplierName: selectedSup?.name || 'Fornecedor',
+        category,
+        description: description.trim(),
+        amount: numAmount,
+        dueDate,
+        status: requiresApproval ? 'pendente' : 'pendente',
+        installmentsCount: totalInst,
+        recurrencePattern,
+        requiresApproval,
+        approvalStatus: requiresApproval ? 'pendente' : 'aprovado',
+        hasAttachment: true,
+      });
 
-    const recLabel =
-      recurrencePattern !== 'none'
-        ? ` recorrente (${recurrencePattern})`
-        : totalInst > 1
-          ? ` em ${totalInst} parcelas`
-          : '';
+      const recLabel =
+        recurrencePattern !== 'none'
+          ? ` recorrente (${recurrencePattern})`
+          : totalInst > 1
+            ? ` em ${totalInst} parcelas`
+            : '';
 
-    addToast({
-      type: 'success',
-      title: 'Lançamento Criado!',
-      message: `Conta cadastrada${recLabel} para ${selectedSup?.name || 'Fornecedor'}${requiresApproval ? ' (Aguardando Aprovação)' : ''}.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Lançamento Criado!',
+        message: `Conta cadastrada${recLabel} para ${selectedSup?.name || 'Fornecedor'}${requiresApproval ? ' (Aguardando Aprovação)' : ''}.`,
+      });
 
-    setIsNewModalOpen(false);
-    setDescription('');
-    setAmount('');
-    setRecurrencePattern('none');
-    setRequiresApproval(false);
+      setIsNewModalOpen(false);
+      setDescription('');
+      setAmount('');
+      setRecurrencePattern('none');
+      setRequiresApproval(false);
+    } catch (err: unknown) {
+      console.error(err);
+      addToast({
+        type: 'error',
+        title: 'Erro ao Salvar Conta',
+        message: 'Não foi possível cadastrar a conta no banco de dados. Tente novamente.',
+      });
+    }
   };
 
   const handleApprove = async (p: Payable) => {
@@ -270,24 +293,48 @@ export default function ContasAPagarPage() {
     e.preventDefault();
     if (!editingPayable) return;
 
+    const errors: Record<string, string> = {};
+    if (!editDescription.trim()) {
+      errors.description = 'Informe a descrição da despesa.';
+    }
     const numAmount =
-      parseFloat(editAmount.replace(/\./g, '').replace(',', '.')) || editingPayable.amount;
+      parseFloat(editAmount.replace(/\./g, '').replace(',', '.')) || 0;
+    if (numAmount <= 0) {
+      errors.amount = 'Informe um valor maior que zero.';
+    }
+    if (!editDueDate) {
+      errors.dueDate = 'Informe a data de vencimento.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+    setEditFormErrors({});
 
-    await updatePayable(editingPayable.id, {
-      description: editDescription,
-      amount: numAmount,
-      dueDate: editDueDate,
-      category: editCategory,
-      fieldId: editFieldId || undefined,
-    });
+    try {
+      await updatePayable(editingPayable.id, {
+        description: editDescription.trim(),
+        amount: numAmount,
+        dueDate: editDueDate,
+        category: editCategory,
+        fieldId: editFieldId || undefined,
+      });
 
-    addToast({
-      type: 'success',
-      title: 'Conta Atualizada!',
-      message: `Alterações em "${editDescription}" salvas com sucesso.`,
-    });
+      addToast({
+        type: 'success',
+        title: 'Conta Atualizada!',
+        message: `Alterações em "${editDescription}" salvas com sucesso.`,
+      });
 
-    setEditingPayable(null);
+      setEditingPayable(null);
+    } catch (err: unknown) {
+      console.error(err);
+      addToast({
+        type: 'error',
+        title: 'Erro ao Atualizar',
+        message: 'Não foi possível salvar as alterações no banco de dados. Tente novamente.',
+      });
+    }
   };
 
   const handleConfirmPay = async (e: React.FormEvent) => {
@@ -594,6 +641,16 @@ export default function ContasAPagarPage() {
         </div>
       </div>
 
+      {/* Page Error State */}
+      {pageError && (
+        <ErrorState
+          title="Erro ao processar contas a pagar"
+          description={pageError}
+          onRetry={() => setPageError(null)}
+          retryLabel="Tentar Novamente"
+        />
+      )}
+
       {/* KPIs Grid */}
       <div className="grid-4">
         <KpiCard
@@ -724,8 +781,8 @@ export default function ContasAPagarPage() {
                           width: '16px',
                           height: '16px',
                           borderRadius: '50%',
-                          background: '#dc2626',
-                          color: '#fff',
+                          background: 'var(--color-danger)',
+                          color: 'var(--text-on-primary)',
                           fontSize: '9px',
                           fontWeight: 'bold',
                           display: 'flex',
@@ -771,13 +828,38 @@ export default function ContasAPagarPage() {
             </div>
           </ClayCard>
 
-          {/* Table */}
-          <ClayTable
-            columns={columns}
-            data={filteredPayables}
-            keyExtractor={(p) => p.id}
-            emptyMessage="Nenhuma conta a pagar encontrada com os filtros selecionados."
-          />
+          {/* Table or EmptyState */}
+          {filteredPayables.length === 0 ? (
+            <EmptyState
+              title={
+                activePayables.length === 0
+                  ? 'Nenhuma conta a pagar cadastrada'
+                  : 'Nenhuma conta encontrada'
+              }
+              description={
+                activePayables.length === 0
+                  ? 'Não há contas a pagar cadastradas nesta safra. Cadastre sua primeira obrigação financeira.'
+                  : 'Nenhuma conta corresponde aos filtros ou busca selecionados. Ajuste os filtros para visualizar.'
+              }
+              actionLabel={activePayables.length === 0 ? 'Nova Conta a Pagar' : 'Limpar Filtros'}
+              onAction={() => {
+                if (activePayables.length === 0) {
+                  setIsNewModalOpen(true);
+                } else {
+                  setStatusFilter('todos');
+                  setSupplierFilter('');
+                  setSearchTerm('');
+                  setAlertCategoryFilter(null);
+                }
+              }}
+            />
+          ) : (
+            <ClayTable
+              columns={columns}
+              data={filteredPayables}
+              keyExtractor={(p) => p.id}
+            />
+          )}
         </>
       )}
 
@@ -800,12 +882,16 @@ export default function ContasAPagarPage() {
         title="Nova Conta a Pagar"
         subtitle="Cadastre uma obrigação financeira com parcelamento automático no banco de dados"
       >
-        <form onSubmit={handleCreatePayable} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+        <form onSubmit={handleCreatePayable} className="flex-col" style={{ gap: 'var(--space-4)' }} noValidate>
           <ClayInput
             label="Descrição da Despesa"
             placeholder="Ex: Compra de Fertilizante NPK 04-14-08"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (formErrors.description) setFormErrors((prev) => ({ ...prev, description: '' }));
+            }}
+            error={formErrors.description}
             required
           />
 
@@ -816,14 +902,22 @@ export default function ContasAPagarPage() {
               type="number"
               step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                if (formErrors.amount) setFormErrors((prev) => ({ ...prev, amount: '' }));
+              }}
+              error={formErrors.amount}
               required
             />
             <ClayInput
               label="Data do 1º Vencimento"
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e) => {
+                setDueDate(e.target.value);
+                if (formErrors.dueDate) setFormErrors((prev) => ({ ...prev, dueDate: '' }));
+              }}
+              error={formErrors.dueDate}
               required
             />
           </div>
@@ -949,11 +1043,15 @@ export default function ContasAPagarPage() {
           title="Editar Conta a Pagar"
           subtitle={`Atualizar dados de ${editingPayable.description}`}
         >
-          <form onSubmit={handleConfirmEdit} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+          <form onSubmit={handleConfirmEdit} className="flex-col" style={{ gap: 'var(--space-4)' }} noValidate>
             <ClayInput
               label="Descrição"
               value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
+              onChange={(e) => {
+                setEditDescription(e.target.value);
+                if (editFormErrors.description) setEditFormErrors((prev) => ({ ...prev, description: '' }));
+              }}
+              error={editFormErrors.description}
               required
             />
             <div className="form-grid-2">
@@ -962,14 +1060,22 @@ export default function ContasAPagarPage() {
                 type="number"
                 step="0.01"
                 value={editAmount}
-                onChange={(e) => setEditAmount(e.target.value)}
+                onChange={(e) => {
+                  setEditAmount(e.target.value);
+                  if (editFormErrors.amount) setEditFormErrors((prev) => ({ ...prev, amount: '' }));
+                }}
+                error={editFormErrors.amount}
                 required
               />
               <ClayInput
                 label="Data de Vencimento"
                 type="date"
                 value={editDueDate}
-                onChange={(e) => setEditDueDate(e.target.value)}
+                onChange={(e) => {
+                  setEditDueDate(e.target.value);
+                  if (editFormErrors.dueDate) setEditFormErrors((prev) => ({ ...prev, dueDate: '' }));
+                }}
+                error={editFormErrors.dueDate}
                 required
               />
             </div>
