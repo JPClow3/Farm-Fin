@@ -74,6 +74,17 @@ O **Farm-Fin** é uma plataforma moderna desenvolvida especificamente para o agr
   npm run lint
   ```
 
+- **Executar os testes E2E de login** (instale o Chromium uma vez com `npx playwright install chromium`):
+  ```bash
+  npm run test:e2e
+  ```
+
+- **Fazer uma carga controlada na tela de login** (use uma URL local ou de staging):
+  ```bash
+  FARMFIN_STRESS_BASE_URL=http://localhost:3000 npm run test:stress
+  ```
+  Ajuste `FARMFIN_STRESS_REQUESTS` (1–5000) e `FARMFIN_STRESS_CONCURRENCY` (1–100) para mudar o volume. Hosts de produção são bloqueados por padrão.
+
 ---
 
 ## 📂 Estrutura de Pastas

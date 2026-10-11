@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import * as schema from '@/db/schema';
-import { DEFAULT_ORG_ID } from '@/db/seed';
+import { eq } from 'drizzle-orm';
 import { getCurrentSession, SessionContext } from '@/lib/session';
 import { registerSchema, RegisterInput } from '@/lib/validations/auth.schema';
 
@@ -16,6 +16,7 @@ export interface RegisterResult {
   user?: {
     id: string;
     name: string;
+    username?: string | null;
     email: string;
     role: string;
     organizationId: string;
@@ -39,10 +40,26 @@ export async function registerUserAction(input: RegisterInput): Promise<Register
     };
   }
 
-  const { name, email, role, organizationName } = validated.data;
+  const { name, username, email, role, organizationName } = validated.data;
 
   try {
-    // 1. Create Tenant Organization
+    // Better Auth has already created the credential and user before this action
+    // attaches the tenant. Reuse that row when it matches the submitted identity.
+    const existingUser = await db.query.users.findFirst({
+      where: (u, { or, eq: equals }) => or(equals(u.email, email), equals(u.username, username)),
+    });
+
+    if (existingUser) {
+      if (existingUser.username?.toLowerCase() !== username.toLowerCase()) {
+        return { success: false, error: 'Este e-mail já está cadastrado.' };
+      }
+      if (existingUser.email.toLowerCase() !== email.toLowerCase()) {
+        return { success: false, error: 'Este nome de usuário já está em uso.' };
+      }
+    }
+    if (!existingUser) throw new Error('Conta não encontrada após a autenticação.');
+
+    // 1. Create tenant organization
     const [newOrg] = await db
       .insert(schema.organizations)
       .values({
@@ -51,21 +68,15 @@ export async function registerUserAction(input: RegisterInput): Promise<Register
       })
       .returning();
 
-    const orgId = newOrg ? newOrg.id : DEFAULT_ORG_ID;
+    if (!newOrg) throw new Error('Não foi possível criar a organização.');
+    const orgId = newOrg.id;
 
-    // 2. Create User record in database
-    const [newUser] = await db
-      .insert(schema.users)
-      .values({
-        name,
-        email,
-        role,
-        organizationId: orgId,
-        emailVerified: true,
-      })
-      .returning();
-
-    const userId = newUser ? newUser.id : `u-${Date.now()}`;
+    // Better Auth created the credential and account row before tenant setup.
+    await db
+      .update(schema.users)
+      .set({ name, username, displayUsername: username, role, organizationId: orgId })
+      .where(eq(schema.users.id, existingUser.id));
+    const userId = existingUser.id;
 
     // 3. Assign User Role
     try {
@@ -96,6 +107,7 @@ export async function registerUserAction(input: RegisterInput): Promise<Register
       user: {
         id: userId,
         name,
+        username,
         email,
         role,
         organizationId: orgId,
@@ -105,26 +117,25 @@ export async function registerUserAction(input: RegisterInput): Promise<Register
         name: organizationName,
       },
     };
-  } catch (err) {
-    // Graceful optimistic fallback for preview/local environments without live DB
-    console.warn('[registerUserAction] DB insertion warning, using optimistic response:', err);
-
-    const fallbackOrgId = `org-${Date.now()}`;
-    const fallbackUserId = `user-${Date.now()}`;
+  } catch (err: unknown) {
+    const errorObj = err as { code?: string; message?: string } | null;
+    if (
+      errorObj?.code === '23505' ||
+      errorObj?.message?.includes('unique') ||
+      errorObj?.message?.includes('duplicate key')
+    ) {
+      const isUsername = errorObj?.message?.includes('username');
+      return {
+        success: false,
+        error: isUsername
+          ? 'Este nome de usuário já está em uso.'
+          : 'Este e-mail já está cadastrado.',
+      };
+    }
 
     return {
-      success: true,
-      user: {
-        id: fallbackUserId,
-        name,
-        email,
-        role,
-        organizationId: fallbackOrgId,
-      },
-      organization: {
-        id: fallbackOrgId,
-        name: organizationName,
-      },
+      success: false,
+      error: 'Não foi possível finalizar o cadastro agora. Tente novamente em instantes.',
     };
   }
 }

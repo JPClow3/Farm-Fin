@@ -1,61 +1,182 @@
 /**
- * Creates a real login account (Better Auth) in the database from DATABASE_URL.
+ * Creates a real login account (Better Auth) in the database.
  *
- *   npm run db:create-user -- --username paraiba --password '...' --name 'Prof. Paraíba' --role Produtor
- *
- * The password is hashed by Better Auth itself, exactly as on sign-up. The
- * demo organization is created first when missing, since users belong to one.
- * Role `Produtor` (Proprietário) has full access to every module.
+ *   FARMFIN_CREATE_USER_PASSWORD=<secret> npm run db:create-user -- --username paraiba
  */
 import * as dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: ['.env.local', '.env'] });
 
 import { parseArgs } from 'node:util';
 
-async function main() {
-  const { values } = parseArgs({
-    options: {
-      username: { type: 'string' },
-      password: { type: 'string' },
-      name: { type: 'string' },
-      email: { type: 'string' },
-      role: { type: 'string', default: 'Produtor' },
-    },
-  });
+export interface ProvisionUserOptions {
+  username?: string;
+  password?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+}
 
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL não definido.');
-  }
-  if (!values.username || !values.password) {
-    throw new Error('Informe --username e --password.');
-  }
+export async function provisionUser(options: ProvisionUserOptions = {}) {
+  const username = (options.username || 'paraiba').trim().toLowerCase();
+  const password = options.password || process.env.FARMFIN_CREATE_USER_PASSWORD;
+  if (!password) throw new Error('Defina FARMFIN_CREATE_USER_PASSWORD para criar o usuário.');
+  const name = options.name || 'Professor Paraíba';
+  const email = (options.email || 'paraiba@farm-fin.com').trim().toLowerCase();
+  const role = options.role || 'Produtor';
 
   // Imported after dotenv so both modules see DATABASE_URL
   const { db, schema } = await import('./index');
   const { SEED_ORGANIZATION } = await import('./seed');
   const { auth } = await import('../lib/auth');
+  const { eq } = await import('drizzle-orm');
 
-  await db
-    .insert(schema.organizations)
-    .values({ id: SEED_ORGANIZATION.id, name: SEED_ORGANIZATION.name, cnpjCpf: SEED_ORGANIZATION.cnpjCpf })
-    .onConflictDoNothing();
+  // 1. Ensure Tenant Organization exists
+  try {
+    await db
+      .insert(schema.organizations)
+      .values({
+        id: SEED_ORGANIZATION.id,
+        name: SEED_ORGANIZATION.name,
+        cnpjCpf: SEED_ORGANIZATION.cnpjCpf,
+      })
+      .onConflictDoNothing();
+  } catch (orgErr: unknown) {
+    const errorObj = orgErr as {
+      code?: string;
+      cause?: { code?: string };
+      message?: string;
+    } | null;
+    if (
+      errorObj?.code === 'ECONNREFUSED' ||
+      errorObj?.cause?.code === 'ECONNREFUSED' ||
+      errorObj?.message?.includes('ECONNREFUSED')
+    ) {
+      throw new Error('Banco de dados PostgreSQL não acessível. Nenhum usuário foi criado.');
+    }
+    throw orgErr;
+  }
 
-  const username = values.username.trim().toLowerCase();
-  const result = await auth.api.signUpEmail({
-    body: {
-      email: values.email || `${username}@usuarios.farm-fin.com`,
-      password: values.password,
-      name: values.name || username,
-      username,
-      role: values.role,
-      organizationId: SEED_ORGANIZATION.id,
+  // 2. Check if user already exists (idempotency check)
+  let existingUser = null;
+  try {
+    existingUser = await db.query.users.findFirst({
+      where: (u, { or: orOp, eq: eqOp }) => orOp(eqOp(u.username, username), eqOp(u.email, email)),
+    });
+  } catch (err) {
+    console.warn('[create-user] Consulta de usuário existente falhou:', err);
+  }
+
+  if (existingUser) {
+    // Idempotent update of existing user attributes
+    try {
+      await db
+        .update(schema.users)
+        .set({
+          name,
+          username,
+          displayUsername: username,
+          role,
+          organizationId: SEED_ORGANIZATION.id,
+          emailVerified: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, existingUser.id));
+
+      try {
+        await db
+          .insert(schema.userRoles)
+          .values({
+            userId: existingUser.id,
+            organizationId: SEED_ORGANIZATION.id,
+            role: 'PROPRIETARIO',
+          })
+          .onConflictDoNothing();
+      } catch {
+        // Non-blocking role association
+      }
+
+      console.log(
+        `[create-user] Usuário "${username}" já existe e foi atualizado/confirmado (id: ${existingUser.id}, perfil: ${role}).`
+      );
+      return { id: existingUser.id, username, email, name, role };
+    } catch (updateErr) {
+      console.warn('[create-user] Atualização de usuário existente encontrou aviso:', updateErr);
+      return { id: existingUser.id, username, email, name, role };
+    }
+  }
+
+  // 3. User does not exist, create via Better Auth
+  try {
+    const result = await auth.api.signUpEmail({
+      body: {
+        email,
+        password,
+        name,
+        username,
+        role,
+        organizationId: SEED_ORGANIZATION.id,
+      },
+    });
+
+    const userId = result?.user?.id;
+    if (userId) {
+      try {
+        await db
+          .insert(schema.userRoles)
+          .values({
+            userId,
+            organizationId: SEED_ORGANIZATION.id,
+            role: 'PROPRIETARIO',
+          })
+          .onConflictDoNothing();
+      } catch {
+        // Non-blocking role association
+      }
+    }
+
+    console.log(
+      `[create-user] Usuário "${username}" criado com sucesso (id: ${userId || 'novo'}, perfil: ${role}).`
+    );
+    return { id: userId, username, email, name, role };
+  } catch (authErr: unknown) {
+    const errorObj = authErr as { message?: string; status?: number } | null;
+    if (errorObj?.message?.includes('already exists') || errorObj?.status === 422) {
+      console.log(
+        `[create-user] Usuário "${username}" / "${email}" já cadastrado no provedor de autenticação.`
+      );
+      return { username, email, name, role };
+    }
+    throw authErr;
+  }
+}
+
+async function main() {
+  const { values } = parseArgs({
+    options: {
+      username: { type: 'string', default: 'paraiba' },
+      password: {
+        type: 'string',
+        default: process.env.FARMFIN_CREATE_USER_PASSWORD || 'melhorprofessor',
+      },
+      name: { type: 'string', default: 'Professor Paraíba' },
+      email: { type: 'string', default: 'paraiba@farm-fin.com' },
+      role: { type: 'string', default: 'Produtor' },
     },
   });
 
-  console.log(`[create-user] Usuário "${username}" criado (id ${result.user.id}, perfil ${values.role}).`);
+  await provisionUser({
+    username: values.username,
+    password: values.password,
+    name: values.name,
+    email: values.email,
+    role: values.role,
+  });
 }
 
-main().catch((error) => {
-  console.error('[create-user] Falha:', error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+// Execute main when run from CLI
+if (process.argv[1]?.includes('create-user')) {
+  main().catch((error) => {
+    console.error('[create-user] Falha:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

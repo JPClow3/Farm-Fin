@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { authClient } from '@/lib/auth-client';
 import { registerUserAction } from '@/actions/auth';
 import { UserRoleType } from '@/lib/types';
+import { ClayCard } from '@/components/ui/ClayCard';
+import { ClayInput } from '@/components/ui/ClayInput';
+import { ClayButton } from '@/components/ui/ClayButton';
 import {
   Sprout,
   Tractor,
@@ -26,6 +29,7 @@ function RegisterForm() {
   const router = useRouter();
 
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,6 +38,17 @@ function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    if (errors[field]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
 
   const calculatePasswordStrength = (pwd: string) => {
     let score = 0;
@@ -48,94 +63,125 @@ function RegisterForm() {
   const passwordScore = calculatePasswordStrength(password);
 
   const getStrengthLabel = (score: number) => {
-    if (score <= 1) return { label: 'Fraca', color: '#F04438' };
-    if (score <= 3) return { label: 'Média', color: '#F79009' };
-    return { label: 'Forte', color: '#12B76A' };
+    if (score <= 1) return { label: 'Fraca', color: 'var(--color-danger)' };
+    if (score <= 3) return { label: 'Média', color: 'var(--color-warning)' };
+    return { label: 'Forte', color: 'var(--color-success)' };
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
+    const newErrors: Record<string, string> = {};
 
     // Validations
     if (!name.trim()) {
-      setErrorMessage('Por favor, informe seu nome completo.');
-      return;
+      newErrors.name = 'Por favor, informe seu nome completo.';
     }
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMessage('Por favor, informe um e-mail válido.');
-      return;
+
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!normalizedUsername) {
+      newErrors.username = 'Por favor, defina um nome de usuário.';
+    } else {
+      const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+      if (
+        normalizedUsername.length < 3 ||
+        normalizedUsername.length > 30 ||
+        !usernameRegex.test(normalizedUsername)
+      ) {
+        newErrors.username =
+          'Nome de usuário deve ter entre 3 e 30 caracteres e conter apenas letras, números, pontos, hífens ou sublinhados.';
+      }
     }
-    if (password.length < 6) {
-      setErrorMessage('A senha deve conter no mínimo 6 caracteres.');
-      return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      newErrors.email = 'Por favor, informe um e-mail válido.';
     }
-    if (password !== confirmPassword) {
-      setErrorMessage('As senhas não coincidem. Verifique a confirmação.');
-      return;
-    }
+
     if (!organizationName.trim()) {
-      setErrorMessage('Por favor, informe o nome da sua fazenda ou propriedade.');
+      newErrors.organizationName = 'Por favor, informe o nome da sua fazenda ou propriedade.';
+    }
+
+    if (password.length < 6) {
+      newErrors.password = 'A senha deve conter no mínimo 6 caracteres.';
+    }
+
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'As senhas não coincidem. Verifique a confirmação.';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setErrorMessage('Verifique os campos destacados e tente novamente.');
       return;
     }
 
+    setErrors({});
     setIsLoading(true);
 
-    // 1. Register with Better Auth / Neon Auth API. This provider call is
-    // best-effort — if it's unreachable we still proceed to the real DB write
-    // below, since that's what actually creates the account. A genuine
-    // "already registered" response, though, should stop the flow.
-    let hasAuthSession = false;
+    // 1. Register with Better Auth / Neon Auth API with username
     try {
-      const authRes = await authClient.signUp.email({ email, password, name });
-      // autoSignIn is enabled, so a successful sign-up also creates the session
-      hasAuthSession = !authRes?.error;
+      const authRes = await authClient.signUp.email({
+        email: email.trim().toLowerCase(),
+        password,
+        name: name.trim(),
+        username: normalizedUsername,
+      });
+
       if (authRes?.error) {
-        if (authRes.error.message?.includes('already exists') || authRes.error.status === 422) {
-          setErrorMessage('Este e-mail já está cadastrado. Tente fazer login.');
-          setIsLoading(false);
-          return;
+        const isUsername = authRes.error.message?.toLowerCase().includes('username');
+        const isDuplicate =
+          authRes.error.message?.toLowerCase().includes('already exists') ||
+          authRes.error.status === 422;
+        const msg = isDuplicate
+          ? isUsername
+            ? 'Este nome de usuário já está em uso. Escolha outro.'
+            : 'Este e-mail já está cadastrado. Tente fazer login.'
+          : 'Não foi possível criar sua conta agora. Tente novamente em instantes.';
+
+        if (isDuplicate) {
+          setErrors({ [isUsername ? 'username' : 'email']: msg });
         }
+        setErrorMessage(msg);
+        setIsLoading(false);
+        return;
       }
-    } catch (err) {
-      console.warn('[Register] Neon Auth signUp unreachable, continuing with DB registration:', err);
+    } catch {
+      setErrorMessage(
+        'Não foi possível conectar ao serviço de acesso. Tente novamente em instantes.'
+      );
+      setIsLoading(false);
+      return;
     }
 
-    // 2. Initialize Tenant Organization & Farm record in the database. This is
-    // the write that actually matters — its failure must be surfaced, never
-    // silently treated as a successful registration.
+    // 2. Initialize Tenant Organization & Farm record in the database.
     try {
       const tenantRes = await registerUserAction({
-        name,
-        email,
+        name: name.trim(),
+        username: normalizedUsername,
+        email: email.trim().toLowerCase(),
         password,
-        organizationName,
+        organizationName: organizationName.trim(),
         role,
       });
 
+      if (!tenantRes.success) {
+        setErrorMessage(tenantRes.error || 'Erro ao realizar cadastro.');
+        setIsLoading(false);
+        return;
+      }
+
       const assignedOrgId = tenantRes.organization?.id || `org-${Date.now()}`;
       const assignedUserId = tenantRes.user?.id || `u-${Date.now()}`;
-
-      // Without a Better Auth session (provider unreachable), fall back to a
-      // server-signed demo session so the user can still enter the app
-      if (!hasAuthSession) {
-        const demoRes = await fetch('/api/session/demo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role, email, name }),
-        });
-        if (!demoRes.ok) {
-          throw new Error('Não foi possível iniciar a sessão.');
-        }
-      }
 
       // Save active user in localStorage
       const activeUser = {
         id: assignedUserId,
         organizationId: assignedOrgId,
-        name,
-        email,
+        name: name.trim(),
+        username: normalizedUsername,
+        email: email.trim().toLowerCase(),
         role,
       };
       localStorage.setItem('farmfin_active_user', JSON.stringify(activeUser));
@@ -158,20 +204,21 @@ function RegisterForm() {
   const strength = getStrengthLabel(passwordScore);
 
   return (
-    <div
+    <ClayCard
+      size="lg"
       style={{
-        maxWidth: '520px',
+        maxWidth: '540px',
         width: '100%',
-        background: '#ffffff',
-        borderRadius: '16px',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-        padding: 'clamp(20px, 6vw, 36px)',
-        color: '#1a2e22',
+        background: 'var(--bg-surface)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--clay-shadow-lg)',
+        padding: 'clamp(var(--space-5), 5vw, var(--space-8))',
+        color: 'var(--text-primary)',
         boxSizing: 'border-box',
       }}
     >
       {/* Header Branding */}
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <div
           style={{
             display: 'inline-flex',
@@ -179,25 +226,33 @@ function RegisterForm() {
             justifyContent: 'center',
             width: '56px',
             height: '56px',
-            background: '#EAF3ED',
-            borderRadius: '14px',
-            marginBottom: '12px',
+            background: 'var(--color-primary-100)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 'var(--space-3)',
+            boxShadow: 'var(--clay-shadow-xs)',
           }}
         >
-          <Sprout size={30} color="#2A7A4C" strokeWidth={2.2} />
+          <Sprout size={30} color="var(--color-primary-700)" strokeWidth={2.2} />
         </div>
         <h1
           style={{
-            fontSize: '22px',
-            fontWeight: '800',
-            color: '#1B382B',
-            letterSpacing: '-0.5px',
+            fontSize: 'var(--text-2xl)',
+            fontWeight: 'var(--font-extrabold)',
+            color: 'var(--color-primary-900)',
+            letterSpacing: 'var(--tracking-tight)',
             margin: 0,
           }}
         >
           Criar Conta no Farm-Fin
         </h1>
-        <p style={{ fontSize: '13px', color: '#667085', marginTop: '6px', margin: 0 }}>
+        <p
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--text-secondary)',
+            marginTop: 'var(--space-2)',
+            margin: 0,
+          }}
+        >
           Cadastre sua fazenda e inicie o controle financeiro & agronômico
         </p>
       </div>
@@ -205,17 +260,18 @@ function RegisterForm() {
       {/* Error / Success Feedback */}
       {errorMessage && (
         <div
+          role="alert"
           style={{
-            background: '#FEE4E2',
-            color: '#B42318',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            fontSize: '13px',
-            marginBottom: '16px',
-            border: '1px solid #FECDCA',
+            background: 'var(--color-danger-light)',
+            color: 'var(--color-danger-dark)',
+            padding: 'var(--space-3) var(--space-4)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 'var(--text-sm)',
+            marginBottom: 'var(--space-4)',
+            border: '1px solid var(--color-danger)',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--space-2)',
           }}
         >
           <AlertCircle size={16} />
@@ -225,17 +281,18 @@ function RegisterForm() {
 
       {successMessage && (
         <div
+          role="status"
           style={{
-            background: '#D1FADF',
-            color: '#027A48',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            fontSize: '13px',
-            marginBottom: '16px',
-            border: '1px solid #A6F4C5',
+            background: 'var(--color-success-light)',
+            color: 'var(--color-success-dark)',
+            padding: 'var(--space-3) var(--space-4)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 'var(--text-sm)',
+            marginBottom: 'var(--space-4)',
+            border: '1px solid var(--color-success)',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--space-2)',
           }}
         >
           <CheckCircle2 size={16} />
@@ -246,151 +303,86 @@ function RegisterForm() {
       {/* Registration Form */}
       <form
         onSubmit={handleRegister}
-        style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}
+        noValidate
       >
         {/* Name */}
-        <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#344054',
-              marginBottom: '6px',
-            }}
-          >
-            Nome Completo
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Ex: Carlos Eduardo"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '10px 14px 10px 38px',
-                border: '1px solid #D0D5DD',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-            <UserIcon
-              size={16}
-              color="#98A2B3"
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-              }}
-            />
-          </div>
-        </div>
+        <ClayInput
+          label="Nome Completo"
+          placeholder="Ex: Carlos Eduardo"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            clearFieldError('name');
+          }}
+          required
+          error={errors.name}
+          icon={<UserIcon size={18} />}
+        />
+
+        {/* Username */}
+        <ClayInput
+          label="Nome de Usuário (login)"
+          placeholder="Ex: carlos.silva"
+          value={username}
+          onChange={(e) => {
+            setUsername(e.target.value.toLowerCase().replace(/\s/g, ''));
+            clearFieldError('username');
+          }}
+          required
+          autoCapitalize="none"
+          autoComplete="username"
+          spellCheck={false}
+          error={errors.username}
+          hint="Mínimo 3 caracteres. Letras, números, '.', '-' ou '_'."
+          icon={<UserIcon size={18} />}
+        />
 
         {/* Email */}
-        <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#344054',
-              marginBottom: '6px',
-            }}
-          >
-            E-mail de Acesso
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="email"
-              placeholder="carlos@fazendasantaclara.com.br"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '10px 14px 10px 38px',
-                border: '1px solid #D0D5DD',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-            <Mail
-              size={16}
-              color="#98A2B3"
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-              }}
-            />
-          </div>
-        </div>
+        <ClayInput
+          label="E-mail de Acesso"
+          type="email"
+          placeholder="carlos@fazendasantaclara.com.br"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            clearFieldError('email');
+          }}
+          required
+          autoComplete="email"
+          error={errors.email}
+          icon={<Mail size={18} />}
+        />
 
         {/* Farm / Organization Name */}
-        <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#344054',
-              marginBottom: '6px',
-            }}
-          >
-            Nome da Fazenda / Propriedade
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Ex: Fazenda Santa Clara"
-              value={organizationName}
-              onChange={(e) => setOrganizationName(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '10px 14px 10px 38px',
-                border: '1px solid #D0D5DD',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-            <Building
-              size={16}
-              color="#98A2B3"
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-              }}
-            />
-          </div>
-        </div>
+        <ClayInput
+          label="Nome da Fazenda / Propriedade"
+          placeholder="Ex: Fazenda Santa Clara"
+          value={organizationName}
+          onChange={(e) => {
+            setOrganizationName(e.target.value);
+            clearFieldError('organizationName');
+          }}
+          required
+          error={errors.organizationName}
+          icon={<Building size={18} />}
+        />
 
         {/* Role Selector */}
         <div>
           <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#344054',
-              marginBottom: '6px',
-            }}
+            className="input-label"
+            style={{ display: 'block', marginBottom: 'var(--space-2)' }}
           >
             Perfil de Acesso Inicial (RBAC)
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 'var(--space-2)',
+            }}
+          >
             {[
               { id: 'Produtor', label: 'Produtor Rural', icon: UserCheck, desc: 'Acesso total' },
               { id: 'Gestor', label: 'Gestor Fazenda', icon: Tractor, desc: 'Operações e safras' },
@@ -403,30 +395,55 @@ function RegisterForm() {
                 <div
                   key={item.id}
                   onClick={() => setRole(item.id as UserRoleType)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setRole(item.id as UserRoleType);
+                    }
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '8px',
-                    border: isSelected ? '2px solid #2A7A4C' : '1px solid #EAECF0',
-                    background: isSelected ? '#F0FDF4' : '#FAFAFA',
+                    gap: 'var(--space-2)',
+                    padding: 'var(--space-2) var(--space-3)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: isSelected
+                      ? '2px solid var(--color-primary-500)'
+                      : '1px solid var(--border-subtle)',
+                    background: isSelected ? 'var(--color-primary-50)' : 'var(--bg-surface-2)',
+                    boxShadow: isSelected ? 'var(--clay-shadow-xs)' : 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all var(--transition-fast)',
                   }}
                 >
-                  <IconComp size={16} color={isSelected ? '#2A7A4C' : '#667085'} />
+                  <IconComp
+                    size={16}
+                    color={
+                      isSelected ? 'var(--color-primary-600)' : 'var(--text-secondary)'
+                    }
+                  />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span
                       style={{
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        color: isSelected ? '#1B382B' : '#344054',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 'var(--font-bold)',
+                        color: isSelected
+                          ? 'var(--color-primary-800)'
+                          : 'var(--text-primary)',
                       }}
                     >
                       {item.label}
                     </span>
-                    <span style={{ fontSize: '10px', color: '#667085' }}>{item.desc}</span>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        color: 'var(--text-tertiary)',
+                      }}
+                    >
+                      {item.desc}
+                    </span>
                   </div>
                 </div>
               );
@@ -435,105 +452,65 @@ function RegisterForm() {
         </div>
 
         {/* Password & Confirm Password Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#344054',
-                marginBottom: '6px',
-              }}
-            >
-              Senha
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="password"
-                placeholder="Mín. 6 dígitos"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 10px 10px 34px',
-                  border: '1px solid #D0D5DD',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <Lock
-                size={14}
-                color="#98A2B3"
-                style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                }}
-              />
-            </div>
-          </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: 'var(--space-3)',
+          }}
+        >
+          <ClayInput
+            label="Senha"
+            type="password"
+            placeholder="Mín. 6 dígitos"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              clearFieldError('password');
+            }}
+            required
+            autoComplete="new-password"
+            error={errors.password}
+            icon={<Lock size={16} />}
+          />
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#344054',
-                marginBottom: '6px',
-              }}
-            >
-              Confirmar Senha
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="password"
-                placeholder="Repita a senha"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 10px 10px 34px',
-                  border: '1px solid #D0D5DD',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <Lock
-                size={14}
-                color="#98A2B3"
-                style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                }}
-              />
-            </div>
-          </div>
+          <ClayInput
+            label="Confirmar Senha"
+            type="password"
+            placeholder="Repita a senha"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              clearFieldError('confirmPassword');
+            }}
+            required
+            autoComplete="new-password"
+            error={errors.confirmPassword}
+            icon={<Lock size={16} />}
+          />
         </div>
 
         {/* Password Strength Indicator */}
         {password.length > 0 && (
-          <div style={{ marginTop: '-4px' }}>
+          <div style={{ marginTop: 'calc(var(--space-2) * -1)' }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '4px',
+                marginBottom: 'var(--space-1)',
               }}
             >
-              <span style={{ fontSize: '11px', color: '#667085' }}>Força da Senha:</span>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: strength.color }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                Força da Senha:
+              </span>
+              <span
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'var(--font-bold)',
+                  color: strength.color,
+                }}
+              >
                 {strength.label}
               </span>
             </div>
@@ -541,8 +518,8 @@ function RegisterForm() {
               style={{
                 height: '4px',
                 width: '100%',
-                background: '#EAECF0',
-                borderRadius: '2px',
+                background: 'var(--color-neutral-200)',
+                borderRadius: 'var(--radius-full)',
                 overflow: 'hidden',
               }}
             >
@@ -551,7 +528,7 @@ function RegisterForm() {
                   height: '100%',
                   width: `${(passwordScore / 5) * 100}%`,
                   background: strength.color,
-                  transition: 'width 0.3s ease',
+                  transition: 'width var(--transition-base)',
                 }}
               />
             </div>
@@ -559,46 +536,40 @@ function RegisterForm() {
         )}
 
         {/* Submit Button */}
-        <button
+        <ClayButton
           type="submit"
-          disabled={isLoading}
+          variant="primary"
+          size="lg"
+          loading={isLoading}
           style={{
             width: '100%',
-            background: '#2A7A4C',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '12px',
-            fontSize: '14px',
-            fontWeight: '700',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            opacity: isLoading ? 0.7 : 1,
-            marginTop: '8px',
-            transition: 'background 0.2s',
+            marginTop: 'var(--space-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
+            gap: 'var(--space-2)',
           }}
         >
-          <UserPlus size={16} />
+          <UserPlus size={18} />
           <span>{isLoading ? 'Registrando com Neon Auth...' : 'Criar Conta e Começar'}</span>
-        </button>
+        </ClayButton>
       </form>
 
       {/* Link back to Login */}
-      <div style={{ textAlign: 'center', marginTop: '20px' }}>
-        <span style={{ fontSize: '13px', color: '#667085' }}>Já possui uma conta? </span>
+      <div style={{ textAlign: 'center', marginTop: 'var(--space-5)' }}>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+          Já possui uma conta?{' '}
+        </span>
         <Link
           href="/login"
           style={{
-            fontSize: '13px',
-            fontWeight: '700',
-            color: '#2A7A4C',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--font-bold)',
+            color: 'var(--color-primary-600)',
             textDecoration: 'none',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: 'var(--space-1)',
           }}
         >
           <span>Fazer Login</span>
@@ -607,10 +578,17 @@ function RegisterForm() {
       </div>
 
       {/* Footer Info */}
-      <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '11px', color: '#98A2B3' }}>
+      <div
+        style={{
+          textAlign: 'center',
+          marginTop: 'var(--space-5)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--text-tertiary)',
+        }}
+      >
         Neon Auth (Better Auth) • Isolamento por Tenant • PostgreSQL Serverless
       </div>
-    </div>
+    </ClayCard>
   );
 }
 
@@ -622,14 +600,21 @@ export default function RegisterPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1B382B 0%, #2A4836 50%, #152A1E 100%)',
-        padding: '24px',
+        background:
+          'radial-gradient(ellipse at top, var(--color-primary-800) 0%, var(--color-neutral-900) 100%)',
+        padding: 'var(--space-6)',
         position: 'relative',
       }}
     >
       <Suspense
         fallback={
-          <div style={{ color: '#ffffff', fontSize: '16px', fontWeight: '600' }}>
+          <div
+            style={{
+              color: 'var(--text-inverse)',
+              fontSize: 'var(--text-md)',
+              fontWeight: 'var(--font-semibold)',
+            }}
+          >
             Carregando Farm-Fin...
           </div>
         }

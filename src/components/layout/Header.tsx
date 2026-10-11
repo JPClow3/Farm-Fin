@@ -152,9 +152,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
 
   return (
     <>
-      <header className="header">
+      <header className="header" style={{ minHeight: 'var(--header-height)', height: 'var(--header-height)', flexWrap: 'nowrap' }}>
         {/* Left side: Mobile Hamburger + Farm Switcher + Safra Switcher + Period Filter */}
-        <div className="header__left" style={{ flexWrap: 'wrap', gap: '8px' }}>
+        <div className="header__left" style={{ flexWrap: 'nowrap', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
           <ClayButton
             variant="ghost"
             size="sm"
@@ -266,7 +266,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
         </div>
 
         {/* Right: Quick Action, Alerts & User Profile */}
-        <div className="flex-row items-center" style={{ gap: 'var(--space-3)' }}>
+        <div className="flex-row items-center" style={{ gap: 'var(--space-3)', flexShrink: 0 }}>
           {/* Quick Add Button */}
           <ClayButton
             variant="primary"
