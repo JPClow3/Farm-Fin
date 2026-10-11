@@ -94,7 +94,15 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
     });
   // Query/update failures must cause the CLI to fail instead of reporting readiness.
   const existingUser = await findAccount();
-  if (existingUser) return await attachAccount(existingUser.id);
+  if (existingUser) {
+    if (
+      existingUser.username?.toLowerCase() !== username ||
+      existingUser.email.toLowerCase() !== email
+    ) {
+      throw new Error('O nome de usuário e o e-mail devem corresponder à mesma conta existente.');
+    }
+    return await attachAccount(existingUser.id);
+  }
   let userId: string | undefined;
   try {
     const result = await auth.api.signUpEmail({ body: { email, password, name, username } });

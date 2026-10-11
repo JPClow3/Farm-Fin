@@ -181,6 +181,23 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
       expect(result.email).toBe('paraiba@farm-fin.com');
     });
 
+    it('rejects a username/email collision before changing an existing account', async () => {
+      mocks.findUser.mockResolvedValue({
+        id: 'existing',
+        username: 'paraiba',
+        email: 'other@example.com',
+      });
+      await expect(
+        provisionUser({
+          username: 'paraiba',
+          email: 'paraiba@farm-fin.com',
+          password: 'fixture-password',
+        })
+      ).rejects.toThrow('mesma conta');
+      expect(mocks.dbUpdate).not.toHaveBeenCalled();
+      expect(mocks.signUpEmail).not.toHaveBeenCalled();
+    });
+
     it('updates user idempotently without calling signUpEmail when user already exists in DB', async () => {
       // Simulate user existing in database
       const existingUserRecord = {

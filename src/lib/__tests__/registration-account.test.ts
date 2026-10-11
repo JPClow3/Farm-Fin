@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensureRegistrationAccount } from '../registration-account';
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), signup: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), signup: vi.fn(), signin: vi.fn() }));
 vi.mock('../auth-client', () => ({
-  authClient: { getSession: mocks.session, signUp: { email: mocks.signup } },
+  authClient: {
+    getSession: mocks.session,
+    signUp: { email: mocks.signup },
+    signIn: { email: mocks.signin },
+  },
 }));
 const input = {
   email: 'owner@example.com',
@@ -17,10 +21,21 @@ describe('registration account recovery', () => {
     vi.resetAllMocks();
     mocks.session.mockResolvedValue({ data: null });
     mocks.signup.mockResolvedValue({ error: null });
+    mocks.signin.mockResolvedValue({ error: null });
   });
   it('resumes tenant initialization for the matching authenticated account', async () => {
     mocks.session.mockResolvedValue({ data: { user: { email: 'OWNER@example.com' } } });
     expect(await ensureRegistrationAccount(input)).toEqual({ error: null });
+    expect(mocks.signup).not.toHaveBeenCalled();
+    expect(mocks.signin).toHaveBeenCalledWith({ email: input.email, password: input.password });
+  });
+  it('rejects a changed recovery password that the provider does not accept', async () => {
+    mocks.session.mockResolvedValue({ data: { user: { email: input.email } } });
+    const error = { status: 401, message: 'Invalid credential' };
+    mocks.signin.mockResolvedValue({ error });
+    expect(await ensureRegistrationAccount({ ...input, password: 'wrong-password' })).toEqual({
+      error,
+    });
     expect(mocks.signup).not.toHaveBeenCalled();
   });
   it('does not reuse a different authenticated account', async () => {

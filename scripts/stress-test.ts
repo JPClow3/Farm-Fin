@@ -30,8 +30,8 @@ const SCENARIOS: BenchmarkScenario[] = [
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      username: 'paraiba',
-      password: 'melhorprofessor',
+      username: process.env.FARMFIN_STRESS_IDENTIFIER,
+      password: process.env.FARMFIN_STRESS_PASSWORD,
     }),
     connections: 10,
     duration: 5,
@@ -110,7 +110,7 @@ async function waitForServer(urlStr: string, timeoutMs: number = 60000): Promise
   throw new Error(`Timeout waiting for server at ${urlStr} after ${timeoutMs}ms`);
 }
 
-async function warmupRoute(urlStr: string): Promise<void> {
+async function warmupRoute(urlStr: string, headers?: Record<string, string>): Promise<void> {
   return new Promise((resolve) => {
     try {
       const u = new URL(urlStr);
@@ -121,6 +121,7 @@ async function warmupRoute(urlStr: string): Promise<void> {
           path: u.pathname,
           method: 'GET',
           timeout: 10000,
+          headers,
         },
         (res) => {
           res.resume();
@@ -194,6 +195,22 @@ function formatTable(
 }
 
 async function main() {
+  const base = new URL(BASE_URL);
+  if (
+    base.protocol !== 'http:' ||
+    base.username ||
+    base.password ||
+    !['localhost', '127.0.0.1', '[::1]'].includes(base.hostname.toLowerCase())
+  ) {
+    throw new Error(
+      'Stress benchmarks require a local HTTP target. Production and remote hosts are blocked.'
+    );
+  }
+  if (!process.env.FARMFIN_STRESS_IDENTIFIER || !process.env.FARMFIN_STRESS_PASSWORD) {
+    throw new Error(
+      'Set FARMFIN_STRESS_IDENTIFIER and FARMFIN_STRESS_PASSWORD for a dedicated local test account.'
+    );
+  }
   console.log(`[stress-test] Initializing benchmark suite against: ${BASE_URL}`);
 
   let devServerProcess: ChildProcess | null = null;
@@ -221,9 +238,27 @@ async function main() {
     console.log('[stress-test] Connected to running instance.');
   }
 
+  const authScenario = SCENARIOS[1];
+  const login = await fetch(`${BASE_URL}${authScenario.urlPath}`, {
+    method: 'POST',
+    headers: authScenario.headers,
+    body: authScenario.body,
+    redirect: 'manual',
+  });
+  const cookies = login.headers
+    .getSetCookie()
+    .map((cookie) => cookie.split(';')[0])
+    .join('; ');
+  await login.body?.cancel();
+  if (login.status !== 200 || !cookies) {
+    killProcessTree(devServerProcess?.pid);
+    throw new Error('The dedicated local account did not authenticate with a session cookie.');
+  }
+  for (const scenario of SCENARIOS.slice(2))
+    scenario.headers = { ...scenario.headers, cookie: cookies };
   console.log('[stress-test] Warming up routes before benchmarking...');
   for (const scenario of SCENARIOS) {
-    await warmupRoute(`${BASE_URL}${scenario.urlPath}`);
+    await warmupRoute(`${BASE_URL}${scenario.urlPath}`, scenario.headers);
   }
   console.log('[stress-test] Warm-up complete. Starting benchmark runs...');
 
@@ -247,6 +282,11 @@ async function main() {
       });
 
       const latencyAny = result.latency as any;
+      if (result.errors || result.timeouts || result.non2xx) {
+        throw new Error(
+          `${scenario.name} failed: errors=${result.errors}, timeouts=${result.timeouts}, non2xx=${result.non2xx}`
+        );
+      }
       const p95Val =
         latencyAny.p95 ?? latencyAny.p97_5 ?? latencyAny.p90 ?? result.latency.p50 ?? 0;
 

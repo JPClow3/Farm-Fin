@@ -8,7 +8,8 @@ export async function ensureRegistrationAccount(input: {
 }) {
   const current = await authClient.getSession();
   if (current.data?.user.email?.toLowerCase() === input.email.toLowerCase()) {
-    return { error: null };
+    // Confirm the password the form presents as the account credential.
+    return await authClient.signIn.email({ email: input.email, password: input.password });
   }
   return await authClient.signUp.email(input);
 }
