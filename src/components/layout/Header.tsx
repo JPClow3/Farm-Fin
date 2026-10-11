@@ -152,9 +152,22 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
 
   return (
     <>
-      <header className="header" style={{ minHeight: 'var(--header-height)', height: 'var(--header-height)', flexWrap: 'nowrap' }}>
+      <header
+        className="header"
+        style={{
+          minHeight: 'var(--header-height)',
+          height: 'auto',
+          flexWrap: 'wrap',
+          gap: '8px',
+          paddingTop: '8px',
+          paddingBottom: '8px',
+        }}
+      >
         {/* Left side: Mobile Hamburger + Farm Switcher + Safra Switcher + Period Filter */}
-        <div className="header__left" style={{ flexWrap: 'nowrap', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
+        <div
+          className="header__left"
+          style={{ flexWrap: 'wrap', gap: '8px', minWidth: 0, maxWidth: '100%' }}
+        >
           <ClayButton
             variant="ghost"
             size="sm"
@@ -332,7 +345,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                 >
                   <div className="flex-row items-center" style={{ gap: '6px' }}>
                     <Bell size={16} color="var(--color-primary-700)" />
-                    <span style={{ fontWeight: '700', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                    <span
+                      style={{
+                        fontWeight: '700',
+                        fontSize: 'var(--text-sm)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
                       Alertas & Avisos ({totalAlertCount})
                     </span>
                   </div>
@@ -391,7 +410,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                           Despesa(s) aguardando liberação da diretoria antes da baixa.
                         </div>
                       </div>
-                      <ArrowRight size={14} style={{ color: '#b45309', flexShrink: 0, marginTop: '3px' }} />
+                      <ArrowRight
+                        size={14}
+                        style={{ color: '#b45309', flexShrink: 0, marginTop: '3px' }}
+                      />
                     </div>
                   )}
 
@@ -416,7 +438,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         transition: 'all var(--transition-fast)',
                       }}
                     >
-                      <AlertCircle size={17} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--color-danger)' }} />
+                      <AlertCircle
+                        size={17}
+                        style={{ flexShrink: 0, marginTop: '2px', color: 'var(--color-danger)' }}
+                      />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: '700', color: '#7f1d1d' }}>
                           {kpis.overduePayablesCount} conta(s) vencida(s)
@@ -428,7 +453,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                           })}
                         </div>
                       </div>
-                      <ArrowRight size={14} style={{ color: 'var(--color-danger)', flexShrink: 0, marginTop: '3px' }} />
+                      <ArrowRight
+                        size={14}
+                        style={{ color: 'var(--color-danger)', flexShrink: 0, marginTop: '3px' }}
+                      />
                     </div>
                   )}
 
@@ -465,10 +493,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                           R${' '}
                           {kpis.totalDueTodayPayables.toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
-                          })} previstos para quitação imediata.
+                          })}{' '}
+                          previstos para quitação imediata.
                         </div>
                       </div>
-                      <ArrowRight size={14} style={{ color: '#ea580c', flexShrink: 0, marginTop: '3px' }} />
+                      <ArrowRight
+                        size={14}
+                        style={{ color: '#ea580c', flexShrink: 0, marginTop: '3px' }}
+                      />
                     </div>
                   )}
 
@@ -505,7 +537,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                           Planejamento de liquidez imediata.
                         </div>
                       </div>
-                      <ArrowRight size={14} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '3px' }} />
+                      <ArrowRight
+                        size={14}
+                        style={{ color: '#ca8a04', flexShrink: 0, marginTop: '3px' }}
+                      />
                     </div>
                   )}
 
@@ -530,7 +565,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                         transition: 'all var(--transition-fast)',
                       }}
                     >
-                      <Package size={17} style={{ flexShrink: 0, marginTop: '2px', color: '#ca8a04' }} />
+                      <Package
+                        size={17}
+                        style={{ flexShrink: 0, marginTop: '2px', color: '#ca8a04' }}
+                      />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: '700', color: '#713f12' }}>
                           {kpis.lowStockCount} insumo(s) em nível crítico
@@ -539,7 +577,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                           Quantidade abaixo do estoque mínimo de segurança.
                         </div>
                       </div>
-                      <ArrowRight size={14} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '3px' }} />
+                      <ArrowRight
+                        size={14}
+                        style={{ color: '#ca8a04', flexShrink: 0, marginTop: '3px' }}
+                      />
                     </div>
                   )}
 
@@ -555,7 +596,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                       }}
                     >
                       <CheckCircle2 size={32} color="var(--color-primary-600)" />
-                      <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                      <div
+                        style={{
+                          fontWeight: '600',
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--text-primary)',
+                        }}
+                      >
                         Nenhum alerta pendente
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
@@ -584,7 +631,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                 padding: '4px 10px',
                 borderRadius: 'var(--radius-lg)',
                 background: showUserMenu ? 'var(--bg-surface-2)' : 'transparent',
-                border: showUserMenu ? '1px solid rgba(212, 201, 186, 0.6)' : '1px solid transparent',
+                border: showUserMenu
+                  ? '1px solid rgba(212, 201, 186, 0.6)'
+                  : '1px solid transparent',
                 transition: 'all var(--transition-fast)',
               }}
             >
@@ -647,10 +696,18 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                     marginBottom: 'var(--space-2)',
                   }}
                 >
-                  <div style={{ fontWeight: '700', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+                  <div
+                    style={{
+                      fontWeight: '700',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
                     {currentUser.name}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+                  <div
+                    style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}
+                  >
                     {currentUser.email}
                   </div>
                   <div style={{ marginTop: '8px' }}>

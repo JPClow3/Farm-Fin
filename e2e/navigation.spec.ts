@@ -3,6 +3,30 @@ import { test, expect } from '@playwright/test';
 test.describe('Navigation & Responsive Viewport Suite (e2e/navigation.spec.ts)', () => {
   test.setTimeout(120000);
 
+  test('3. Laptop header selectors remain fully reachable', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.goto('/');
+    for (const title of [
+      'Selecionar Fazenda Ativa',
+      'Selecionar Safra Agrícola',
+      'Filtro Global de Período Financeiro',
+    ]) {
+      const control = page.getByTitle(title, { exact: true });
+      await expect(control).toBeInViewport();
+      await expect
+        .poll(() =>
+          control.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            return (
+              document.elementFromPoint(bounds.right - 2, bounds.top + bounds.height / 2) ===
+              element
+            );
+          })
+        )
+        .toBe(true);
+    }
+  });
+
   test.beforeEach(async ({ context, page }) => {
     // Inject authenticated session cookie for middleware access
     await context.addCookies([
@@ -46,7 +70,9 @@ test.describe('Navigation & Responsive Viewport Suite (e2e/navigation.spec.ts)',
     });
   });
 
-  test('1. Authenticated desktop navigation across core financial and operational modules', async ({ page }) => {
+  test('1. Authenticated desktop navigation across core financial and operational modules', async ({
+    page,
+  }) => {
     // Navigate to root dashboard
     await page.goto('/');
     await expect(page).toHaveURL(/\//);
@@ -54,17 +80,23 @@ test.describe('Navigation & Responsive Viewport Suite (e2e/navigation.spec.ts)',
     // 1. Contas a Pagar
     await page.goto('/contas-a-pagar');
     await expect(page).toHaveURL(/\/contas-a-pagar/);
-    await expect(page.locator('h1.page-title')).toContainText(/Contas a Pagar/i, { timeout: 30000 });
+    await expect(page.locator('h1.page-title')).toContainText(/Contas a Pagar/i, {
+      timeout: 30000,
+    });
 
     // 2. Contas a Receber
     await page.goto('/contas-a-receber');
     await expect(page).toHaveURL(/\/contas-a-receber/);
-    await expect(page.locator('h1.page-title')).toContainText(/Contas a Receber/i, { timeout: 30000 });
+    await expect(page.locator('h1.page-title')).toContainText(/Contas a Receber/i, {
+      timeout: 30000,
+    });
 
     // 3. Fluxo de Caixa
     await page.goto('/fluxo-de-caixa');
     await expect(page).toHaveURL(/\/fluxo-de-caixa/);
-    await expect(page.locator('h1.page-title')).toContainText(/Fluxo de Caixa/i, { timeout: 30000 });
+    await expect(page.locator('h1.page-title')).toContainText(/Fluxo de Caixa/i, {
+      timeout: 30000,
+    });
 
     // 4. DRE Agrícola
     await page.goto('/dre');
@@ -91,21 +123,27 @@ test.describe('Navigation & Responsive Viewport Suite (e2e/navigation.spec.ts)',
     await expect(payablesLink).toBeVisible();
     await payablesLink.click();
     await expect(page).toHaveURL(/\/contas-a-pagar/);
-    await expect(page.locator('h1.page-title')).toContainText(/Contas a Pagar/i, { timeout: 30000 });
+    await expect(page.locator('h1.page-title')).toContainText(/Contas a Pagar/i, {
+      timeout: 30000,
+    });
 
     // Navigate to "A Receber" via bottom nav
     const receivablesLink = bottomNav.getByRole('link', { name: /A Receber/i });
     await expect(receivablesLink).toBeVisible();
     await receivablesLink.click();
     await expect(page).toHaveURL(/\/contas-a-receber/);
-    await expect(page.locator('h1.page-title')).toContainText(/Contas a Receber/i, { timeout: 30000 });
+    await expect(page.locator('h1.page-title')).toContainText(/Contas a Receber/i, {
+      timeout: 30000,
+    });
 
     // Navigate to "Fluxo" via bottom nav
     const cashFlowLink = bottomNav.getByRole('link', { name: /Fluxo/i });
     await expect(cashFlowLink).toBeVisible();
     await cashFlowLink.click();
     await expect(page).toHaveURL(/\/fluxo-de-caixa/);
-    await expect(page.locator('h1.page-title')).toContainText(/Fluxo de Caixa/i, { timeout: 30000 });
+    await expect(page.locator('h1.page-title')).toContainText(/Fluxo de Caixa/i, {
+      timeout: 30000,
+    });
 
     // Test mobile drawer toggle: open menu
     const menuButton = bottomNav.getByRole('button', { name: /Menu/i });
