@@ -1,17 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginScreen } from './LoginScreen';
 
 const mocks = vi.hoisted(() => ({
-  push: vi.fn(),
-  refresh: vi.fn(),
+  assign: vi.fn(),
   signInEmail: vi.fn(),
   signInUsername: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -29,9 +27,21 @@ const methods = { magicLink: false, google: false, microsoft: false };
 describe('LoginScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.signInEmail.mockResolvedValue({ data: { user: { id: 'u1', email: 'maria@example.com' } } });
+    vi.stubGlobal(
+      'window',
+      new Proxy(window, {
+        get(target, property, receiver) {
+          if (property === 'location') return { assign: mocks.assign };
+          return Reflect.get(target, property, receiver);
+        },
+      })
+    );
+    mocks.signInEmail.mockResolvedValue({
+      data: { user: { id: 'u1', email: 'maria@example.com' } },
+    });
     mocks.signInUsername.mockResolvedValue({ data: { user: { id: 'u1', username: 'paraiba' } } });
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   it('does not render demo profile choices', () => {
     render(<LoginScreen methods={methods} />);
@@ -48,12 +58,14 @@ describe('LoginScreen', () => {
     await user.type(screen.getByLabelText('Senha'), 'valid-password');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    await waitFor(() => expect(mocks.signInUsername).toHaveBeenCalledWith({
-      username: 'paraiba',
-      password: 'valid-password',
-    }));
+    await waitFor(() =>
+      expect(mocks.signInUsername).toHaveBeenCalledWith({
+        username: 'paraiba',
+        password: 'valid-password',
+      })
+    );
     expect(mocks.signInEmail).not.toHaveBeenCalled();
-    expect(mocks.push).toHaveBeenCalledWith('/');
+    expect(mocks.assign).toHaveBeenCalledWith('/');
   });
 
   it('submits an email identifier through Better Auth email sign-in', async () => {
@@ -63,10 +75,12 @@ describe('LoginScreen', () => {
     await user.type(screen.getByLabelText('Senha'), 'valid-password');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    await waitFor(() => expect(mocks.signInEmail).toHaveBeenCalledWith({
-      email: 'maria@example.com',
-      password: 'valid-password',
-    }));
+    await waitFor(() =>
+      expect(mocks.signInEmail).toHaveBeenCalledWith({
+        email: 'maria@example.com',
+        password: 'valid-password',
+      })
+    );
     expect(mocks.signInUsername).not.toHaveBeenCalled();
   });
 
@@ -77,7 +91,9 @@ describe('LoginScreen', () => {
     await user.type(screen.getByLabelText('Senha'), 'valid-password');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Nome de usuário deve ter entre 3 e 30 caracteres');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nome de usuário deve ter entre 3 e 30 caracteres'
+    );
     expect(mocks.signInUsername).not.toHaveBeenCalled();
     expect(mocks.signInEmail).not.toHaveBeenCalled();
   });
