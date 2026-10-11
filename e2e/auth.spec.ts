@@ -166,7 +166,12 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 30000 });
   });
 
-  test('4. Verify username-based registration workflow', async ({ page }) => {
+  test('4. Submit registration identity and reject unauthenticated tenant setup', async ({
+    page,
+  }) => {
+    await page.route('**/api/auth/get-session*', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
+    });
     // Mock registration API response
     let registerBody: Record<string, unknown> | undefined;
     await page.route('**/api/auth/sign-up/email*', async (route) => {
@@ -211,9 +216,21 @@ test.describe('Authentication & User Management Suite (e2e/auth.spec.ts)', () =>
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Verify submission triggered without client-side error blocks
+    await expect
+      .poll(() => registerBody)
+      .toMatchObject({
+        username: 'carlos.silva',
+        email: 'carlos.silva@fazendateste.com.br',
+        name: 'Carlos Eduardo Silva',
+        password: 'SenhaSegura123!',
+      });
+    // This fixture has no real provider session/database. It must never report
+    // successful tenant creation merely because the mocked sign-up returned 200.
     await expect(
-      page.locator('[role="alert"]').filter({ hasText: /Verifique os campos/i })
-    ).toHaveCount(0);
+      page.getByRole('alert').filter({
+        hasText: 'Autentique sua conta para finalizar o cadastro.',
+      })
+    ).toBeVisible({ timeout: 30000 });
+    await expect(page).toHaveURL((url) => url.pathname === '/register');
   });
 });

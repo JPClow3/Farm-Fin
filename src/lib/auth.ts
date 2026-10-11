@@ -10,6 +10,7 @@ const socialProviders = {
   ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
     ? {
         google: {
+          disableSignUp: true,
           clientId: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         },
@@ -18,6 +19,7 @@ const socialProviders = {
   ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
     ? {
         microsoft: {
+          disableSignUp: true,
           clientId: process.env.MICROSOFT_CLIENT_ID,
           clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
           tenantId: process.env.MICROSOFT_TENANT_ID || 'common',
@@ -85,6 +87,9 @@ export const auth = betterAuth({
   socialProviders,
   plugins: [
     magicLink({
+      // Tenant initialization requires the username/password registration flow.
+      // Passwordless sign-in may authenticate an existing account only.
+      disableSignUp: true,
       expiresIn: 5 * 60,
       sendMagicLink: async ({ email, url }) => {
         await sendMagicLinkEmail(email, url);
