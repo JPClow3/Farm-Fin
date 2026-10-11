@@ -113,13 +113,17 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
         password,
         name,
         username,
-        role,
-        organizationId: SEED_ORGANIZATION.id,
       },
     });
 
     const userId = result?.user?.id;
     if (userId) {
+      // Tenant and role are assigned by this operator-only provisioning command.
+      // Public sign-up deliberately cannot accept either field.
+      await db
+        .update(schema.users)
+        .set({ role, organizationId: SEED_ORGANIZATION.id, updatedAt: new Date() })
+        .where(eq(schema.users.id, userId));
       try {
         await db
           .insert(schema.userRoles)

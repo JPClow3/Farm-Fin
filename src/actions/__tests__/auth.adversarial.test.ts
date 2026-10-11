@@ -18,14 +18,29 @@ vi.mock('@/db', () => ({
     query: { users: { findFirst: mocks.findUser } },
     insert: mocks.insert,
     update: mocks.update,
+    transaction: (callback: (tx: unknown) => unknown) =>
+      callback({
+        query: { users: { findFirst: mocks.findUser } },
+        insert: mocks.insert,
+        update: mocks.update,
+        execute: vi.fn().mockResolvedValue([]),
+      }),
   },
 }));
 
-vi.mock('@/lib/session', () => ({ getCurrentSession: mocks.getSession }));
+vi.mock('@/lib/session', () => ({
+  getCurrentSession: mocks.getSession,
+  getVerifiedSession: mocks.getSession,
+}));
 
 describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getSession.mockResolvedValue({
+      kind: 'auth',
+      isAuthenticated: true,
+      user: { id: 'user-paraiba-id', email: 'paraiba@farm-fin.com' },
+    });
   });
 
   // =========================================================================
@@ -140,7 +155,7 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
     it('rejects adversarial characters, injection attempts, and special symbols', () => {
       const injectionAttempts = [
         "paraiba' OR '1'='1",
-        'admin\'--',
+        "admin'--",
         '<script>alert(1)</script>',
         'paraiba; DROP TABLE users;',
         'paraiba" OR "1"="1',
@@ -305,8 +320,12 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
     });
 
     it('enforces password minimum length of 6 characters', () => {
-      expect(registerSchema.safeParse({ ...baseValidInput, password: '12345' }).success).toBe(false);
-      expect(registerSchema.safeParse({ ...baseValidInput, password: '123456' }).success).toBe(true);
+      expect(registerSchema.safeParse({ ...baseValidInput, password: '12345' }).success).toBe(
+        false
+      );
+      expect(registerSchema.safeParse({ ...baseValidInput, password: '123456' }).success).toBe(
+        true
+      );
     });
   });
 
@@ -344,8 +363,12 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
       });
       mocks.insert.mockImplementation(() => {
         const op = Object.assign(Promise.resolve([]), {
-          returning: vi.fn().mockResolvedValue([{ id: 'org-santa-fe-id', name: 'Fazenda Santa Fé' }]),
-        }) as unknown as Promise<unknown[]> & { returning: () => Promise<Array<{ id: string; name: string }>> };
+          returning: vi
+            .fn()
+            .mockResolvedValue([{ id: 'org-santa-fe-id', name: 'Fazenda Santa Fé' }]),
+        }) as unknown as Promise<unknown[]> & {
+          returning: () => Promise<Array<{ id: string; name: string }>>;
+        };
         return { values: () => op };
       });
       mocks.update.mockReturnValue({ set: () => ({ where: vi.fn().mockResolvedValue([]) }) });
@@ -369,8 +392,12 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
       });
       mocks.insert.mockImplementation(() => {
         const op = Object.assign(Promise.resolve([]), {
-          returning: vi.fn().mockResolvedValue([{ id: 'org-santa-fe-id', name: 'Fazenda Santa Fé' }]),
-        }) as unknown as Promise<unknown[]> & { returning: () => Promise<Array<{ id: string; name: string }>> };
+          returning: vi
+            .fn()
+            .mockResolvedValue([{ id: 'org-santa-fe-id', name: 'Fazenda Santa Fé' }]),
+        }) as unknown as Promise<unknown[]> & {
+          returning: () => Promise<Array<{ id: string; name: string }>>;
+        };
         return { values: () => op };
       });
       mocks.update.mockReturnValue({ set: () => ({ where: vi.fn().mockResolvedValue([]) }) });
@@ -415,12 +442,14 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
 
     it('handles unexpected database duplicate key errors gracefully', async () => {
       mocks.findUser.mockResolvedValue({
-        id: 'user-id',
+        id: 'user-paraiba-id',
         username: 'paraiba',
         email: 'paraiba@farm-fin.com',
       });
       mocks.insert.mockImplementation(() => {
-        const error = new Error('duplicate key value violates unique constraint "users_username_unique"');
+        const error = new Error(
+          'duplicate key value violates unique constraint "users_username_unique"'
+        );
         Object.assign(error, { code: '23505' });
         throw error;
       });
@@ -435,7 +464,9 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
 
       const res = await registerUserAction(defaultInput);
       expect(res.success).toBe(false);
-      expect(res.error).toBe('Não foi possível finalizar o cadastro agora. Tente novamente em instantes.');
+      expect(res.error).toBe(
+        'Não foi possível finalizar o cadastro agora. Tente novamente em instantes.'
+      );
     });
   });
 
@@ -474,7 +505,9 @@ describe('Milestone 1 Adversarial & Empirical Test Suite', () => {
       const content = fs.readFileSync(loginScreenPath, 'utf-8');
 
       // Check mode type definition
-      expect(content).toContain("type Mode = 'password' | 'magicLink' | 'magicLinkSent' | 'twoFactor';");
+      expect(content).toContain(
+        "type Mode = 'password' | 'magicLink' | 'magicLinkSent' | 'twoFactor';"
+      );
     });
   });
 });

@@ -25,10 +25,10 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: `${baseURL}/login`,
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
-      PORT: '3000',
+      PORT: new URL(baseURL).port || '3000',
       BETTER_AUTH_SECRET: 'farm-fin-e2e-only-secret-at-least-32-characters',
       BETTER_AUTH_URL: baseURL,
       NEXT_PUBLIC_APP_URL: baseURL,

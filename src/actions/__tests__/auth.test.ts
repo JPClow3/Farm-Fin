@@ -14,10 +14,20 @@ vi.mock('@/db', () => ({
     query: { users: { findFirst: mocks.findUser } },
     insert: mocks.insert,
     update: mocks.update,
+    transaction: (callback: (tx: unknown) => unknown) =>
+      callback({
+        query: { users: { findFirst: mocks.findUser } },
+        insert: mocks.insert,
+        update: mocks.update,
+        execute: vi.fn().mockResolvedValue([]),
+      }),
   },
 }));
 
-vi.mock('@/lib/session', () => ({ getCurrentSession: mocks.getSession }));
+vi.mock('@/lib/session', () => ({
+  getCurrentSession: mocks.getSession,
+  getVerifiedSession: mocks.getSession,
+}));
 
 describe('Auth Server Actions', () => {
   beforeEach(() => {
@@ -38,8 +48,9 @@ describe('Auth Server Actions', () => {
     });
     mocks.update.mockReturnValue({ set: () => ({ where: vi.fn().mockResolvedValue([]) }) });
     mocks.getSession.mockResolvedValue({
+      kind: 'auth',
       isAuthenticated: true,
-      user: { id: 'user-existing', email: 'maria@example.com' },
+      user: { id: 'user-existing', email: 'mariana@fazendasantafe.com.br' },
     });
   });
 
@@ -199,6 +210,43 @@ describe('Auth Server Actions', () => {
     expect(res.error).toBeDefined();
   });
 
+  it.each(['anonymous', 'demo', 'other-account', 'existing-tenant'])(
+    'rejects unauthorized tenant setup: %s',
+    async (scenario) => {
+      if (scenario === 'anonymous') mocks.getSession.mockResolvedValue(null);
+      if (scenario === 'demo')
+        mocks.getSession.mockResolvedValue({
+          kind: 'demo',
+          isAuthenticated: true,
+          user: { id: 'user-existing' },
+        });
+      if (scenario === 'other-account')
+        mocks.getSession.mockResolvedValue({
+          kind: 'auth',
+          isAuthenticated: true,
+          user: { id: 'someone-else' },
+        });
+      if (scenario === 'existing-tenant')
+        mocks.findUser.mockResolvedValue({
+          id: 'user-existing',
+          username: 'mariana.gestora',
+          email: 'mariana@fazendasantafe.com.br',
+          organizationId: 'existing-org',
+        });
+      const result = await registerUserAction({
+        name: 'Mariana Gestora',
+        username: 'mariana.gestora',
+        email: 'mariana@fazendasantafe.com.br',
+        password: 'strongPassword2026',
+        organizationName: 'Another tenant',
+        role: 'Gestor',
+      });
+      expect(result.success).toBe(false);
+      expect(mocks.insert).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+    }
+  );
+
   it('retrieves auth session via getAuthSessionAction', async () => {
     const session = await getAuthSessionAction();
     expect(session).toBeDefined();
@@ -206,5 +254,4 @@ describe('Auth Server Actions', () => {
     expect(session.user).toHaveProperty('id');
     expect(session.user).toHaveProperty('email');
   });
-
 });

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   dbInsert: vi.fn(),
   dbUpdate: vi.fn(),
   signUpEmail: vi.fn(),
+  verifiedSession: vi.fn(),
 }));
 
 // Mock DB queries for create-user.ts and actions/auth.ts
@@ -21,6 +22,13 @@ vi.mock('../index', () => ({
     },
     insert: mocks.dbInsert,
     update: mocks.dbUpdate,
+    transaction: (callback: (tx: unknown) => unknown) =>
+      callback({
+        query: { users: { findFirst: mocks.findUser } },
+        insert: mocks.dbInsert,
+        update: mocks.dbUpdate,
+        execute: vi.fn().mockResolvedValue([]),
+      }),
   },
   schema: {
     organizations: { id: 'organizations.id' },
@@ -39,6 +47,13 @@ vi.mock('@/db', () => ({
     },
     insert: mocks.dbInsert,
     update: mocks.dbUpdate,
+    transaction: (callback: (tx: unknown) => unknown) =>
+      callback({
+        query: { users: { findFirst: mocks.findUser } },
+        insert: mocks.dbInsert,
+        update: mocks.dbUpdate,
+        execute: vi.fn().mockResolvedValue([]),
+      }),
   },
   schema: {
     organizations: { id: 'organizations.id' },
@@ -47,6 +62,8 @@ vi.mock('@/db', () => ({
     farms: { id: 'farms.id' },
   },
 }));
+
+vi.mock('../../lib/session', () => ({ getVerifiedSession: mocks.verifiedSession }));
 
 // Mock Better Auth for create-user.ts
 vi.mock('../../lib/auth', () => ({
@@ -60,6 +77,11 @@ vi.mock('../../lib/auth', () => ({
 describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Auth Collisions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.verifiedSession.mockResolvedValue({
+      kind: 'auth',
+      isAuthenticated: true,
+      user: { id: 'legit-user-id' },
+    });
 
     // Default mock behaviors
     mocks.dbInsert.mockReturnValue({
@@ -127,10 +149,12 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
               username: 'paraiba',
               password: 'melhorprofessor',
               email: 'paraiba@farm-fin.com',
-              role: 'Produtor',
             }),
           })
         );
+        expect(mocks.signUpEmail.mock.calls[0][0].body).not.toHaveProperty('role');
+        expect(mocks.signUpEmail.mock.calls[0][0].body).not.toHaveProperty('organizationId');
+        expect(mocks.dbUpdate).toHaveBeenCalled();
       } finally {
         if (previousEnv !== undefined) {
           process.env.FARMFIN_CREATE_USER_PASSWORD = previousEnv;
@@ -343,15 +367,13 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
       });
 
       expect(res.success).toBe(false);
-      expect(res.error).toBe(
-        'Não foi possível finalizar o cadastro agora. Tente novamente em instantes.'
-      );
+      expect(res.error).toBe('A conta autenticada não corresponde ao cadastro.');
     });
 
     it('handles PostgreSQL unique constraint violation (code 23505) for username', async () => {
       // Simulate findFirst returning user, but concurrent race condition throws 23505 on update
       mocks.findUser.mockResolvedValue({
-        id: 'race-user-id',
+        id: 'legit-user-id',
         username: 'paraiba',
         email: 'paraiba@farm-fin.com',
       });
@@ -378,7 +400,7 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
 
     it('handles PostgreSQL unique constraint violation (code 23505) for email', async () => {
       mocks.findUser.mockResolvedValue({
-        id: 'race-user-id',
+        id: 'legit-user-id',
         username: 'paraiba',
         email: 'paraiba@farm-fin.com',
       });
@@ -415,9 +437,13 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
 
     it('rejects usernames that violate length boundaries (< 3 or > 30)', () => {
       expect(registerSchema.safeParse({ ...baseValid, username: 'ab' }).success).toBe(false);
-      expect(registerSchema.safeParse({ ...baseValid, username: 'a'.repeat(31) }).success).toBe(false);
+      expect(registerSchema.safeParse({ ...baseValid, username: 'a'.repeat(31) }).success).toBe(
+        false
+      );
       expect(registerSchema.safeParse({ ...baseValid, username: 'abc' }).success).toBe(true);
-      expect(registerSchema.safeParse({ ...baseValid, username: 'a'.repeat(30) }).success).toBe(true);
+      expect(registerSchema.safeParse({ ...baseValid, username: 'a'.repeat(30) }).success).toBe(
+        true
+      );
     });
 
     it('rejects usernames with spaces, special symbols, or injection payloads', () => {
