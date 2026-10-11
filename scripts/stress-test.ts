@@ -153,39 +153,41 @@ function fmt(val: number | undefined | null): string {
   return val.toFixed(1);
 }
 
-function formatTable(metrics: Array<{
-  scenario: string;
-  reqSec: number;
-  avgLatency: number;
-  p50: number;
-  p95: number;
-  p99: number;
-  totalReqs: number;
-  errors: number;
-}>) {
+function formatTable(
+  metrics: Array<{
+    scenario: string;
+    reqSec: number;
+    avgLatency: number;
+    p50: number;
+    p95: number;
+    p99: number;
+    totalReqs: number;
+    errors: number;
+  }>
+) {
   console.log('\n' + '='.repeat(105));
   console.log('FARM-FIN AUTOCANNON BENCHMARK REPORT');
   console.log('='.repeat(105));
   console.log(
     'Scenario'.padEnd(46) +
-    'Req/s'.padStart(10) +
-    'Avg(ms)'.padStart(10) +
-    'p50(ms)'.padStart(10) +
-    'p95(ms)'.padStart(10) +
-    'p99(ms)'.padStart(10) +
-    'Total'.padStart(9)
+      'Req/s'.padStart(10) +
+      'Avg(ms)'.padStart(10) +
+      'p50(ms)'.padStart(10) +
+      'p95(ms)'.padStart(10) +
+      'p99(ms)'.padStart(10) +
+      'Total'.padStart(9)
   );
   console.log('-'.repeat(105));
 
   for (const m of metrics) {
     console.log(
       m.scenario.padEnd(46).slice(0, 46) +
-      fmt(m.reqSec).padStart(10) +
-      fmt(m.avgLatency).padStart(10) +
-      fmt(m.p50).padStart(10) +
-      fmt(m.p95).padStart(10) +
-      fmt(m.p99).padStart(10) +
-      m.totalReqs.toString().padStart(9)
+        fmt(m.reqSec).padStart(10) +
+        fmt(m.avgLatency).padStart(10) +
+        fmt(m.p50).padStart(10) +
+        fmt(m.p95).padStart(10) +
+        fmt(m.p99).padStart(10) +
+        m.totalReqs.toString().padStart(9)
     );
   }
   console.log('='.repeat(105) + '\n');
@@ -202,6 +204,7 @@ async function main() {
     devServerProcess = spawn('npx', ['next', 'dev', '--port', '3000', '--hostname', '127.0.0.1'], {
       shell: process.platform === 'win32',
       stdio: 'ignore',
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         PORT: '3000',
@@ -228,7 +231,9 @@ async function main() {
 
   try {
     for (const scenario of SCENARIOS) {
-      console.log(`\n[stress-test] Running: ${scenario.name} (connections: ${scenario.connections}, duration: ${scenario.duration}s)...`);
+      console.log(
+        `\n[stress-test] Running: ${scenario.name} (connections: ${scenario.connections}, duration: ${scenario.duration}s)...`
+      );
       const targetUrl = `${BASE_URL}${scenario.urlPath}`;
 
       const result = await runBenchmark({
@@ -242,7 +247,8 @@ async function main() {
       });
 
       const latencyAny = result.latency as any;
-      const p95Val = latencyAny.p95 ?? latencyAny.p97_5 ?? latencyAny.p90 ?? result.latency.p50 ?? 0;
+      const p95Val =
+        latencyAny.p95 ?? latencyAny.p97_5 ?? latencyAny.p90 ?? result.latency.p50 ?? 0;
 
       collectedMetrics.push({
         scenario: scenario.name,

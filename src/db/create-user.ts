@@ -28,7 +28,7 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
   const { db, schema } = await import('./index');
   const { SEED_ORGANIZATION } = await import('./seed');
   const { auth } = await import('../lib/auth');
-  const { eq } = await import('drizzle-orm');
+  const { eq, sql } = await import('drizzle-orm');
 
   // 1. Ensure Tenant Organization exists
   try {
@@ -56,20 +56,13 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
     throw orgErr;
   }
 
-  // 2. Check if user already exists (idempotency check)
-  let existingUser = null;
-  try {
-    existingUser = await db.query.users.findFirst({
-      where: (u, { or: orOp, eq: eqOp }) => orOp(eqOp(u.username, username), eqOp(u.email, email)),
-    });
-  } catch (err) {
-    console.warn('[create-user] Consulta de usuário existente falhou:', err);
-  }
-
-  if (existingUser) {
-    // Idempotent update of existing user attributes
-    try {
-      await db
+  const attachAccount = async (userId: string) => {
+    await db.transaction(async (tx) => {
+      // Serialize role initialization without requiring a production migration.
+      await tx.execute(
+        sql`SELECT id FROM ${schema.users} WHERE ${schema.users.id} = ${userId} FOR UPDATE`
+      );
+      const updated = await tx
         .update(schema.users)
         .set({
           name,
@@ -80,78 +73,47 @@ export async function provisionUser(options: ProvisionUserOptions = {}) {
           emailVerified: true,
           updatedAt: new Date(),
         })
-        .where(eq(schema.users.id, existingUser.id));
-
-      try {
-        await db
-          .insert(schema.userRoles)
-          .values({
-            userId: existingUser.id,
-            organizationId: SEED_ORGANIZATION.id,
-            role: 'PROPRIETARIO',
-          })
-          .onConflictDoNothing();
-      } catch {
-        // Non-blocking role association
-      }
-
-      console.log(
-        `[create-user] Usuário "${username}" já existe e foi atualizado/confirmado (id: ${existingUser.id}, perfil: ${role}).`
-      );
-      return { id: existingUser.id, username, email, name, role };
-    } catch (updateErr) {
-      console.warn('[create-user] Atualização de usuário existente encontrou aviso:', updateErr);
-      return { id: existingUser.id, username, email, name, role };
-    }
-  }
-
-  // 3. User does not exist, create via Better Auth
-  try {
-    const result = await auth.api.signUpEmail({
-      body: {
-        email,
-        password,
-        name,
-        username,
-      },
+        .where(eq(schema.users.id, userId))
+        .returning({ id: schema.users.id });
+      if (!updated.length)
+        throw new Error('A conta de acesso não foi encontrada para provisionamento.');
+      await tx.execute(sql`
+        INSERT INTO ${schema.userRoles} (user_id, organization_id, role)
+        SELECT ${userId}::uuid, ${SEED_ORGANIZATION.id}::uuid, 'PROPRIETARIO'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM ${schema.userRoles}
+          WHERE user_id = ${userId}::uuid AND organization_id = ${SEED_ORGANIZATION.id}::uuid AND role = 'PROPRIETARIO'
+        )
+      `);
     });
-
-    const userId = result?.user?.id;
-    if (userId) {
-      // Tenant and role are assigned by this operator-only provisioning command.
-      // Public sign-up deliberately cannot accept either field.
-      await db
-        .update(schema.users)
-        .set({ role, organizationId: SEED_ORGANIZATION.id, updatedAt: new Date() })
-        .where(eq(schema.users.id, userId));
-      try {
-        await db
-          .insert(schema.userRoles)
-          .values({
-            userId,
-            organizationId: SEED_ORGANIZATION.id,
-            role: 'PROPRIETARIO',
-          })
-          .onConflictDoNothing();
-      } catch {
-        // Non-blocking role association
-      }
-    }
-
-    console.log(
-      `[create-user] Usuário "${username}" criado com sucesso (id: ${userId || 'novo'}, perfil: ${role}).`
-    );
     return { id: userId, username, email, name, role };
+  };
+  const findAccount = () =>
+    db.query.users.findFirst({
+      where: (u, { or: orOp, eq: eqOp }) => orOp(eqOp(u.username, username), eqOp(u.email, email)),
+    });
+  // Query/update failures must cause the CLI to fail instead of reporting readiness.
+  const existingUser = await findAccount();
+  if (existingUser) return await attachAccount(existingUser.id);
+  let userId: string | undefined;
+  try {
+    const result = await auth.api.signUpEmail({ body: { email, password, name, username } });
+    userId = result?.user?.id;
   } catch (authErr: unknown) {
     const errorObj = authErr as { message?: string; status?: number } | null;
     if (errorObj?.message?.includes('already exists') || errorObj?.status === 422) {
-      console.log(
-        `[create-user] Usuário "${username}" / "${email}" já cadastrado no provedor de autenticação.`
-      );
-      return { username, email, name, role };
+      const recovered = await findAccount();
+      if (
+        recovered?.username?.toLowerCase() === username &&
+        recovered.email.toLowerCase() === email
+      ) {
+        return await attachAccount(recovered.id);
+      }
     }
     throw authErr;
   }
+  if (!userId) throw new Error('O provedor não retornou uma conta criada.');
+  return await attachAccount(userId);
 }
 
 async function main() {

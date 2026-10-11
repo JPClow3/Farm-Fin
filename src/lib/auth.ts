@@ -93,7 +93,7 @@ export const auth = betterAuth({
     twoFactor({
       issuer: 'Farm-Fin',
     }),
-    username(),
+    username({ usernameValidator: (value) => /^[a-zA-Z0-9._-]+$/.test(value) }),
   ],
   session: {
     cookieCache: {

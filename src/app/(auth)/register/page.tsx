@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authClient } from '@/lib/auth-client';
+import { ensureRegistrationAccount } from '@/lib/registration-account';
 import { registerUserAction } from '@/actions/auth';
 import { UserRoleType } from '@/lib/types';
 import { ClayCard } from '@/components/ui/ClayCard';
@@ -122,7 +122,9 @@ function RegisterForm() {
 
     // 1. Register with Better Auth / Neon Auth API with username
     try {
-      const authRes = await authClient.signUp.email({
+      // A successful signup can outlive a failed tenant transaction. Resume
+      // only a matching account authenticated by the provider's session cookie.
+      const authRes = await ensureRegistrationAccount({
         email: email.trim().toLowerCase(),
         password,
         name: name.trim(),
@@ -195,7 +197,7 @@ function RegisterForm() {
     } catch (err) {
       console.error('[Register] Failed to create tenant/organization/farm record:', err);
       setErrorMessage(
-        'Não foi possível concluir o cadastro no banco de dados. Verifique sua conexão e tente novamente — nenhuma conta foi criada.'
+        'Sua conta de acesso foi criada, mas o cadastro da organização não terminou. Tente novamente para concluir esta etapa.'
       );
       setIsLoading(false);
     }
@@ -420,18 +422,14 @@ function RegisterForm() {
                 >
                   <IconComp
                     size={16}
-                    color={
-                      isSelected ? 'var(--color-primary-600)' : 'var(--text-secondary)'
-                    }
+                    color={isSelected ? 'var(--color-primary-600)' : 'var(--text-secondary)'}
                   />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span
                       style={{
                         fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--font-bold)',
-                        color: isSelected
-                          ? 'var(--color-primary-800)'
-                          : 'var(--text-primary)',
+                        color: isSelected ? 'var(--color-primary-800)' : 'var(--text-primary)',
                       }}
                     >
                       {item.label}

@@ -93,7 +93,9 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
 
     mocks.dbUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 'mock-user-uuid' }]),
+        where: vi
+          .fn()
+          .mockReturnValue({ returning: vi.fn().mockResolvedValue([{ id: 'mock-user-uuid' }]) }),
       }),
     });
 
@@ -248,13 +250,24 @@ describe('Milestone 1 Empirical Challenger: User Provisioning, Idempotency & Aut
         message: 'User already exists',
       });
 
-      const result = await provisionUser({
-        username: 'paraiba',
-        password: 'melhorprofessor',
-      });
+      await expect(
+        provisionUser({ username: 'paraiba', password: 'melhorprofessor' })
+      ).rejects.toMatchObject({ status: 422 });
+    });
 
-      expect(result.username).toBe('paraiba');
-      expect(result.email).toBe('paraiba@farm-fin.com');
+    it('does not report provisioning success when the existing account update fails', async () => {
+      mocks.findUser.mockResolvedValue({
+        id: 'existing',
+        username: 'paraiba',
+        email: 'paraiba@farm-fin.com',
+      });
+      mocks.dbUpdate.mockImplementationOnce(() => {
+        throw new Error('database unavailable');
+      });
+      await expect(provisionUser({ username: 'paraiba', password: 'fixture' })).rejects.toThrow(
+        'database unavailable'
+      );
+      expect(mocks.signUpEmail).not.toHaveBeenCalled();
     });
 
     it('propagates clean error when PostgreSQL connection is refused (ECONNREFUSED)', async () => {
