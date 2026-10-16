@@ -3,7 +3,10 @@
 
   // ─── Identity ───────────────────────────────────────────────────────────────
   "name": "farm-fin",
-  "main": ".open-next/worker.js",
+  // OpenNext's generated worker (`.open-next/worker.js`) only exports `fetch`.
+  // Cron Triggers require `scheduled()`, so the deployed entry is this wrapper.
+  // `build.command` generates `.open-next/worker.js` before Wrangler bundles it.
+  "main": "custom-worker.ts",
 
   // ─── Build ──────────────────────────────────────────────────────────────────
   // Generates .open-next/ before `wrangler deploy` / `wrangler versions upload`
@@ -63,6 +66,20 @@
       {
         "binding": "REPORT_QUEUE",
         "queue": "farm-fin-reports"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "farm-fin-alerts",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3
+      },
+      {
+        "queue": "farm-fin-reports",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3
       }
     ]
   },

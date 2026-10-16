@@ -10,6 +10,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/session') ||
+    // Cron calls this with an HMAC, not a user session. The route checks it.
+    pathname.startsWith('/api/internal/scheduled-jobs') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.includes('.')
   ) {
