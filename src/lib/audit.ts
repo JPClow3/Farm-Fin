@@ -32,7 +32,10 @@ export type AuditEntityType =
   | 'reconciliation'
   | 'cost_apportionment'
   | 'lcdpr'
-  | 'dre';
+  | 'dre'
+  | 'pessoa'
+  | 'classificacao'
+  | 'movimento_contas';
 
 interface WriteAuditLogParams {
   action: AuditAction;

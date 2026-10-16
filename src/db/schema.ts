@@ -9,8 +9,11 @@ import {
   boolean,
   integer,
   text,
+  serial,
+  uniqueIndex,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // ----------------------------------------------------
 // Core Multi-Tenant & Identity Tables
@@ -589,6 +592,101 @@ export const bankStatements = pgTable('bank_statements', {
 });
 
 // ----------------------------------------------------
+// Projeto Administrativo-Financeiro (Atividade N2)
+// Entidades PESSOAS, CLASSIFICACAO, MOVIMENTOCONTAS e PARCELACONTAS.
+// Cadastros nunca são excluídos: status 'ATIVO' | 'INATIVO' (exclusão lógica).
+// IDs inteiros sequenciais para exibição ("EXISTE – ID: 19").
+// ----------------------------------------------------
+
+export const pessoas = pgTable(
+  'pessoas',
+  {
+    id: serial('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id)
+      .notNull(),
+    tipo: varchar('tipo', { length: 20 }).notNull(), // 'FORNECEDOR' | 'CLIENTE' | 'FATURADO'
+    razaoSocial: varchar('razao_social', { length: 255 }).notNull(),
+    fantasia: varchar('fantasia', { length: 255 }),
+    documento: varchar('documento', { length: 14 }), // CPF/CNPJ apenas dígitos
+    status: varchar('status', { length: 10 }).default('ATIVO').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('pessoas_org_tipo_documento_uq')
+      .on(t.organizationId, t.tipo, t.documento)
+      .where(sql`${t.documento} is not null`),
+  ]
+);
+
+export const classificacao = pgTable(
+  'classificacao',
+  {
+    id: serial('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id)
+      .notNull(),
+    tipo: varchar('tipo', { length: 10 }).notNull(), // 'DESPESA' | 'RECEITA'
+    descricao: varchar('descricao', { length: 150 }).notNull(), // sempre em maiúsculas
+    status: varchar('status', { length: 10 }).default('ATIVO').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('classificacao_org_tipo_descricao_uq').on(t.organizationId, t.tipo, t.descricao),
+  ]
+);
+
+export const movimentoContas = pgTable('movimento_contas', {
+  id: serial('id').primaryKey(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id)
+    .notNull(),
+  tipo: varchar('tipo', { length: 10 }).notNull(), // 'APAGAR' | 'ARECEBER'
+  numeroNotaFiscal: varchar('numero_nota_fiscal', { length: 50 }),
+  dataEmissao: date('data_emissao'),
+  descricao: text('descricao'),
+  valorTotal: numeric('valor_total', { precision: 14, scale: 2 }).notNull(),
+  // Fornecedor (APAGAR) ou Cliente (ARECEBER)
+  pessoaId: integer('pessoa_id')
+    .references(() => pessoas.id)
+    .notNull(),
+  faturadoId: integer('faturado_id').references(() => pessoas.id),
+  status: varchar('status', { length: 10 }).default('ATIVO').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Um movimento pode ser classificado em uma ou mais classificações (N:N)
+export const movimentoClassificacao = pgTable(
+  'movimento_classificacao',
+  {
+    movimentoId: integer('movimento_id')
+      .references(() => movimentoContas.id, { onDelete: 'cascade' })
+      .notNull(),
+    classificacaoId: integer('classificacao_id')
+      .references(() => classificacao.id)
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.movimentoId, t.classificacaoId] })]
+);
+
+export const parcelaContas = pgTable('parcela_contas', {
+  id: serial('id').primaryKey(),
+  movimentoId: integer('movimento_id')
+    .references(() => movimentoContas.id, { onDelete: 'cascade' })
+    .notNull(),
+  identificacao: varchar('identificacao', { length: 20 }).notNull(), // 'ÚNICA' | '1/3' ...
+  numeroParcela: integer('numero_parcela').default(1).notNull(),
+  dataVencimento: date('data_vencimento').notNull(),
+  valorParcela: numeric('valor_parcela', { precision: 14, scale: 2 }).notNull(),
+  status: varchar('status', { length: 10 }).default('ATIVO').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ----------------------------------------------------
 // Drizzle Relations
 // ----------------------------------------------------
 
@@ -720,4 +818,46 @@ export const bankAccountsRelations = relations(bankAccounts, ({ one, many }) => 
     references: [organizations.id],
   }),
   statements: many(bankStatements),
+}));
+
+export const pessoasRelations = relations(pessoas, ({ many }) => ({
+  movimentos: many(movimentoContas, { relationName: 'movimento_pessoa' }),
+  movimentosFaturados: many(movimentoContas, { relationName: 'movimento_faturado' }),
+}));
+
+export const classificacaoRelations = relations(classificacao, ({ many }) => ({
+  movimentos: many(movimentoClassificacao),
+}));
+
+export const movimentoContasRelations = relations(movimentoContas, ({ one, many }) => ({
+  pessoa: one(pessoas, {
+    fields: [movimentoContas.pessoaId],
+    references: [pessoas.id],
+    relationName: 'movimento_pessoa',
+  }),
+  faturado: one(pessoas, {
+    fields: [movimentoContas.faturadoId],
+    references: [pessoas.id],
+    relationName: 'movimento_faturado',
+  }),
+  classificacoes: many(movimentoClassificacao),
+  parcelas: many(parcelaContas),
+}));
+
+export const movimentoClassificacaoRelations = relations(movimentoClassificacao, ({ one }) => ({
+  movimento: one(movimentoContas, {
+    fields: [movimentoClassificacao.movimentoId],
+    references: [movimentoContas.id],
+  }),
+  classificacao: one(classificacao, {
+    fields: [movimentoClassificacao.classificacaoId],
+    references: [classificacao.id],
+  }),
+}));
+
+export const parcelaContasRelations = relations(parcelaContas, ({ one }) => ({
+  movimento: one(movimentoContas, {
+    fields: [parcelaContas.movimentoId],
+    references: [movimentoContas.id],
+  }),
 }));

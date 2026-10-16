@@ -4,3 +4,4 @@ export * from './finance.schema';
 export * from './stock.schema';
 export * from './employee.schema';
 export * from './analytics.schema';
+export * from './administrativo.schema';

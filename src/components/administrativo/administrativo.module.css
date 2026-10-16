@@ -1,0 +1,422 @@
+/* Telas do Projeto Administrativo-Financeiro (Atividade N2) */
+
+.searchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+.searchInput {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.searchField.searchField {
+  padding-left: 2.25rem;
+  padding-right: 2.25rem;
+}
+
+/* Usa o botão próprio de limpar em vez do "x" nativo do input search */
+.searchField::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clearButton {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.clearButton:hover,
+.clearButton:focus-visible {
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+}
+
+.searchInput > :global(.input-group),
+.filter > :global(.input-group) {
+  margin-bottom: 0;
+}
+
+.filter {
+  flex: 0 1 200px;
+}
+
+.searchButtons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.searchOptions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sortButton:hover,
+.sortButton:focus-visible {
+  color: var(--color-primary-600);
+}
+
+.table thead th,
+.table tbody td {
+  padding: var(--space-3);
+}
+
+.table thead th {
+  white-space: nowrap;
+}
+
+.table tbody td {
+  font-size: var(--text-sm);
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background-color var(--transition-fast, 150ms) ease;
+}
+
+.table tbody tr:hover td {
+  background: var(--bg-surface-2);
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.rowActions > :global(.btn) {
+  white-space: nowrap;
+}
+
+/* A coluna de ações fica fixa à direita quando a tabela rola na horizontal */
+.table .actionsCell {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--bg-surface-1);
+  box-shadow: -8px 0 8px -8px rgba(34, 30, 25, 0.18);
+}
+
+.table thead .actionsCell {
+  background: var(--bg-surface-2);
+}
+
+/* Abaixo de ~1100px de tabela, os botões de ação mostram só o ícone */
+.tableContainer {
+  container-type: inline-size;
+}
+
+@container (max-width: 1100px) {
+  .actionLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .rowActions > :global(.btn) {
+    padding-inline: var(--space-2);
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.emptyState > svg {
+  margin-bottom: var(--space-2);
+  opacity: 0.7;
+}
+
+.emptyState strong {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+.inactiveRow td {
+  color: var(--text-tertiary);
+}
+
+.insertRow {
+  display: flex;
+  justify-content: center;
+}
+
+.muted {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.breakAll {
+  word-break: break-all;
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tagList > :global(.badge) {
+  white-space: normal;
+  text-align: left;
+}
+
+.parcelasCell {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  justify-content: start;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.parcelaValor {
+  text-align: right;
+}
+
+.formNotice {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-light);
+  color: var(--color-warning-dark);
+  font-size: var(--text-sm);
+}
+
+.formNotice a {
+  color: inherit;
+  font-weight: var(--font-semibold);
+}
+
+.chipGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--space-1);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-3);
+  border: var(--border-medium);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease;
+}
+
+.chip:hover {
+  border-color: var(--color-primary-500, currentColor);
+  color: var(--text-primary);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-primary-500, currentColor);
+  outline-offset: 2px;
+}
+
+.chipSelected,
+.chipSelected:hover {
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  color: #fff;
+}
+
+.gerador {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+}
+
+.gerador > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-primary-700);
+  cursor: pointer;
+}
+
+.gerador[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+.geradorRow {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1.2fr auto;
+  gap: var(--space-2);
+  align-items: end;
+  margin-bottom: var(--space-2);
+}
+
+.geradorRow > :global(.input-group) {
+  margin-bottom: 0;
+}
+
+.gerador p {
+  margin: 0;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.formError {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-light);
+  color: var(--color-danger-dark);
+  font-size: var(--text-sm);
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.fieldset legend {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.checkGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--space-1);
+}
+
+.parcelaRow {
+  display: grid;
+  grid-template-columns: 64px 1fr 1fr auto;
+  gap: var(--space-2);
+  align-items: end;
+  margin-bottom: var(--space-2);
+}
+
+.parcelaRow > :global(.input-group) {
+  margin-bottom: 0;
+}
+
+.parcelaId {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  padding-bottom: var(--space-3);
+}
+
+.parcelaFooter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 560px) {
+  .geradorRow {
+    grid-template-columns: 1fr 1fr;
+  }
+  .parcelaRow {
+    grid-template-columns: 48px 1fr auto;
+  }
+  .parcelaRow > :nth-child(3) {
+    grid-column: 2 / 3;
+  }
+  .searchButtons {
+    width: 100%;
+  }
+  .searchButtons > * {
+    flex: 1;
+  }
+}

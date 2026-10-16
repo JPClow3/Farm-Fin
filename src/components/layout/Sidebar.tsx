@@ -25,6 +25,10 @@ import {
   Home,
   Wheat,
   Sparkles,
+  Users,
+  Tags,
+  ArrowDownCircle,
+  ArrowUpCircle,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -171,6 +175,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           icon: <Sparkles size={18} strokeWidth={2.2} />,
           module: 'processador-nf',
         },
+        {
+          href: '/atividades/pessoas',
+          label: 'Pessoas',
+          icon: <Users size={18} strokeWidth={2.2} />,
+          module: 'processador-nf',
+        },
+        {
+          href: '/atividades/classificacoes',
+          label: 'Classificações',
+          icon: <Tags size={18} strokeWidth={2.2} />,
+          module: 'processador-nf',
+        },
+        {
+          href: '/atividades/contas-a-pagar',
+          label: 'Registrar Contas a Pagar',
+          icon: <ArrowUpCircle size={18} strokeWidth={2.2} />,
+          module: 'processador-nf',
+        },
+        {
+          href: '/atividades/contas-a-receber',
+          label: 'Registrar Contas a Receber',
+          icon: <ArrowDownCircle size={18} strokeWidth={2.2} />,
+          module: 'processador-nf',
+        },
       ],
     },
   ];
@@ -253,13 +281,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             border: '1px solid var(--border-color)',
           }}
         >
-          <div className="flex-row items-center" style={{ gap: '6px', fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
+          <div
+            className="flex-row items-center"
+            style={{
+              gap: '6px',
+              fontSize: '12px',
+              fontWeight: '700',
+              color: 'var(--text-primary)',
+            }}
+          >
             <Home size={14} color="var(--color-primary-600)" />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {activeFarm?.name || 'Fazenda Principal'}
             </span>
           </div>
-
           <div className="flex-col" style={{ gap: '4px' }}>
             <label
               htmlFor="mobile-drawer-safra-select"

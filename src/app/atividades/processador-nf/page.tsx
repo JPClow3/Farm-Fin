@@ -10,6 +10,13 @@ import { useModuleGuard } from '@/lib/useModuleGuard';
 import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
 import type { ExtractedInvoiceData } from '@/lib/mistralInvoiceAgent';
 import type { InvoiceReview } from '@/lib/invoiceQuality';
+import { analisarNotaFiscal, lancarNotaFiscal } from '@/actions/administrativo';
+import {
+  documentoLabel,
+  type EntidadeConsulta,
+  type LancamentoResultado,
+  type NotaAnalise,
+} from '@/lib/administrativo';
 import {
   Sparkles,
   UploadCloud,
@@ -25,6 +32,12 @@ import {
   Building,
   User,
   FlaskConical,
+  Database,
+  CheckCircle2,
+  Send,
+  RefreshCw,
+  PlusCircle,
+  FilePlus2,
 } from 'lucide-react';
 import styles from './processador-nf.module.css';
 
@@ -57,6 +70,69 @@ function formatFileSize(bytes: number): string {
     : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function acaoLabel(acao: 'criado' | 'existente' | 'reativado', feminino = false): string {
+  if (acao === 'existente') return 'JÁ EXISTIA';
+  return `${acao === 'criado' ? 'CRIAD' : 'REATIVAD'}${feminino ? 'A' : 'O'}`;
+}
+const ACAO_BADGE = {
+  criado: 'badge--success',
+  existente: 'badge--neutral',
+  reativado: 'badge--info',
+} as const;
+
+/** Resposta da consulta no formato pedido: nome, documento e EXISTE – ID / NÃO EXISTE */
+function ConsultaBloco({
+  titulo,
+  entidade,
+  lancado,
+}: {
+  titulo: string;
+  entidade: EntidadeConsulta;
+  /** Depois do lançamento a consulta é refeita: não há mais o que "será" feito */
+  lancado: boolean;
+}) {
+  const inativo = entidade.status === 'INATIVO';
+  // "despesa" é feminino: será criada / usada / reativada
+  const o = titulo === 'DESPESA' ? 'a' : 'o';
+  const efeito = !entidade.existe
+    ? `Será criad${o} ao lançar`
+    : inativo
+      ? `Está inativ${o}: será reativad${o} ao lançar`
+      : `Será usad${o} no lançamento`;
+  return (
+    <div
+      className={`${styles.consultaItem} ${
+        entidade.existe ? styles.consultaItemExiste : styles.consultaItemNovo
+      }`}
+    >
+      <span className={styles.consultaTitulo}>
+        {entidade.existe ? (
+          <CheckCircle2 size={14} aria-hidden="true" />
+        ) : (
+          <PlusCircle size={14} aria-hidden="true" />
+        )}
+        {titulo}
+      </span>
+      <span className={styles.consultaNome}>{entidade.nome || '—'}</span>
+      {entidade.documento && (
+        <span className={styles.consultaDoc}>
+          {documentoLabel(entidade.documento)}: {entidade.documento}
+        </span>
+      )}
+      <span
+        className={`${styles.consultaStatus} ${
+          entidade.existe ? styles.consultaExiste : styles.consultaNaoExiste
+        }`}
+      >
+        {entidade.existe
+          ? `EXISTE – ID: ${entidade.id}${entidade.status === 'INATIVO' ? ' (INATIVO)' : ''}`
+          : 'NÃO EXISTE'}
+      </span>
+      {!lancado && <span className={styles.consultaEfeito}>{efeito}</span>}
+    </div>
+  );
+}
+
 function validatePdf(file: File): string | null {
   if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
     return 'Selecione um arquivo no formato PDF (.pdf).';
@@ -80,6 +156,12 @@ export default function ProcessadorNfPage() {
   const [rawJsonString, setRawJsonString] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [error, setError] = useState<ProcessingError | null>(null);
+  const [analise, setAnalise] = useState<NotaAnalise | null>(null);
+  const [analiseErro, setAnaliseErro] = useState<string | null>(null);
+  const [isAnalisando, setIsAnalisando] = useState(false);
+  const [isLancando, setIsLancando] = useState(false);
+  const [lancamento, setLancamento] = useState<LancamentoResultado | null>(null);
+  const [revisaoConfirmada, setRevisaoConfirmada] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -103,6 +185,52 @@ export default function ProcessadorNfPage() {
     return <AppShellSkeleton />;
   }
 
+  const clearAnalise = () => {
+    setAnalise(null);
+    setAnaliseErro(null);
+    setLancamento(null);
+    setRevisaoConfirmada(false);
+  };
+
+  // 2ª etapa: consulta no banco se fornecedor, faturado e despesa já existem
+  const runAnalise = async (data: ExtractedInvoiceData) => {
+    setIsAnalisando(true);
+    setAnaliseErro(null);
+    try {
+      const result = await analisarNotaFiscal(data);
+      if (result.success) setAnalise(result.data);
+      else setAnaliseErro(result.error);
+    } catch {
+      setAnaliseErro('Sem conexão com o servidor para consultar o banco de dados.');
+    } finally {
+      setIsAnalisando(false);
+    }
+  };
+
+  const handleLancar = async () => {
+    if (!extractedData) return;
+    setIsLancando(true);
+    setAnaliseErro(null);
+    try {
+      const result = await lancarNotaFiscal(extractedData);
+      if (!result.success) {
+        setAnaliseErro(result.error);
+        return;
+      }
+      setLancamento(result.data);
+      addToast({
+        type: 'success',
+        title: 'Registro lançado com sucesso',
+        message: `Movimento ID ${result.data.movimentoId} gravado em Contas a Pagar.`,
+      });
+      await runAnalise(extractedData);
+    } catch {
+      setAnaliseErro('Sem conexão com o servidor. O lançamento não foi confirmado.');
+    } finally {
+      setIsLancando(false);
+    }
+  };
+
   const selectFile = (file: File | undefined) => {
     if (!file || isLoading) return;
     const validationError = validatePdf(file);
@@ -116,6 +244,7 @@ export default function ProcessadorNfPage() {
     setExtractedData(null);
     setReview(null);
     setRawJsonString('');
+    clearAnalise();
   };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -130,6 +259,7 @@ export default function ProcessadorNfPage() {
     setReview(null);
     setRawJsonString('');
     setError(null);
+    clearAnalise();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -154,6 +284,7 @@ export default function ProcessadorNfPage() {
     setExtractedData(null);
     setReview(null);
     setRawJsonString('');
+    clearAnalise();
 
     try {
       const formData = new FormData();
@@ -190,6 +321,7 @@ export default function ProcessadorNfPage() {
         title: result.review?.required ? 'Confira os campos sinalizados' : 'Extração concluída',
         message: 'Confira os dados com o PDF antes de lançar em Contas a Pagar.',
       });
+      void runAnalise(result.data);
     } catch {
       setError({
         message: 'Sem conexão com o servidor. Verifique sua internet e tente novamente.',
@@ -247,12 +379,13 @@ export default function ProcessadorNfPage() {
               <Sparkles size={12} aria-hidden="true" />
               Leitura com IA
             </span>
-            <span className="badge badge--neutral">Atividade 1ª etapa</span>
+            <span className="badge badge--neutral">Atividade N2 · 1ª e 2ª etapas</span>
           </div>
           <h1 className="page-title">Leitor de Nota Fiscal</h1>
           <p className="page-subtitle">
-            Envie o PDF da nota (DANFE, NF-e ou NFS-e). O sistema lê o documento, preenche os dados
-            de Contas a Pagar e classifica o tipo de despesa.
+            Envie o PDF da nota (DANFE, NF-e ou NFS-e). O sistema lê o documento, classifica a
+            despesa, consulta fornecedor, faturado e despesa no banco de dados e lança a conta a
+            pagar com suas parcelas.
           </p>
         </div>
       </div>
@@ -401,9 +534,16 @@ export default function ProcessadorNfPage() {
           <details className={`${styles.details} ${styles.section}`}>
             <summary>Sobre a atividade</summary>
             <p>
-              Atividade da 1ª etapa de Prática de Engenharia de Software: extrair do PDF os campos
-              obrigatórios (fornecedor, faturado, número da NF, data de emissão, produtos, parcelas,
-              vencimento e valor total), classificar a despesa e exibir o resultado em JSON na tela.
+              1ª etapa: extrair do PDF os campos obrigatórios (fornecedor, faturado, número da NF,
+              data de emissão, produtos, parcelas, vencimento e valor total), classificar a despesa
+              e exibir o resultado em JSON na tela.
+            </p>
+            <p>
+              2ª etapa: consultar no banco se o FORNECEDOR, o FATURADO e a DESPESA existem, criar o
+              que faltar e lançar o movimento a pagar com suas parcelas. Os cadastros ficam em{' '}
+              <Link href="/atividades/pessoas">Pessoas</Link>,{' '}
+              <Link href="/atividades/classificacoes">Classificações</Link> e{' '}
+              <Link href="/atividades/contas-a-pagar">Contas a Pagar</Link>.
             </p>
           </details>
         </ClayCard>
@@ -428,6 +568,205 @@ export default function ProcessadorNfPage() {
               </div>
             </div>
           )}
+          <ClayCard>
+            <div className={styles.resultHeader}>
+              <div>
+                <h2 className="card-title">
+                  <Database size={18} aria-hidden="true" className={styles.titleIcon} />
+                  3. Consulta no banco de dados
+                </h2>
+                <p className="card-subtitle">
+                  Fornecedor, faturado e despesa procurados nos cadastros.
+                </p>
+              </div>
+              {analise && (
+                <ClayButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => runAnalise(extractedData)}
+                  disabled={isAnalisando || isLancando}
+                >
+                  <RefreshCw size={14} aria-hidden="true" />
+                  Consultar de novo
+                </ClayButton>
+              )}
+            </div>
+
+            {isAnalisando && !analise && (
+              <div className={styles.progress} role="status" aria-live="polite">
+                <Spinner size={16} />
+                <span>Consultando o banco de dados…</span>
+              </div>
+            )}
+
+            {analiseErro && (
+              <div className={`${styles.alert} ${styles.section}`} role="alert">
+                <AlertTriangle size={18} className={styles.alertIcon} aria-hidden="true" />
+                <div>{analiseErro}</div>
+              </div>
+            )}
+
+            {analise && (
+              <>
+                <div className={styles.consultaGrid} aria-live="polite">
+                  <ConsultaBloco
+                    titulo="FORNECEDOR"
+                    entidade={analise.fornecedor}
+                    lancado={lancamento !== null}
+                  />
+                  <ConsultaBloco
+                    titulo="FATURADO"
+                    entidade={analise.faturado}
+                    lancado={lancamento !== null}
+                  />
+                  {analise.despesas.map((despesa) => (
+                    <ConsultaBloco
+                      key={despesa.nome}
+                      titulo="DESPESA"
+                      entidade={despesa}
+                      lancado={lancamento !== null}
+                    />
+                  ))}
+                </div>
+
+                {lancamento ? (
+                  <div className={styles.successBox} role="status">
+                    <CheckCircle2 size={24} aria-hidden="true" />
+                    <div className={styles.successBody}>
+                      <strong className={styles.successTitle}>Registro lançado com sucesso!</strong>
+                      <p>
+                        Movimento a pagar <strong>ID {lancamento.movimentoId}</strong> no valor de{' '}
+                        <strong>{formatCurrency(lancamento.valorTotal)}</strong>.
+                      </p>
+                      <dl className={styles.successList}>
+                        <dt>Fornecedor</dt>
+                        <dd>
+                          ID {lancamento.fornecedor.id}
+                          <span className={`badge ${ACAO_BADGE[lancamento.fornecedor.acao]}`}>
+                            {acaoLabel(lancamento.fornecedor.acao)}
+                          </span>
+                        </dd>
+                        <dt>Faturado</dt>
+                        <dd>
+                          ID {lancamento.faturado.id}
+                          <span className={`badge ${ACAO_BADGE[lancamento.faturado.acao]}`}>
+                            {acaoLabel(lancamento.faturado.acao)}
+                          </span>
+                        </dd>
+                        {lancamento.despesas.map((d) => (
+                          <React.Fragment key={d.id}>
+                            <dt>Despesa</dt>
+                            <dd>
+                              {d.descricao} · ID {d.id}
+                              <span className={`badge ${ACAO_BADGE[d.acao]}`}>
+                                {acaoLabel(d.acao, true)}
+                              </span>
+                            </dd>
+                          </React.Fragment>
+                        ))}
+                        {lancamento.parcelas.map((p) => (
+                          <React.Fragment key={p.id}>
+                            <dt>Parcela {p.identificacao}</dt>
+                            <dd>
+                              ID {p.id} · vence {formatDate(p.dataVencimento)} ·{' '}
+                              {formatCurrency(p.valorParcela)}
+                            </dd>
+                          </React.Fragment>
+                        ))}
+                      </dl>
+                      <div className={styles.successActions}>
+                        <Link
+                          href="/atividades/contas-a-pagar"
+                          className="btn btn--primary btn--sm"
+                        >
+                          Ver em Contas a Pagar
+                        </Link>
+                        <ClayButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleReset();
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        >
+                          <FilePlus2 size={14} aria-hidden="true" />
+                          Processar outra nota
+                        </ClayButton>
+                      </div>
+                    </div>
+                  </div>
+                ) : analise.movimentoExistenteId ? (
+                  <div className={`${styles.reviewAlert} ${styles.section}`} role="alert">
+                    <AlertTriangle size={20} aria-hidden="true" />
+                    <div>
+                      <strong>Esta nota já foi lançada</strong> (movimento ID{' '}
+                      {analise.movimentoExistenteId}).{' '}
+                      <Link href="/atividades/contas-a-pagar">Ver em Contas a Pagar</Link>
+                    </div>
+                  </div>
+                ) : analise.pendencias.length > 0 ? (
+                  <div className={`${styles.reviewAlert} ${styles.section}`} role="alert">
+                    <AlertTriangle size={20} aria-hidden="true" />
+                    <div>
+                      <strong>Não é possível lançar com os dados extraídos</strong>
+                      <ul>
+                        {analise.pendencias.map((p) => (
+                          <li key={p}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.section}>
+                    <h3 className={styles.sectionTitle}>Ao lançar, o sistema irá</h3>
+                    <ul className={styles.planList}>
+                      {!analise.fornecedor.existe && <li>Criar o novo FORNECEDOR</li>}
+                      {analise.fornecedor.status === 'INATIVO' && <li>Reativar o FORNECEDOR</li>}
+                      {!analise.faturado.existe && <li>Criar o novo FATURADO</li>}
+                      {analise.faturado.status === 'INATIVO' && <li>Reativar o FATURADO</li>}
+                      {analise.despesas
+                        .filter((d) => !d.existe)
+                        .map((d) => (
+                          <li key={`nova-${d.nome}`}>Criar a nova DESPESA {d.nome}</li>
+                        ))}
+                      {analise.despesas
+                        .filter((d) => d.status === 'INATIVO')
+                        .map((d) => (
+                          <li key={`reativar-${d.nome}`}>Reativar a DESPESA {d.nome}</li>
+                        ))}
+                      <li>
+                        Criar o registro do movimento a pagar e{' '}
+                        {parcelas.length > 1 ? `suas ${parcelas.length} parcelas` : 'sua parcela'}
+                      </li>
+                    </ul>
+                    {review?.required && (
+                      <label className={styles.confirmCheck}>
+                        <input
+                          type="checkbox"
+                          checked={revisaoConfirmada}
+                          onChange={(e) => setRevisaoConfirmada(e.target.checked)}
+                        />
+                        Conferi com o PDF os campos sinalizados na revisão
+                      </label>
+                    )}
+                    <div className={styles.uploadActions}>
+                      <ClayButton
+                        variant="primary"
+                        size="lg"
+                        loading={isLancando}
+                        disabled={isAnalisando || (review?.required && !revisaoConfirmada)}
+                        onClick={handleLancar}
+                      >
+                        {!isLancando && <Send size={18} aria-hidden="true" />}
+                        {isLancando ? 'Lançando…' : '4. Lançar conta a pagar'}
+                      </ClayButton>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </ClayCard>
+
           <ClayCard>
             <div className={styles.resultHeader}>
               <div>

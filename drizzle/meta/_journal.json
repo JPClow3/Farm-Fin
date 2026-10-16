@@ -43,6 +43,13 @@
       "when": 1790256435632,
       "tag": "0005_username_login",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791723780917,
+      "tag": "0006_atividade_n2_contas",
+      "breakpoints": true
     }
   ]
 }

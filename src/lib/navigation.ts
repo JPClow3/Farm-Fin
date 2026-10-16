@@ -51,6 +51,28 @@ export const NAV_SECTIONS: NavSectionConfig[] = [
       { href: '/configuracoes', label: 'Configurações', module: 'configuracoes' },
     ],
   },
+  {
+    title: 'Atividades Acadêmicas',
+    items: [
+      {
+        href: '/atividades/processador-nf',
+        label: 'Processador de NF (IA)',
+        module: 'processador-nf',
+      },
+      { href: '/atividades/pessoas', label: 'Pessoas', module: 'processador-nf' },
+      { href: '/atividades/classificacoes', label: 'Classificações', module: 'processador-nf' },
+      {
+        href: '/atividades/contas-a-pagar',
+        label: 'Registrar Contas a Pagar',
+        module: 'processador-nf',
+      },
+      {
+        href: '/atividades/contas-a-receber',
+        label: 'Registrar Contas a Receber',
+        module: 'processador-nf',
+      },
+    ],
+  },
 ];
 
 export function findNavContext(pathname: string): { section: string; item: NavRouteConfig } | null {
