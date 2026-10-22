@@ -15,6 +15,7 @@ import { useFarm } from '../../context/FarmContext';
 import { useToast } from '../../context/ToastContext';
 import { getTodayDateString } from '../../lib/dateUtils';
 import { CreditCard, CircleDollarSign } from 'lucide-react';
+import { NotaDraftProvider } from '@/context/NotaDraftContext';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
@@ -109,162 +110,167 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <Header
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        onOpenQuickNew={() => setIsQuickNewOpen(true)}
-      />
-      <main className="app-main">
-        {isLoading ? (
-          <AppShellSkeleton />
-        ) : (
-          <>
-            <Breadcrumbs />
-            {children}
-          </>
-        )}
-      </main>
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNavigation onOpenSidebar={() => setIsSidebarOpen(true)} />
-
-      {/* Quick Launch Modal */}
-      <ClayModal
-        isOpen={isQuickNewOpen}
-        onClose={() => setIsQuickNewOpen(false)}
-        title="Novo Lançamento Rápido"
-        subtitle="Adicione rapidamente uma conta a pagar ou a receber na safra ativa"
-      >
-        <form onSubmit={handleSaveQuick} className="flex-col" style={{ gap: 'var(--space-4)' }}>
-          <div className="flex-row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-            <ClayButton
-              type="button"
-              variant={quickType === 'pagar' ? 'primary' : 'ghost'}
-              size="sm"
-              style={{
-                flex: '1 1 auto',
-                minWidth: '180px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                whiteSpace: 'normal',
-                height: 'auto',
-              }}
-              onClick={() => setQuickType('pagar')}
-            >
-              <CreditCard size={15} />
-              <span>Conta a Pagar (Despesa)</span>
-            </ClayButton>
-            <ClayButton
-              type="button"
-              variant={quickType === 'receber' ? 'primary' : 'ghost'}
-              size="sm"
-              style={{
-                flex: '1 1 auto',
-                minWidth: '180px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                whiteSpace: 'normal',
-                height: 'auto',
-              }}
-              onClick={() => setQuickType('receber')}
-            >
-              <CircleDollarSign size={15} />
-              <span>Conta a Receber (Receita)</span>
-            </ClayButton>
-          </div>
-
-          <ClayInput
-            label="Descrição do Lançamento"
-            placeholder={
-              quickType === 'pagar'
-                ? 'Ex: Fertilizante Yara NPK Talhão 01'
-                : 'Ex: Venda de Soja Lote Bunge'
-            }
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-          />
-
-          <div className="form-grid-2">
-            <ClayInput
-              label="Valor (R$)"
-              placeholder="0,00"
-              type="number"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-            <ClayInput
-              label="Data de Vencimento"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              required
-            />
-          </div>
-
-          {quickType === 'pagar' ? (
-            <>
-              <div className="form-grid-2">
-                <ClaySelect
-                  label="Fornecedor"
-                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-                  value={entityId || (suppliers[0]?.id ?? '')}
-                  onChange={(e) => setEntityId(e.target.value)}
-                />
-                <ClaySelect
-                  label="Categoria Financeira"
-                  options={[
-                    { value: 'Insumos > Fertilizantes', label: 'Insumos > Fertilizantes' },
-                    { value: 'Insumos > Defensivos', label: 'Insumos > Defensivos' },
-                    { value: 'Insumos > Sementes', label: 'Insumos > Sementes' },
-                    {
-                      value: 'Combustíveis e Lubrificantes',
-                      label: 'Combustíveis e Lubrificantes',
-                    },
-                    { value: 'Manutenção de Maquinário', label: 'Manutenção de Maquinário' },
-                    { value: 'Despesas Administrativas', label: 'Despesas Administrativas' },
-                  ]}
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                />
-              </div>
-
-              <ClaySelect
-                label="Talhão Vinculado (Opcional)"
-                options={[
-                  { value: '', label: 'Rateio Geral da Fazenda' },
-                  ...activeFields.map((f) => ({ value: f.id, label: `${f.name} (${f.area} ha)` })),
-                ]}
-                value={fieldId}
-                onChange={(e) => setFieldId(e.target.value)}
-              />
-            </>
+    <NotaDraftProvider>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        <Header
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          onOpenQuickNew={() => setIsQuickNewOpen(true)}
+        />
+        <main className="app-main">
+          {isLoading ? (
+            <AppShellSkeleton />
           ) : (
-            <ClaySelect
-              label="Cliente / Comprador"
-              options={customers.map((c) => ({ value: c.id, label: c.name }))}
-              value={entityId || (customers[0]?.id ?? '')}
-              onChange={(e) => setEntityId(e.target.value)}
-            />
+            <>
+              <Breadcrumbs />
+              {children}
+            </>
           )}
+        </main>
 
-          <div className="modal__footer">
-            <ClayButton type="button" variant="ghost" onClick={() => setIsQuickNewOpen(false)}>
-              Cancelar
-            </ClayButton>
-            <ClayButton type="submit" variant="primary">
-              Salvar Lançamento
-            </ClayButton>
-          </div>
-        </form>
-      </ClayModal>
-    </div>
+        {/* Mobile Bottom Navigation */}
+        <BottomNavigation onOpenSidebar={() => setIsSidebarOpen(true)} />
+
+        {/* Quick Launch Modal */}
+        <ClayModal
+          isOpen={isQuickNewOpen}
+          onClose={() => setIsQuickNewOpen(false)}
+          title="Novo Lançamento Rápido"
+          subtitle="Adicione rapidamente uma conta a pagar ou a receber na safra ativa"
+        >
+          <form onSubmit={handleSaveQuick} className="flex-col" style={{ gap: 'var(--space-4)' }}>
+            <div className="flex-row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <ClayButton
+                type="button"
+                variant={quickType === 'pagar' ? 'primary' : 'ghost'}
+                size="sm"
+                style={{
+                  flex: '1 1 auto',
+                  minWidth: '180px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  whiteSpace: 'normal',
+                  height: 'auto',
+                }}
+                onClick={() => setQuickType('pagar')}
+              >
+                <CreditCard size={15} />
+                <span>Conta a Pagar (Despesa)</span>
+              </ClayButton>
+              <ClayButton
+                type="button"
+                variant={quickType === 'receber' ? 'primary' : 'ghost'}
+                size="sm"
+                style={{
+                  flex: '1 1 auto',
+                  minWidth: '180px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  whiteSpace: 'normal',
+                  height: 'auto',
+                }}
+                onClick={() => setQuickType('receber')}
+              >
+                <CircleDollarSign size={15} />
+                <span>Conta a Receber (Receita)</span>
+              </ClayButton>
+            </div>
+
+            <ClayInput
+              label="Descrição do Lançamento"
+              placeholder={
+                quickType === 'pagar'
+                  ? 'Ex: Fertilizante Yara NPK Talhão 01'
+                  : 'Ex: Venda de Soja Lote Bunge'
+              }
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+
+            <div className="form-grid-2">
+              <ClayInput
+                label="Valor (R$)"
+                placeholder="0,00"
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
+              <ClayInput
+                label="Data de Vencimento"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                required
+              />
+            </div>
+
+            {quickType === 'pagar' ? (
+              <>
+                <div className="form-grid-2">
+                  <ClaySelect
+                    label="Fornecedor"
+                    options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                    value={entityId || (suppliers[0]?.id ?? '')}
+                    onChange={(e) => setEntityId(e.target.value)}
+                  />
+                  <ClaySelect
+                    label="Categoria Financeira"
+                    options={[
+                      { value: 'Insumos > Fertilizantes', label: 'Insumos > Fertilizantes' },
+                      { value: 'Insumos > Defensivos', label: 'Insumos > Defensivos' },
+                      { value: 'Insumos > Sementes', label: 'Insumos > Sementes' },
+                      {
+                        value: 'Combustíveis e Lubrificantes',
+                        label: 'Combustíveis e Lubrificantes',
+                      },
+                      { value: 'Manutenção de Maquinário', label: 'Manutenção de Maquinário' },
+                      { value: 'Despesas Administrativas', label: 'Despesas Administrativas' },
+                    ]}
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  />
+                </div>
+
+                <ClaySelect
+                  label="Talhão Vinculado (Opcional)"
+                  options={[
+                    { value: '', label: 'Rateio Geral da Fazenda' },
+                    ...activeFields.map((f) => ({
+                      value: f.id,
+                      label: `${f.name} (${f.area} ha)`,
+                    })),
+                  ]}
+                  value={fieldId}
+                  onChange={(e) => setFieldId(e.target.value)}
+                />
+              </>
+            ) : (
+              <ClaySelect
+                label="Cliente / Comprador"
+                options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                value={entityId || (customers[0]?.id ?? '')}
+                onChange={(e) => setEntityId(e.target.value)}
+              />
+            )}
+
+            <div className="modal__footer">
+              <ClayButton type="button" variant="ghost" onClick={() => setIsQuickNewOpen(false)}>
+                Cancelar
+              </ClayButton>
+              <ClayButton type="submit" variant="primary">
+                Salvar Lançamento
+              </ClayButton>
+            </div>
+          </form>
+        </ClayModal>
+      </div>
+    </NotaDraftProvider>
   );
 };

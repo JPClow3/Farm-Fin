@@ -4,17 +4,21 @@ import type { ExtractedInvoiceData } from '@/lib/mistralInvoiceAgent';
 import { ClayInput } from '@/components/ui/ClayInput';
 import { ClayButton } from '@/components/ui/ClayButton';
 import { Plus, Trash2 } from 'lucide-react';
+import { notaFieldId } from './NotaErrorSummary';
 import styles from '@/app/atividades/processador-nf/processador-nf.module.css';
 
 export function NotaReviewForm({
   data,
   onChange,
   disabled,
+  errors = {},
 }: {
   data: ExtractedInvoiceData;
   onChange: (data: ExtractedInvoiceData) => void;
   disabled: boolean;
+  errors?: Record<string, string>;
 }) {
+  const field = (path: string) => ({ id: notaFieldId(path), error: errors[path] });
   const update = (patch: Partial<ExtractedInvoiceData>) => onChange({ ...data, ...patch });
   const updateParcelas = (parcelas: ExtractedInvoiceData['parcelas']) =>
     update({
@@ -28,6 +32,7 @@ export function NotaReviewForm({
       <h3 className={styles.sectionTitle}>Empresa emitente</h3>
       <div className={styles.formGrid}>
         <ClayInput
+          {...field('fornecedor.razaoSocial')}
           label="Razão social do fornecedor"
           maxLength={255}
           value={data.fornecedor.razaoSocial}
@@ -36,6 +41,7 @@ export function NotaReviewForm({
           }
         />
         <ClayInput
+          {...field('fornecedor.cnpj')}
           label="CPF/CNPJ do fornecedor"
           maxLength={30}
           inputMode="numeric"
@@ -54,12 +60,14 @@ export function NotaReviewForm({
       <h3 className={styles.sectionTitle}>Destinatário e documento</h3>
       <div className={styles.formGrid}>
         <ClayInput
+          {...field('faturado.nomeCompleto')}
           label="Nome do destinatário"
           maxLength={255}
           value={data.faturado.nomeCompleto}
           onChange={(e) => update({ faturado: { ...data.faturado, nomeCompleto: e.target.value } })}
         />
         <ClayInput
+          {...field('faturado.cpf')}
           label="CPF/CNPJ do destinatário"
           maxLength={30}
           inputMode="numeric"
@@ -67,12 +75,14 @@ export function NotaReviewForm({
           onChange={(e) => update({ faturado: { ...data.faturado, cpf: e.target.value } })}
         />
         <ClayInput
+          {...field('numeroNotaFiscal')}
           label="Número da nota fiscal"
           maxLength={50}
           value={data.numeroNotaFiscal}
           onChange={(e) => update({ numeroNotaFiscal: e.target.value })}
         />
         <ClayInput
+          {...field('dataEmissao')}
           label="Data de emissão"
           type="date"
           value={data.dataEmissao ?? ''}
@@ -80,7 +90,9 @@ export function NotaReviewForm({
         />
       </div>
       <div className={styles.sectionHeading}>
-        <h3 className={styles.sectionTitle}>Produtos e serviços</h3>
+        <h3 id={notaFieldId('produtos')} tabIndex={-1} className={styles.sectionTitle}>
+          Produtos e serviços
+        </h3>
         <ClayButton
           type="button"
           variant="ghost"
@@ -91,6 +103,7 @@ export function NotaReviewForm({
           <Plus size={14} aria-hidden="true" /> Adicionar produto
         </ClayButton>
       </div>
+      {errors.produtos && <p className="input-error-msg">{errors.produtos}</p>}
       {data.descricaoProdutos.length === 0 && (
         <p className={styles.muted}>
           Nenhum produto identificado. Adicione os itens que constam na nota.
@@ -99,7 +112,7 @@ export function NotaReviewForm({
       {data.descricaoProdutos.map((descricao, i) => (
         <div className={styles.editRow} key={i}>
           <ClayInput
-            id={`produto-${i}`}
+            {...field(`descricaoProdutos.${i}`)}
             label={`Produto ${i + 1}`}
             maxLength={500}
             value={descricao}
@@ -127,6 +140,7 @@ export function NotaReviewForm({
       <h3 className={styles.sectionTitle}>Pagamento</h3>
       <div className={styles.formGrid}>
         <ClayInput
+          {...field('valorTotal')}
           label="Valor total da nota (R$)"
           type="number"
           min="0.01"
@@ -138,6 +152,7 @@ export function NotaReviewForm({
           }
         />
         <ClayInput
+          {...field('classificacaoDespesa')}
           label="Classificações de despesa"
           hint="Separe com ponto e vírgula quando houver mais de uma."
           value={data.classificacaoDespesa.join(';')}
@@ -150,7 +165,9 @@ export function NotaReviewForm({
         />
       </div>
       <div className={styles.sectionHeading}>
-        <h3 className={styles.sectionTitle}>Parcelas ({data.parcelas.length})</h3>
+        <h3 id={notaFieldId('parcelas')} tabIndex={-1} className={styles.sectionTitle}>
+          Parcelas ({data.parcelas.length})
+        </h3>
         <ClayButton
           type="button"
           variant="ghost"
@@ -166,13 +183,14 @@ export function NotaReviewForm({
           <Plus size={14} aria-hidden="true" /> Adicionar parcela
         </ClayButton>
       </div>
+      {errors.parcelas && <p className="input-error-msg">{errors.parcelas}</p>}
       {data.parcelas.length === 0 && (
         <p className={styles.muted}>Informe o vencimento e o valor para lançar a conta a pagar.</p>
       )}
       {data.parcelas.map((p, i) => (
         <div className={styles.parcelaRow} key={i}>
           <ClayInput
-            id={`vencimento-${i}`}
+            {...field(`parcelas.${i}.dataVencimento`)}
             label={`Vencimento da parcela ${i + 1}`}
             type="date"
             value={p.dataVencimento ?? ''}
@@ -185,7 +203,7 @@ export function NotaReviewForm({
             }
           />
           <ClayInput
-            id={`valor-${i}`}
+            {...field(`parcelas.${i}.valor`)}
             label={`Valor da parcela ${i + 1} (R$)`}
             type="number"
             min="0.01"

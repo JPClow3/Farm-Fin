@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClayCard } from '@/components/ui/ClayCard';
 import { ClayButton } from '@/components/ui/ClayButton';
 import { Spinner } from '@/components/ui/Spinner';
 import { NotaReviewForm } from '@/components/administrativo/NotaReviewForm';
+import { NotaErrorSummary } from '@/components/administrativo/NotaErrorSummary';
+import { NotaPdfPreview } from '@/components/administrativo/NotaPdfPreview';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useNotaDraft } from '@/context/NotaDraftContext';
 import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
 import { useToast } from '@/context/ToastContext';
 import { useModuleGuard } from '@/lib/useModuleGuard';
@@ -18,13 +22,7 @@ import {
   cadastrarItensNotaFiscal,
   lancarNotaFiscal,
 } from '@/actions/administrativo';
-import {
-  buildNotaPayload,
-  type EntidadeConsulta,
-  type NotaAnalise,
-  type CadastroNotaResultado,
-  type LancamentoResultado,
-} from '@/lib/administrativo';
+import { buildNotaPayload, type EntidadeConsulta, type NotaAnalise } from '@/lib/administrativo';
 import {
   UploadCloud,
   FileText,
@@ -40,6 +38,7 @@ import {
   PlusCircle,
   ArrowRight,
   Copy,
+  Eye,
 } from 'lucide-react';
 import styles from './processador-nf.module.css';
 
@@ -83,27 +82,35 @@ function CadastroItem({
 export default function ProcessadorNfPage() {
   const allowed = useModuleGuard('processador-nf');
   const { addToast } = useToast();
+  const { draft, updateDraft } = useNotaDraft();
+  const { file, data, ocrReview, cadastro, lancamento, saving } = draft;
+  const setFile = (file: File | null) => updateDraft({ file });
+  const setData = (data: ExtractedInvoiceData | null) => updateDraft({ data });
+  const setOcrReview = (ocrReview: InvoiceReview | null) => updateDraft({ ocrReview });
+  const setCadastro = (cadastro: typeof draft.cadastro) => updateDraft({ cadastro });
+  const setLancamento = (lancamento: typeof draft.lancamento) => updateDraft({ lancamento });
+  const setSaving = (saving: typeof draft.saving) => updateDraft({ saving });
   const [canManage, setCanManage] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [data, setData] = useState<ExtractedInvoiceData | null>(null);
-  const [ocrReview, setOcrReview] = useState<InvoiceReview | null>(null);
   const [analise, setAnalise] = useState<NotaAnalise | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [saving, setSaving] = useState<'cadastros' | 'lancamento' | null>(null);
-  const [cadastro, setCadastro] = useState<CadastroNotaResultado | null>(null);
-  const [lancamento, setLancamento] = useState<LancamentoResultado | null>(null);
+  const [showPdf, setShowPdf] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [restored, setRestored] = useState(Boolean(data));
+  const restoreAnalysis = useRef(Boolean(data));
+  const pdfButtonRef = useRef<HTMLButtonElement>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
   const revision = useRef(0);
   const mounted = useRef(true);
   const mutation = useRef(false);
   const extraction = useRef(false);
+  const extractionController = useRef<AbortController | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = processing || saving !== null;
@@ -119,6 +126,7 @@ export default function ProcessadorNfPage() {
     return () => {
       active = false;
       mounted.current = false;
+      extractionController.current?.abort();
     };
   }, []);
   useEffect(() => {
@@ -143,13 +151,20 @@ export default function ProcessadorNfPage() {
     setCopied(false);
   };
   const reset = () => {
-    if (mutation.current || extraction.current) return;
+    if (mutation.current || extraction.current || saving) return;
     clearResult();
     setFile(null);
+    setRestored(false);
+    setShowPdf(false);
+    setConfirmDiscard(false);
     if (inputRef.current) inputRef.current.value = '';
   };
+  const requestReset = () => {
+    if (data && !lancamento) setConfirmDiscard(true);
+    else reset();
+  };
   const selectFile = (next?: File) => {
-    if (!next || mutation.current || extraction.current) return;
+    if (!next || mutation.current || extraction.current || saving) return;
     if (next.size === 0 || next.size > 20 * 1024 * 1024 || !/\.pdf$/i.test(next.name)) {
       setError('Escolha um PDF válido, com até 20 MB.');
       return;
@@ -157,7 +172,7 @@ export default function ProcessadorNfPage() {
     clearResult();
     setFile(next);
   };
-  const runAnalysis = async (nota: ExtractedInvoiceData) => {
+  const runAnalysis = useCallback(async (nota: ExtractedInvoiceData) => {
     if (!mounted.current) return;
     const request = ++revision.current;
     setAnalysing(true);
@@ -176,9 +191,15 @@ export default function ProcessadorNfPage() {
     } finally {
       if (mounted.current && request === revision.current) setAnalysing(false);
     }
-  };
+  }, []);
+  useEffect(() => {
+    if (data && !saving && (restoreAnalysis.current || cadastro || lancamento)) {
+      restoreAnalysis.current = false;
+      void runAnalysis(data);
+    }
+  }, [data, saving, cadastro, lancamento, runAnalysis]);
   const editData = (next: ExtractedInvoiceData) => {
-    if (mutation.current || lancamento) return;
+    if (mutation.current || saving || lancamento) return;
     revision.current++;
     setData(next);
     setAnalise(null);
@@ -189,15 +210,22 @@ export default function ProcessadorNfPage() {
     setCopied(false);
   };
   const processPdf = async () => {
-    if (!file || !canManage || extraction.current || mutation.current) return;
+    if (!file || !canManage || extraction.current || mutation.current || saving) return;
     extraction.current = true;
+    const controller = new AbortController();
+    extractionController.current = controller;
     clearResult();
     setProcessing(true);
     try {
       const form = new FormData();
       form.append('file', file);
-      const response = await fetch('/api/ai/extrair-nf', { method: 'POST', body: form });
+      const response = await fetch('/api/ai/extrair-nf', {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
       const result = await response.json().catch(() => null);
+      if (!mounted.current || controller.signal.aborted) return;
       if (response.status === 401) setNeedsLogin(true);
       if (!response.ok || !result?.success || !result.data) {
         setError(result?.error || 'Não foi possível ler a nota. Tente novamente.');
@@ -215,10 +243,12 @@ export default function ProcessadorNfPage() {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       );
     } catch {
-      setError('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
+      if (mounted.current && !controller.signal.aborted)
+        setError('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
     } finally {
-      setProcessing(false);
+      if (mounted.current) setProcessing(false);
       extraction.current = false;
+      extractionController.current = null;
     }
   };
   const save = async (kind: 'cadastros' | 'lancamento') => {
@@ -228,6 +258,7 @@ export default function ProcessadorNfPage() {
       analysing ||
       analysisError ||
       mutation.current ||
+      saving ||
       !canManage ||
       lancamento ||
       !confirmed
@@ -266,7 +297,6 @@ export default function ProcessadorNfPage() {
           message: `Conta a pagar nº ${result.data.movimentoId} criada.`,
         });
       }
-      await runAnalysis(data);
     } catch {
       await runAnalysis(data);
       setAnalysisError(
@@ -457,10 +487,27 @@ export default function ProcessadorNfPage() {
       )}
       {data && (
         <div ref={resultRef} className={styles.stack}>
+          {restored && (
+            <p className={styles.savedNotice} role="status">
+              Sua nota e as correções foram mantidas. Confira os cadastros atualizados antes de
+              continuar.
+            </p>
+          )}
           <div className={styles.fileRow}>
             <FileText size={20} aria-hidden="true" />
             <strong className={styles.fileName}>{file?.name}</strong>
-            <ClayButton variant="ghost" size="sm" disabled={busy} onClick={reset}>
+            {file && (
+              <button
+                ref={pdfButtonRef}
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => setShowPdf(true)}
+                aria-haspopup="dialog"
+              >
+                <Eye size={16} aria-hidden="true" /> Ver PDF
+              </button>
+            )}
+            <ClayButton variant="ghost" size="sm" disabled={busy} onClick={requestReset}>
               <RotateCcw size={14} aria-hidden="true" />{' '}
               {lancamento ? 'Ler outra nota' : 'Trocar nota'}
             </ClayButton>
@@ -516,7 +563,12 @@ export default function ProcessadorNfPage() {
                     </ul>
                   </details>
                 )}
-                <NotaReviewForm data={data} onChange={editData} disabled={busy || !canManage} />
+                <NotaReviewForm
+                  data={data}
+                  onChange={editData}
+                  disabled={busy || !canManage}
+                  errors={validation?.errosCampos}
+                />
               </ClayCard>
               <aside className={styles.stack}>
                 <ClayCard>
@@ -573,11 +625,7 @@ export default function ProcessadorNfPage() {
                         </ul>
                       </details>
                       {validation && validation.pendenciasCadastro.length > 0 && (
-                        <ul className={styles.pendingList}>
-                          {validation.pendenciasCadastro.map((p) => (
-                            <li key={p}>{p}</li>
-                          ))}
-                        </ul>
+                        <NotaErrorSummary errors={validation.errosCampos} cadastroOnly />
                       )}
                       {missing.length > 0 && (
                         <>
@@ -647,15 +695,11 @@ export default function ProcessadorNfPage() {
                   ) : (
                     <>
                       {validation && validation.pendencias.length > 0 && (
-                        <details className={styles.details}>
+                        <details className={styles.details} open>
                           <summary>
                             Corrija {validation.pendencias.length} pendência(s) para lançar
                           </summary>
-                          <ul>
-                            {validation.pendencias.map((p) => (
-                              <li key={p}>{p}</li>
-                            ))}
-                          </ul>
+                          <NotaErrorSummary errors={validation.errosCampos} />
                         </details>
                       )}
                       {analise && (
@@ -719,6 +763,24 @@ export default function ProcessadorNfPage() {
           </details>
         </div>
       )}
+      {showPdf && file && (
+        <NotaPdfPreview
+          file={file}
+          onClose={() => {
+            setShowPdf(false);
+            requestAnimationFrame(() => pdfButtonRef.current?.focus());
+          }}
+        />
+      )}
+      <ConfirmDialog
+        isOpen={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        onConfirm={reset}
+        title="Descartar esta nota?"
+        description="A leitura e as correções desta nota serão descartadas. Os cadastros já gravados serão mantidos."
+        confirmLabel="Descartar e trocar nota"
+        cancelLabel="Continuar conferência"
+      />
     </div>
   );
 }

@@ -264,8 +264,16 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
   payload: NotaLancamentoPayload;
   pendencias: string[];
   pendenciasCadastro: string[];
+  errosCampos: Record<string, string>;
 } {
   const pendencias: string[] = [];
+  const errosCampos: Record<string, string> = {};
+  const pendenciasCadastro: string[] = [];
+  const addError = (campo: string, mensagem: string, cadastro = false) => {
+    errosCampos[campo] = mensagem;
+    pendencias.push(mensagem);
+    if (cadastro) pendenciasCadastro.push(mensagem);
+  };
 
   const fornecedorNome = (data.fornecedor?.razaoSocial ?? '').trim();
   const fornecedorDoc = onlyDigits(data.fornecedor?.cnpj);
@@ -279,24 +287,26 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
         .filter(Boolean)
     ),
   ];
-  const pendenciasCadastro: string[] = [];
-  if (fornecedorNome.length < 2) pendenciasCadastro.push('Informe a razão social do fornecedor.');
+  if (fornecedorNome.length < 2)
+    addError('fornecedor.razaoSocial', 'Informe a razão social do fornecedor.', true);
   if (!validDocument(fornecedorDoc))
-    pendenciasCadastro.push('Informe um CPF/CNPJ válido para o fornecedor.');
+    addError('fornecedor.cnpj', 'Informe um CPF/CNPJ válido para o fornecedor.', true);
   if (produtos.length === 0)
-    pendenciasCadastro.push('Informe ao menos um produto ou serviço da nota.');
-  pendencias.push(...pendenciasCadastro);
-  if (!(data.numeroNotaFiscal ?? '').trim()) pendencias.push('Informe o número da nota fiscal.');
-  if (!isIsoDate(data.dataEmissao)) pendencias.push('Informe uma data de emissão válida.');
-  if (faturadoNome.length < 2) pendencias.push('Informe o nome do faturado.');
-  if (!validDocument(faturadoDoc)) pendencias.push('Informe um CPF/CNPJ válido para o faturado.');
+    addError('produtos', 'Informe ao menos um produto ou serviço da nota.', true);
+  if (!(data.numeroNotaFiscal ?? '').trim())
+    addError('numeroNotaFiscal', 'Informe o número da nota fiscal.');
+  if (!isIsoDate(data.dataEmissao)) addError('dataEmissao', 'Informe uma data de emissão válida.');
+  if (faturadoNome.length < 2) addError('faturado.nomeCompleto', 'Informe o nome do faturado.');
+  if (!validDocument(faturadoDoc))
+    addError('faturado.cpf', 'Informe um CPF/CNPJ válido para o faturado.');
 
   const fonteDespesas =
     Array.isArray(data.classificacaoDespesa) && data.classificacaoDespesa.length > 0
       ? data.classificacaoDespesa
       : [data.tipoDespesa];
   const despesas = [...new Set(fonteDespesas.map(normalizeDescricao).filter(Boolean))];
-  if (despesas.length === 0) pendencias.push('Classificação da despesa não identificada.');
+  if (despesas.length === 0)
+    addError('classificacaoDespesa', 'Classificação da despesa não identificada.');
 
   const fonteParcelas = Array.isArray(data.parcelas) ? data.parcelas : [];
   const parcelaValida = (p: (typeof fonteParcelas)[number]) =>
@@ -306,6 +316,12 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
     roundMoney(p.valor) > 0;
   if (fonteParcelas.some((p) => !parcelaValida(p)))
     pendencias.push('Corrija o vencimento e o valor de todas as parcelas.');
+  fonteParcelas.forEach((p, index) => {
+    if (!isIsoDate(p?.dataVencimento))
+      errosCampos[`parcelas.${index}.dataVencimento`] = 'Informe um vencimento válido.';
+    if (typeof p?.valor !== 'number' || !Number.isFinite(p.valor) || roundMoney(p.valor) <= 0)
+      errosCampos[`parcelas.${index}.valor`] = 'Informe um valor maior que zero.';
+  });
   let parcelas: ParcelaInput[] = fonteParcelas.filter(parcelaValida).map((p) => ({
     dataVencimento: p.dataVencimento as string,
     valor: roundMoney(p.valor as number),
@@ -317,15 +333,16 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
     roundMoney(data.valorTotal) > 0
       ? roundMoney(data.valorTotal)
       : 0;
-  if (valorNota === 0) pendencias.push('Informe um valor total maior que zero.');
+  if (valorNota === 0) addError('valorTotal', 'Informe um valor total maior que zero.');
   if (parcelas.length === 0 && valorNota > 0 && isIsoDate(data.dataVencimento)) {
     parcelas = [{ dataVencimento: data.dataVencimento, valor: roundMoney(valorNota) }];
   }
-  if (parcelas.length === 0) pendencias.push('Nenhuma parcela com vencimento e valor válidos.');
+  if (parcelas.length === 0)
+    addError('parcelas', 'Nenhuma parcela com vencimento e valor válidos.');
 
   const valorTotal = roundMoney(parcelas.reduce((sum, p) => sum + p.valor, 0));
   if (valorNota > 0 && Math.abs(Math.round(valorTotal * 100) - Math.round(valorNota * 100)) > 1)
-    pendencias.push('A soma das parcelas deve ser igual ao valor total da nota.');
+    addError('parcelas', 'A soma das parcelas deve ser igual ao valor total da nota.');
 
   return {
     payload: {
@@ -345,5 +362,6 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
     },
     pendencias,
     pendenciasCadastro,
+    errosCampos,
   };
 }

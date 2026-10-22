@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { installDemoSession } from './helpers/session';
 
 test.describe('Core Financial Pages & Component Rendering Suite (e2e/core-pages.spec.ts)', () => {
-  test.beforeEach(async ({ context, page }) => {
+  test.beforeEach(async ({ context, page, baseURL }) => {
+    await installDemoSession(context, baseURL);
     // Inject authenticated session cookie for middleware access
     await context.addCookies([
       {
@@ -56,10 +58,14 @@ test.describe('Core Financial Pages & Component Rendering Suite (e2e/core-pages.
 
     // 2. Contas a Pagar KPIs
     await page.goto('/contas-a-pagar');
-    await expect(page.getByRole('heading', { level: 1, name: /Contas a Pagar/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { level: 1, name: /Contas a Pagar/i })).toBeVisible({
+      timeout: 15000,
+    });
 
     // Verify individual financial indicators using distinct KPI card labels
-    await expect(page.locator('.kpi-card__label', { hasText: 'Total a Pagar (Aberto)' })).toBeVisible();
+    await expect(
+      page.locator('.kpi-card__label', { hasText: 'Total a Pagar (Aberto)' })
+    ).toBeVisible();
     await expect(page.locator('.kpi-card__label', { hasText: 'Contas Vencidas' })).toBeVisible();
     await expect(page.locator('.kpi-card__label', { hasText: 'Vencem Hoje' })).toBeVisible();
     await expect(page.locator('.kpi-card__label', { hasText: 'Total Pago no Mês' })).toBeVisible();
@@ -67,7 +73,9 @@ test.describe('Core Financial Pages & Component Rendering Suite (e2e/core-pages.
 
   test('2. Table rendering without layout clipping or horizontal breakdown', async ({ page }) => {
     await page.goto('/contas-a-pagar');
-    await expect(page.getByRole('heading', { level: 1, name: /Contas a Pagar/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { level: 1, name: /Contas a Pagar/i })).toBeVisible({
+      timeout: 15000,
+    });
 
     // Verify ClayTable / table container
     const table = page.locator('table');
@@ -98,7 +106,9 @@ test.describe('Core Financial Pages & Component Rendering Suite (e2e/core-pages.
 
   test('3. Interactive filter dropdowns, search input, and status pills', async ({ page }) => {
     await page.goto('/contas-a-pagar');
-    await expect(page.getByRole('heading', { level: 1, name: /Contas a Pagar/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { level: 1, name: /Contas a Pagar/i })).toBeVisible({
+      timeout: 15000,
+    });
 
     // 1. Status Filter Pills
     const allPill = page.locator('.filter-pill', { hasText: 'Todas as Contas' });

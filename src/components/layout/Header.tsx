@@ -72,6 +72,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
 
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const userMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Click outside listener to dismiss dropdowns
   useEffect(() => {
@@ -616,8 +617,28 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
           </div>
 
           {/* User Avatar Menu */}
-          <div ref={userMenuRef} style={{ position: 'relative' }}>
-            <div
+          <div
+            ref={userMenuRef}
+            style={{ position: 'relative' }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && showUserMenu) {
+                event.stopPropagation();
+                setShowUserMenu(false);
+                userMenuButtonRef.current?.focus();
+              }
+            }}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                setShowUserMenu(false);
+            }}
+          >
+            <button
+              ref={userMenuButtonRef}
+              id="account-menu-trigger"
+              type="button"
+              aria-label="Menu da conta"
+              aria-expanded={showUserMenu}
+              aria-controls={showUserMenu ? 'account-menu' : undefined}
               onClick={() => {
                 setShowUserMenu(!showUserMenu);
                 if (showNotifications) setShowNotifications(false);
@@ -635,14 +656,21 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                   ? '1px solid rgba(212, 201, 186, 0.6)'
                   : '1px solid transparent',
                 transition: 'all var(--transition-fast)',
+                minHeight: '44px',
+                font: 'inherit',
+                color: 'inherit',
               }}
             >
-              <div className="avatar-initials avatar--sm">
+              <span className="avatar-initials avatar--sm">
                 <UserIcon size={16} />
-              </div>
-              <div className="hide-mobile" style={{ textAlign: 'left', minWidth: 0 }}>
-                <div
+              </span>
+              <span
+                className="hide-mobile"
+                style={{ display: 'block', textAlign: 'left', minWidth: 0 }}
+              >
+                <span
                   style={{
+                    display: 'block',
                     fontSize: 'var(--text-xs)',
                     fontWeight: '700',
                     color: 'var(--text-primary)',
@@ -653,9 +681,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                   }}
                 >
                   {currentUser.name}
-                </div>
-                <div
+                </span>
+                <span
                   style={{
+                    display: 'block',
                     fontSize: '11px',
                     color: 'var(--text-tertiary)',
                     whiteSpace: 'nowrap',
@@ -665,8 +694,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                   }}
                 >
                   {currentUser.role} • Grupo Santa Fé
-                </div>
-              </div>
+                </span>
+              </span>
               <ChevronDown
                 size={14}
                 color="var(--text-tertiary)"
@@ -675,10 +704,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenQuickNew 
                   transition: 'transform var(--transition-fast)',
                 }}
               />
-            </div>
+            </button>
 
             {showUserMenu && (
               <div
+                id="account-menu"
+                role="group"
+                aria-label="Opções da conta"
                 className="dropdown__menu"
                 style={{
                   width: 'min(260px, calc(100vw - 24px))',

@@ -113,6 +113,12 @@
 .table tbody td {
   padding: var(--space-3);
 }
+.table {
+  min-width: 640px;
+}
+.mobileCellLabel {
+  display: none;
+}
 
 .table thead th {
   white-space: nowrap;
@@ -418,5 +424,75 @@
   }
   .searchButtons > * {
     flex: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .table,
+  .table thead,
+  .table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .table thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .table thead th {
+    display: block;
+    padding: var(--space-2);
+    white-space: normal;
+  }
+  .table thead .actionsCell {
+    display: none;
+  }
+  .table tbody tr {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface-1);
+  }
+  .table tbody td {
+    display: block;
+    min-width: 0;
+    border: 0;
+    padding: var(--space-1) 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    text-align: left !important;
+  }
+  .table .actionsCell {
+    position: static;
+    box-shadow: none;
+    background: transparent;
+  }
+  .table .rowActions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .table .rowActions > :global(.btn) {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+  }
+  .table .actionLabel {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+  .mobileCellLabel {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: 700;
   }
 }

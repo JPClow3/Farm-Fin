@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { installDemoSession } from './helpers/session';
 
 test.describe('Navigation & Responsive Viewport Suite (e2e/navigation.spec.ts)', () => {
   test.setTimeout(120000);
@@ -27,7 +28,8 @@ test.describe('Navigation & Responsive Viewport Suite (e2e/navigation.spec.ts)',
     }
   });
 
-  test.beforeEach(async ({ context, page }) => {
+  test.beforeEach(async ({ context, page, baseURL }) => {
+    await installDemoSession(context, baseURL);
     // Inject authenticated session cookie for middleware access
     await context.addCookies([
       {

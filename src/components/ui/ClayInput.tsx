@@ -17,6 +17,8 @@ export const ClayInput: React.FC<ClayInputProps> = ({
   ...props
 }) => {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const messageId = inputId && (error || hint) ? `${inputId}-message` : undefined;
+  const describedBy = [props['aria-describedby'], messageId].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="input-group">
@@ -31,6 +33,8 @@ export const ClayInput: React.FC<ClayInputProps> = ({
           className={`input ${error ? 'input--error' : ''} ${className}`.trim()}
           style={icon ? { paddingRight: '2.5rem' } : undefined}
           {...props}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={describedBy}
         />
         {icon && (
           <div
@@ -47,8 +51,16 @@ export const ClayInput: React.FC<ClayInputProps> = ({
           </div>
         )}
       </div>
-      {error && <span className="input-error-msg">{error}</span>}
-      {hint && !error && <span className="input-hint">{hint}</span>}
+      {error && (
+        <span id={messageId} className="input-error-msg">
+          {error}
+        </span>
+      )}
+      {hint && !error && (
+        <span id={messageId} className="input-hint">
+          {hint}
+        </span>
+      )}
     </div>
   );
 };

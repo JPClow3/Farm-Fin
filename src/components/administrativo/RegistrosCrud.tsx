@@ -233,95 +233,93 @@ export function RegistrosCrud<T extends { id: number; status: CadastroStatus }>(
             </span>
           )}
         </div>
-        <div className={styles.tableContainer}>
-          <div className="clay-table-wrapper" style={{ overflowX: 'auto', boxShadow: 'none' }}>
-            <table className={`clay-table ${styles.table}`} style={{ minWidth: '640px' }}>
-              <thead>
-                <tr>
-                  {columns.map((col) => {
-                    const active = sort?.key === col.key;
-                    return (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        style={{ textAlign: col.align ?? 'left' }}
-                        aria-sort={
-                          active
-                            ? sort!.direction === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : undefined
-                        }
-                      >
-                        {col.sortValue ? (
-                          <button
-                            type="button"
-                            className={styles.sortButton}
-                            onClick={() => toggleSort(col.key)}
-                          >
-                            {col.header}
-                            {active ? (
-                              sort!.direction === 'asc' ? (
-                                <ArrowUp size={12} aria-hidden="true" />
+        {loading ? (
+          <div className={styles.emptyState} role="status">
+            <Spinner size={16} /> Carregando…
+          </div>
+        ) : sortedRows.length === 0 ? (
+          <div className={styles.emptyState} role="status">
+            {loaded ? (
+              <SearchX size={28} aria-hidden="true" />
+            ) : (
+              <Inbox size={28} aria-hidden="true" />
+            )}
+            <strong>{loaded ? 'Nenhum registro encontrado.' : 'A lista começa vazia.'}</strong>
+            <span>
+              {loaded
+                ? 'Tente outros termos, marque "Incluir inativos" ou cadastre um novo registro.'
+                : 'Busque por um ou mais termos ou clique em "Todos" para carregar os registros ativos.'}
+            </span>
+          </div>
+        ) : (
+          <div className={styles.tableContainer}>
+            <div className="clay-table-wrapper" style={{ overflowX: 'auto', boxShadow: 'none' }}>
+              <table
+                className={`clay-table ${styles.table}`}
+                role="table"
+                aria-label={`Lista de ${titulo}`}
+              >
+                <thead>
+                  <tr>
+                    {columns.map((col) => {
+                      const active = sort?.key === col.key;
+                      return (
+                        <th
+                          key={col.key}
+                          scope="col"
+                          style={{ textAlign: col.align ?? 'left' }}
+                          aria-sort={
+                            active
+                              ? sort!.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : undefined
+                          }
+                        >
+                          {col.sortValue ? (
+                            <button
+                              type="button"
+                              className={styles.sortButton}
+                              onClick={() => toggleSort(col.key)}
+                            >
+                              {col.header}
+                              {active ? (
+                                sort!.direction === 'asc' ? (
+                                  <ArrowUp size={12} aria-hidden="true" />
+                                ) : (
+                                  <ArrowDown size={12} aria-hidden="true" />
+                                )
                               ) : (
-                                <ArrowDown size={12} aria-hidden="true" />
-                              )
-                            ) : (
-                              <ArrowUpDown size={12} aria-hidden="true" />
-                            )}
-                          </button>
-                        ) : (
-                          col.header
-                        )}
-                      </th>
-                    );
-                  })}
-                  <th scope="col" className={styles.actionsCell} style={{ textAlign: 'right' }}>
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={columns.length + 1} style={{ textAlign: 'center' }}>
-                      <span className="flex-row items-center justify-center gap-2">
-                        <Spinner size={16} /> Carregando…
-                      </span>
-                    </td>
+                                <ArrowUpDown size={12} aria-hidden="true" />
+                              )}
+                            </button>
+                          ) : (
+                            col.header
+                          )}
+                        </th>
+                      );
+                    })}
+                    <th scope="col" className={styles.actionsCell} style={{ textAlign: 'right' }}>
+                      Ações
+                    </th>
                   </tr>
-                ) : sortedRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length + 1}>
-                      <div className={styles.emptyState}>
-                        {loaded ? (
-                          <SearchX size={28} aria-hidden="true" />
-                        ) : (
-                          <Inbox size={28} aria-hidden="true" />
-                        )}
-                        <strong>
-                          {loaded ? 'Nenhum registro encontrado.' : 'A lista começa vazia.'}
-                        </strong>
-                        <span>
-                          {loaded
-                            ? 'Tente outros termos, marque "Incluir inativos" ou cadastre um novo registro.'
-                            : 'Busque por um ou mais termos ou clique em "Todos" para carregar os registros ativos.'}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  sortedRows.map((row) => (
+                </thead>
+                <tbody>
+                  {sortedRows.map((row) => (
                     <tr
+                      role="row"
                       key={row.id}
                       className={row.status === 'INATIVO' ? styles.inactiveRow : undefined}
                     >
                       {columns.map((col) => (
-                        <td key={col.key} style={{ textAlign: col.align ?? 'left' }}>
+                        <td key={col.key} role="cell" style={{ textAlign: col.align ?? 'left' }}>
+                          <span className={styles.mobileCellLabel} aria-hidden="true">
+                            {col.header}
+                          </span>
                           {col.render(row)}
                         </td>
                       ))}
-                      <td className={styles.actionsCell}>
+                      <td className={styles.actionsCell} role="cell">
                         <div className={styles.rowActions}>
                           <ClayButton
                             variant="outline"
@@ -356,12 +354,12 @@ export function RegistrosCrud<T extends { id: number; status: CadastroStatus }>(
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </ClayCard>
 
       <div className={styles.insertRow}>

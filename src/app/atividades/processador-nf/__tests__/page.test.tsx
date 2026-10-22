@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { NotaDraftProvider } from '@/context/NotaDraftContext';
 import ProcessadorNfPage from '../page';
 import {
   analisarNotaFiscal,
@@ -9,6 +10,9 @@ import {
 import { getAuthSessionAction } from '@/actions/auth';
 import { buildNotaPayload, type NotaAnalise } from '@/lib/administrativo';
 import type { ExtractedInvoiceData } from '@/lib/mistralInvoiceAgent';
+import { useState } from 'react';
+
+const render = (ui: React.ReactNode) => rtlRender(<NotaDraftProvider>{ui}</NotaDraftProvider>);
 
 vi.mock('@/lib/useModuleGuard', () => ({ useModuleGuard: () => true }));
 vi.mock('@/context/ToastContext', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
@@ -101,6 +105,156 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('revisão e cadastro da NF', () => {
+  it('mantém o bloqueio da gravação ao navegar e atualiza os cadastros quando ela termina', async () => {
+    let finish!: (result: Awaited<ReturnType<typeof cadastrarItensNotaFiscal>>) => void;
+    vi.mocked(cadastrarItensNotaFiscal).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+    function Navigation() {
+      const [reader, setReader] = useState(true);
+      return (
+        <>
+          <button onClick={() => setReader(!reader)}>Alternar catálogo</button>
+          {reader && <ProcessadorNfPage />}
+        </>
+      );
+    }
+    render(<Navigation />);
+    fireEvent.change(screen.getByLabelText('Selecionar PDF da nota fiscal'), {
+      target: { files: [new File(['%PDF-1.4'], 'nf.pdf', { type: 'application/pdf' })] },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Extrair dados da nota' })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Extrair dados da nota' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Conferi os dados com o PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar empresa e produtos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar catálogo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar catálogo' }));
+    expect(screen.getByLabelText('Produto 1')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Consultar cadastros' })).toBeDisabled();
+    exists = true;
+    await act(async () =>
+      finish({
+        success: true,
+        data: {
+          fornecedor: { id: 1, acao: 'criado' },
+          produtos: [{ id: 1, descricao: 'PARAFUSO', acao: 'criado' }],
+        },
+      })
+    );
+    expect(await screen.findAllByText('Já cadastrado')).toHaveLength(2);
+    expect(screen.getByLabelText('Produto 1')).toBeEnabled();
+    expect(cadastrarItensNotaFiscal).toHaveBeenCalledTimes(1);
+  });
+
+  it('não aplica a resposta de uma extração abandonada à próxima nota', async () => {
+    let finish!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          })
+      )
+    );
+    function Navigation() {
+      const [reader, setReader] = useState(true);
+      return (
+        <>
+          <button onClick={() => setReader(!reader)}>Alternar catálogo</button>
+          {reader && <ProcessadorNfPage />}
+        </>
+      );
+    }
+    render(<Navigation />);
+    fireEvent.change(screen.getByLabelText('Selecionar PDF da nota fiscal'), {
+      target: { files: [new File(['%PDF-1.4'], 'primeira.pdf', { type: 'application/pdf' })] },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Extrair dados da nota' })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Extrair dados da nota' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar catálogo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar catálogo' }));
+    fireEvent.change(screen.getByLabelText('Selecionar PDF da nota fiscal'), {
+      target: { files: [new File(['%PDF-1.4'], 'segunda.pdf', { type: 'application/pdf' })] },
+    });
+    await act(async () => finish(new Response(JSON.stringify({ success: true, data: nota }))));
+    expect(screen.getByText('segunda.pdf')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Confira os dados da nota' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('mantém arquivo e correções após consultar outra tela, mas exige nova conferência', async () => {
+    function Navigation() {
+      const [reader, setReader] = useState(true);
+      return (
+        <>
+          <button onClick={() => setReader(!reader)}>Alternar catálogo</button>
+          {reader && <ProcessadorNfPage />}
+        </>
+      );
+    }
+    render(<Navigation />);
+    fireEvent.change(screen.getByLabelText('Selecionar PDF da nota fiscal'), {
+      target: { files: [new File(['%PDF-1.4'], 'rascunho.pdf', { type: 'application/pdf' })] },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Extrair dados da nota' })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Extrair dados da nota' }));
+    await screen.findByRole('heading', { name: 'Confira os dados da nota' });
+    fireEvent.change(screen.getByLabelText('Produto 1'), {
+      target: { value: 'Parafuso M10 revisado' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar cadastros' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Conferi os dados com o PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar catálogo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar catálogo' }));
+    await screen.findByText('PARAFUSO M10 REVISADO');
+    expect(screen.getByText('rascunho.pdf')).toBeInTheDocument();
+    expect(screen.getByLabelText('Produto 1')).toHaveValue('Parafuso M10 revisado');
+    expect(screen.getByRole('checkbox', { name: 'Conferi os dados com o PDF' })).not.toBeChecked();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('destaca o campo inválido, associa sua mensagem e permite focá-lo pelo resumo', async () => {
+    prepareFetch({ ...nota, fornecedor: { ...nota.fornecedor, cnpj: '123' } });
+    await extract();
+    const input = screen.getByLabelText('CPF/CNPJ do fornecedor');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription('Informe um CPF/CNPJ válido para o fornecedor.');
+    fireEvent.click(
+      (
+        await screen.findAllByRole('link', {
+          name: 'Informe um CPF/CNPJ válido para o fornecedor.',
+        })
+      )[0]
+    );
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: '11.222.333/0001-81' } });
+    expect(input).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('pede confirmação antes de descartar as correções e permite cancelar', async () => {
+    await extract();
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar nota' }));
+    expect(screen.getByRole('dialog', { name: 'Descartar esta nota?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar conferência' }));
+    expect(screen.getByLabelText('Produto 1')).toHaveValue('Parafuso');
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar nota' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar e trocar nota' }));
+    await screen.findByRole('heading', { name: 'Envie sua nota fiscal' });
+    expect(
+      screen.queryByRole('heading', { name: 'Confira os dados da nota' })
+    ).not.toBeInTheDocument();
+  });
+
   it('informa empresa e produto ausentes e cadastra ambos com uma ação', async () => {
     await extract();
     expect(await screen.findAllByText('Não cadastrado')).toHaveLength(2);
