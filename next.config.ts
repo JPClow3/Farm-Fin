@@ -11,9 +11,6 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BUILD_SHA: buildInfo.commit,
     NEXT_PUBLIC_BUILD_DIRTY: String(buildInfo.dirty),
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: false,
   },

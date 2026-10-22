@@ -24,6 +24,8 @@ O número da NF é comparado sem pontos, espaços ou zeros à esquerda para evit
 
 O rodapé do login mostra a versão de `package.json` e o commit completo do build em `data-build-commit`, com um link para o GitHub. A configuração lê `WORKERS_CI_COMMIT_SHA` no Cloudflare, `GITHUB_SHA` no GitHub Actions ou o checkout local. Um build local com alterações é marcado como tal. A versão não depende de um SHA digitado no código.
 
+O deploy usa Next.js 16 com OpenNext e build Webpack (`npm run build`). O middleware permanece no runtime Edge compatível com Cloudflare. A versão do Next.js deve estar entre as versões suportadas pelo adaptador; a verificação de suporte do OpenNext permanece habilitada.
+
 ## Validação
 
 `src/actions/__tests__/invoice-catalog.test.ts` usa PostgreSQL embarcado (PGlite), aplica as migrations reais `0006` e `0007` e testa persistência, rollback, reuso, reativação, isolamento por organização, vínculo ao lançamento e duplicidade. Não depende de credenciais ou de um banco de produção.

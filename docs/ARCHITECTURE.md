@@ -7,7 +7,7 @@ Documento de arquitetura do sistema Farm-Fin, um aplicativo de controle financei
 O sistema Farm-Fin adota uma arquitetura em camadas bem definida, garantindo separação de responsabilidades (Frontend → API → Services → Database).
 
 **Stack Tecnológica:**
-*   **Frontend:** Next.js 15+ (App Router) com TypeScript
+*   **Frontend:** Next.js 16 (App Router) com TypeScript
 *   **Backend:** Next.js API Routes + tRPC (ou REST)
 *   **Banco de Dados:** Neon Postgres (Serverless) com Drizzle ORM
 *   **Autenticação:** Neon Auth (Better Auth gerenciado) — `@neondatabase/auth`
@@ -22,7 +22,7 @@ O sistema Farm-Fin adota uma arquitetura em camadas bem definida, garantindo sep
 |---------|---------------|
 | **Neon Postgres** | PostgreSQL serverless com scale-to-zero, branching de banco de dados (preview por PR), e autoscaling de compute. Sem servidor para gerenciar. |
 | **Neon Auth** | Autenticação nativa no Postgres — dados de usuários/sessões vivem no schema `neon_auth` dentro do mesmo banco. Branchable identity: ao criar um branch do banco, o estado de auth é clonado junto. Construído sobre Better Auth (open source). |
-| **Cloudflare Workers** | Deploy edge-first em 300+ localizações globais com cold starts sub-milissegundo. Via OpenNext adapter, suporta SSR, ISR, Server Actions e Middleware do Next.js 15+. |
+| **Cloudflare Workers** | Deploy edge-first em 300+ localizações globais com cold starts sub-milissegundo. Via OpenNext adapter, suporta SSR, ISR, Server Actions e Middleware do Next.js 16. |
 | **Drizzle ORM** | ORM leve, type-safe, edge-compatible. Funciona nativamente em Cloudflare Workers (diferente do Prisma que requer engine binária). |
 | **Cloudflare R2** | Object storage compatível com API S3, sem egress fees. Ideal para comprovantes, NFs e anexos. |
 
@@ -56,7 +56,7 @@ graph TD
     User["Usuários (Browser/Mobile)"]
     
     subgraph "Cloudflare Workers (Edge Global)" 
-        WebApp["Next.js 15+ via OpenNext"]
+        WebApp["Next.js 16 via OpenNext"]
         API["API Layer (tRPC / REST)"]
         Queues["Cloudflare Queues (Jobs Async)"]
         Cron["Cron Triggers (Alertas)"]

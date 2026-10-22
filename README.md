@@ -22,7 +22,7 @@ O **Farm-Fin** é uma plataforma moderna desenvolvida especificamente para o agr
 
 ## 🛠️ Stack Tecnológica
 
-- **Framework**: Next.js 15 (App Router), React 19
+- **Framework**: Next.js 16 (App Router), React 19
 - **Linguagem**: TypeScript (Strict Mode)
 - **Design System**: Clay Design System (Neumórfico Suave com tons da terra, oliva e terracota)
 - **Banco de Dados**: Neon Serverless PostgreSQL com Drizzle ORM
