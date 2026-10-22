@@ -182,6 +182,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           module: 'processador-nf',
         },
         {
+          href: '/atividades/produtos',
+          label: 'Produtos das Notas',
+          icon: <Package size={18} strokeWidth={2.2} />,
+          module: 'processador-nf',
+        },
+        {
           href: '/atividades/classificacoes',
           label: 'Classificações',
           icon: <Tags size={18} strokeWidth={2.2} />,

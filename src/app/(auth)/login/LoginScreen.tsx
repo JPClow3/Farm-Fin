@@ -19,6 +19,7 @@ import {
 import { ClayButton } from '@/components/ui/ClayButton';
 import { authClient } from '@/lib/auth-client';
 import { normalizeLoginIdentifier } from '@/lib/loginIdentifier';
+import { buildInfo } from '@/lib/buildInfo';
 import type { EnabledAuthMethods } from '@/lib/authMethods';
 import styles from './login.module.css';
 
@@ -488,6 +489,28 @@ export function LoginScreen({ methods }: { methods: EnabledAuthMethods }) {
           )}
         </div>
       </div>
+      <footer
+        className={styles.buildVersion}
+        data-app-version={buildInfo.version}
+        data-build-commit={buildInfo.commit}
+        aria-label="Versão do sistema"
+      >
+        v{buildInfo.version}
+        {buildInfo.commit && (
+          <>
+            {' · '}
+            <a
+              href={`https://github.com/JPClow3/Farm-Fin/commit/${buildInfo.commit}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Commit ${buildInfo.commit}`}
+            >
+              {buildInfo.commit.slice(0, 7)}
+            </a>
+          </>
+        )}
+        {buildInfo.dirty && ' · alterações locais'}
+      </footer>
     </main>
   );
 }

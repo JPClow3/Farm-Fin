@@ -5,902 +5,718 @@ import Link from 'next/link';
 import { ClayCard } from '@/components/ui/ClayCard';
 import { ClayButton } from '@/components/ui/ClayButton';
 import { Spinner } from '@/components/ui/Spinner';
+import { NotaReviewForm } from '@/components/administrativo/NotaReviewForm';
+import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
 import { useToast } from '@/context/ToastContext';
 import { useModuleGuard } from '@/lib/useModuleGuard';
-import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
+import { getAuthSessionAction } from '@/actions/auth';
+import { canManageModule } from '@/lib/permissions';
 import type { ExtractedInvoiceData } from '@/lib/mistralInvoiceAgent';
-import type { InvoiceReview } from '@/lib/invoiceQuality';
-import { analisarNotaFiscal, lancarNotaFiscal } from '@/actions/administrativo';
+import { evaluateInvoiceQuality, type InvoiceReview } from '@/lib/invoiceQuality';
 import {
-  documentoLabel,
+  analisarNotaFiscal,
+  cadastrarItensNotaFiscal,
+  lancarNotaFiscal,
+} from '@/actions/administrativo';
+import {
+  buildNotaPayload,
   type EntidadeConsulta,
-  type LancamentoResultado,
   type NotaAnalise,
+  type CadastroNotaResultado,
+  type LancamentoResultado,
 } from '@/lib/administrativo';
 import {
-  Sparkles,
   UploadCloud,
   FileText,
-  Copy,
   Check,
   Download,
   RotateCcw,
   AlertTriangle,
-  Tag,
-  Calendar,
-  DollarSign,
-  Building,
-  User,
-  FlaskConical,
-  Database,
+  Sparkles,
+  Building2,
+  Package,
   CheckCircle2,
-  Send,
   RefreshCw,
   PlusCircle,
-  FilePlus2,
+  ArrowRight,
+  Copy,
 } from 'lucide-react';
 import styles from './processador-nf.module.css';
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const SAMPLE_PDF_URL = '/exemplo-danfe.pdf';
-
-interface ProcessingError {
-  message: string;
-  /** Sessão expirada: mostra link para login */
-  needsLogin?: boolean;
-}
-
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const actionLabel = { criado: 'Cadastrado', existente: 'Já cadastrado', reativado: 'Reativado' };
 
-function formatCurrency(value: unknown): string {
-  const n = Number(value);
-  return Number.isFinite(n) ? currency.format(n) : '—';
-}
-
-/** "AAAA-MM-DD" → "DD/MM/AAAA" sem conversão de fuso horário */
-function formatDate(value: unknown): string {
-  if (typeof value !== 'string') return '—';
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : value || '—';
-}
-
-function formatFileSize(bytes: number): string {
-  return bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function acaoLabel(acao: 'criado' | 'existente' | 'reativado', feminino = false): string {
-  if (acao === 'existente') return 'JÁ EXISTIA';
-  return `${acao === 'criado' ? 'CRIAD' : 'REATIVAD'}${feminino ? 'A' : 'O'}`;
-}
-const ACAO_BADGE = {
-  criado: 'badge--success',
-  existente: 'badge--neutral',
-  reativado: 'badge--info',
-} as const;
-
-/** Resposta da consulta no formato pedido: nome, documento e EXISTE – ID / NÃO EXISTE */
-function ConsultaBloco({
-  titulo,
+function CadastroItem({
   entidade,
-  lancado,
+  tipo,
 }: {
-  titulo: string;
   entidade: EntidadeConsulta;
-  /** Depois do lançamento a consulta é refeita: não há mais o que "será" feito */
-  lancado: boolean;
+  tipo: 'Empresa' | 'Produto';
 }) {
-  const inativo = entidade.status === 'INATIVO';
-  // "despesa" é feminino: será criada / usada / reativada
-  const o = titulo === 'DESPESA' ? 'a' : 'o';
-  const efeito = !entidade.existe
-    ? `Será criad${o} ao lançar`
-    : inativo
-      ? `Está inativ${o}: será reativad${o} ao lançar`
-      : `Será usad${o} no lançamento`;
+  const ativo = entidade.existe && entidade.status === 'ATIVO';
   return (
-    <div
-      className={`${styles.consultaItem} ${
-        entidade.existe ? styles.consultaItemExiste : styles.consultaItemNovo
-      }`}
-    >
-      <span className={styles.consultaTitulo}>
-        {entidade.existe ? (
-          <CheckCircle2 size={14} aria-hidden="true" />
-        ) : (
-          <PlusCircle size={14} aria-hidden="true" />
-        )}
-        {titulo}
-      </span>
-      <span className={styles.consultaNome}>{entidade.nome || '—'}</span>
-      {entidade.documento && (
-        <span className={styles.consultaDoc}>
-          {documentoLabel(entidade.documento)}: {entidade.documento}
-        </span>
+    <li className={`${styles.cadastroRow} ${ativo ? styles.cadastroOk : styles.cadastroMissing}`}>
+      {tipo === 'Empresa' ? (
+        <Building2 size={20} aria-hidden="true" />
+      ) : (
+        <Package size={20} aria-hidden="true" />
       )}
-      <span
-        className={`${styles.consultaStatus} ${
-          entidade.existe ? styles.consultaExiste : styles.consultaNaoExiste
-        }`}
-      >
-        {entidade.existe
-          ? `EXISTE – ID: ${entidade.id}${entidade.status === 'INATIVO' ? ' (INATIVO)' : ''}`
-          : 'NÃO EXISTE'}
+      <div className={styles.cadastroName}>
+        <strong>{entidade.nome || 'Empresa sem nome'}</strong>
+        <span>
+          {tipo}
+          {entidade.documento ? ` · ${entidade.documento}` : ''}
+        </span>
+      </div>
+      <span className={`badge ${ativo ? 'badge--success' : 'badge--warning'}`}>
+        {ativo ? (
+          <CheckCircle2 size={13} aria-hidden="true" />
+        ) : (
+          <PlusCircle size={13} aria-hidden="true" />
+        )}
+        {ativo ? 'Já cadastrado' : entidade.existe ? 'Inativo · será reativado' : 'Não cadastrado'}
       </span>
-      {!lancado && <span className={styles.consultaEfeito}>{efeito}</span>}
-    </div>
+    </li>
   );
 }
 
-function validatePdf(file: File): string | null {
-  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-    return 'Selecione um arquivo no formato PDF (.pdf).';
-  }
-  if (file.size > MAX_FILE_SIZE) {
-    return `O arquivo tem ${formatFileSize(file.size)}; o limite é 20 MB.`;
-  }
-  return null;
-}
-
 export default function ProcessadorNfPage() {
-  const moduleAllowed = useModuleGuard('processador-nf');
+  const allowed = useModuleGuard('processador-nf');
   const { addToast } = useToast();
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [extractedData, setExtractedData] = useState<ExtractedInvoiceData | null>(null);
-  const [review, setReview] = useState<InvoiceReview | null>(null);
-  const [rawJsonString, setRawJsonString] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
-  const [error, setError] = useState<ProcessingError | null>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [data, setData] = useState<ExtractedInvoiceData | null>(null);
+  const [ocrReview, setOcrReview] = useState<InvoiceReview | null>(null);
   const [analise, setAnalise] = useState<NotaAnalise | null>(null);
-  const [analiseErro, setAnaliseErro] = useState<string | null>(null);
-  const [isAnalisando, setIsAnalisando] = useState(false);
-  const [isLancando, setIsLancando] = useState(false);
+  const [analysing, setAnalysing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [saving, setSaving] = useState<'cadastros' | 'lancamento' | null>(null);
+  const [cadastro, setCadastro] = useState<CadastroNotaResultado | null>(null);
   const [lancamento, setLancamento] = useState<LancamentoResultado | null>(null);
-  const [revisaoConfirmada, setRevisaoConfirmada] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const revision = useRef(0);
+  const mounted = useRef(true);
+  const mutation = useRef(false);
+  const extraction = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const busy = processing || saving !== null;
 
-  // Contador de tempo durante a extração (costuma levar ~10 s)
   useEffect(() => {
-    if (!isLoading) return;
-    setElapsedSeconds(0);
-    const timer = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    let active = true;
+    mounted.current = true;
+    getAuthSessionAction()
+      .then((session) => {
+        if (active) setCanManage(canManageModule(session.role, 'processador-nf'));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!processing) return;
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(timer);
-  }, [isLoading]);
+  }, [processing]);
 
-  // Leva o usuário até o resultado quando ele fica pronto
-  useEffect(() => {
-    if (extractedData) {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [extractedData]);
-
-  if (!moduleAllowed) {
-    return <AppShellSkeleton />;
-  }
-
-  const clearAnalise = () => {
+  const clearResult = () => {
+    revision.current++;
+    setData(null);
+    setOcrReview(null);
     setAnalise(null);
-    setAnaliseErro(null);
+    setAnalysisError(null);
+    setAnalysing(false);
+    setCadastro(null);
     setLancamento(null);
-    setRevisaoConfirmada(false);
+    setConfirmed(false);
+    setError(null);
+    setNeedsLogin(false);
+    setCopied(false);
   };
-
-  // 2ª etapa: consulta no banco se fornecedor, faturado e despesa já existem
-  const runAnalise = async (data: ExtractedInvoiceData) => {
-    setIsAnalisando(true);
-    setAnaliseErro(null);
-    try {
-      const result = await analisarNotaFiscal(data);
-      if (result.success) setAnalise(result.data);
-      else setAnaliseErro(result.error);
-    } catch {
-      setAnaliseErro('Sem conexão com o servidor para consultar o banco de dados.');
-    } finally {
-      setIsAnalisando(false);
-    }
+  const reset = () => {
+    if (mutation.current || extraction.current) return;
+    clearResult();
+    setFile(null);
+    if (inputRef.current) inputRef.current.value = '';
   };
-
-  const handleLancar = async () => {
-    if (!extractedData) return;
-    setIsLancando(true);
-    setAnaliseErro(null);
-    try {
-      const result = await lancarNotaFiscal(extractedData);
-      if (!result.success) {
-        setAnaliseErro(result.error);
-        return;
-      }
-      setLancamento(result.data);
-      addToast({
-        type: 'success',
-        title: 'Registro lançado com sucesso',
-        message: `Movimento ID ${result.data.movimentoId} gravado em Contas a Pagar.`,
-      });
-      await runAnalise(extractedData);
-    } catch {
-      setAnaliseErro('Sem conexão com o servidor. O lançamento não foi confirmado.');
-    } finally {
-      setIsLancando(false);
-    }
-  };
-
-  const selectFile = (file: File | undefined) => {
-    if (!file || isLoading) return;
-    const validationError = validatePdf(file);
-    if (validationError) {
-      setError({ message: validationError });
+  const selectFile = (next?: File) => {
+    if (!next || mutation.current || extraction.current) return;
+    if (next.size === 0 || next.size > 20 * 1024 * 1024 || !/\.pdf$/i.test(next.name)) {
+      setError('Escolha um PDF válido, com até 20 MB.');
       return;
     }
-    setSelectedFile(file);
-    setError(null);
-    // Um novo arquivo invalida o resultado anterior
-    setExtractedData(null);
-    setReview(null);
-    setRawJsonString('');
-    clearAnalise();
+    clearResult();
+    setFile(next);
   };
-
-  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    selectFile(e.dataTransfer.files?.[0]);
-  };
-
-  const handleReset = () => {
-    setSelectedFile(null);
-    setExtractedData(null);
-    setReview(null);
-    setRawJsonString('');
-    setError(null);
-    clearAnalise();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleUseSample = async () => {
+  const runAnalysis = async (nota: ExtractedInvoiceData) => {
+    if (!mounted.current) return;
+    const request = ++revision.current;
+    setAnalysing(true);
+    setAnalysisError(null);
+    setAnalise(null);
     try {
-      const response = await fetch(SAMPLE_PDF_URL);
-      if (!response.ok) throw new Error();
-      const blob = await response.blob();
-      selectFile(new File([blob], 'exemplo-danfe.pdf', { type: 'application/pdf' }));
+      const result = await analisarNotaFiscal(nota);
+      if (!mounted.current || request !== revision.current) return;
+      if (result.success) setAnalise(result.data);
+      else setAnalysisError(result.error);
     } catch {
-      setError({ message: 'Não foi possível carregar a nota de exemplo.' });
-    }
-  };
-
-  const handleProcessPdf = async () => {
-    if (!selectedFile) return;
-
-    setIsLoading(true);
-    setError(null);
-    setExtractedData(null);
-    setReview(null);
-    setRawJsonString('');
-    clearAnalise();
-
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      const response = await fetch('/api/ai/extrair-nf', {
-        method: 'POST',
-        body: formData,
-      });
-
-      // Respostas de erro da plataforma podem não ser JSON
-      const result = await response.json().catch(() => null);
-
-      if (response.status === 401) {
-        setError({
-          message: result?.error || 'Sua sessão expirou. Faça login novamente.',
-          needsLogin: true,
-        });
-        return;
-      }
-
-      if (!response.ok || !result?.success) {
-        setError({
-          message: result?.error || `Falha ao processar a nota fiscal (erro ${response.status}).`,
-        });
-        return;
-      }
-
-      setExtractedData(result.data);
-      setReview(result.review ?? null);
-      setRawJsonString(JSON.stringify({ data: result.data, review: result.review }, null, 2));
-      addToast({
-        type: result.review?.required ? 'warning' : 'success',
-        title: result.review?.required ? 'Confira os campos sinalizados' : 'Extração concluída',
-        message: 'Confira os dados com o PDF antes de lançar em Contas a Pagar.',
-      });
-      void runAnalise(result.data);
-    } catch {
-      setError({
-        message: 'Sem conexão com o servidor. Verifique sua internet e tente novamente.',
-      });
+      if (mounted.current && request === revision.current)
+        setAnalysisError(
+          'Não foi possível consultar os cadastros. Verifique sua conexão e tente novamente.'
+        );
     } finally {
-      setIsLoading(false);
+      if (mounted.current && request === revision.current) setAnalysing(false);
+    }
+  };
+  const editData = (next: ExtractedInvoiceData) => {
+    if (mutation.current || lancamento) return;
+    revision.current++;
+    setData(next);
+    setAnalise(null);
+    setAnalysisError(null);
+    setAnalysing(false);
+    setConfirmed(false);
+    setCadastro(null);
+    setCopied(false);
+  };
+  const processPdf = async () => {
+    if (!file || !canManage || extraction.current || mutation.current) return;
+    extraction.current = true;
+    clearResult();
+    setProcessing(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const response = await fetch('/api/ai/extrair-nf', { method: 'POST', body: form });
+      const result = await response.json().catch(() => null);
+      if (response.status === 401) setNeedsLogin(true);
+      if (!response.ok || !result?.success || !result.data) {
+        setError(result?.error || 'Não foi possível ler a nota. Tente novamente.');
+        return;
+      }
+      setData(result.data);
+      setOcrReview(result.review ?? null);
+      void runAnalysis(result.data);
+      addToast({
+        type: 'success',
+        title: 'Leitura concluída',
+        message: 'Confira os dados e os cadastros encontrados.',
+      });
+      requestAnimationFrame(() =>
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      );
+    } catch {
+      setError('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
+    } finally {
+      setProcessing(false);
+      extraction.current = false;
+    }
+  };
+  const save = async (kind: 'cadastros' | 'lancamento') => {
+    if (
+      !data ||
+      !analise ||
+      analysing ||
+      analysisError ||
+      mutation.current ||
+      !canManage ||
+      lancamento ||
+      !confirmed
+    )
+      return;
+    const validation = buildNotaPayload(data);
+    if (kind === 'lancamento' && (validation.pendencias.length || analise.movimentoExistenteId))
+      return;
+    if (kind === 'cadastros' && validation.pendenciasCadastro.length) return;
+    mutation.current = true;
+    setSaving(kind);
+    setAnalysisError(null);
+    try {
+      if (kind === 'cadastros') {
+        const result = await cadastrarItensNotaFiscal(data);
+        if (!result.success) {
+          setAnalysisError(result.error);
+          return;
+        }
+        setCadastro(result.data);
+        addToast({
+          type: 'success',
+          title: 'Cadastros concluídos',
+          message: 'Empresa e produtos estão disponíveis para esta e as próximas notas.',
+        });
+      } else {
+        const result = await lancarNotaFiscal(data);
+        if (!result.success) {
+          setAnalysisError(result.error);
+          return;
+        }
+        setLancamento(result.data);
+        addToast({
+          type: 'success',
+          title: 'Nota lançada',
+          message: `Conta a pagar nº ${result.data.movimentoId} criada.`,
+        });
+      }
+      await runAnalysis(data);
+    } catch {
+      await runAnalysis(data);
+      setAnalysisError(
+        'A resposta da gravação não foi confirmada. Consulte os cadastros novamente antes de tentar outra vez.'
+      );
+    } finally {
+      mutation.current = false;
+      setSaving(null);
     }
   };
 
-  const handleCopyJson = async () => {
-    if (!rawJsonString) return;
+  if (!allowed) return <AppShellSkeleton />;
+  const validation = data ? buildNotaPayload(data) : null;
+  const review = data ? evaluateInvoiceQuality(data) : null;
+  const issues = [
+    ...(review?.issues ?? []),
+    ...(ocrReview?.issues.filter((i) => i.field === 'ocr') ?? []),
+  ];
+  const missing = analise
+    ? [analise.fornecedor, ...analise.produtos].filter((e) => !e.existe || e.status !== 'ATIVO')
+    : [];
+  const json = data
+    ? JSON.stringify(
+        {
+          data,
+          review: {
+            ...review,
+            required: issues.length > 0,
+            issues,
+            ocrMinimumPageConfidence: ocrReview?.ocrMinimumPageConfidence ?? null,
+          },
+        },
+        null,
+        2
+      )
+    : '';
+  const copyJson = async () => {
     try {
-      await navigator.clipboard.writeText(rawJsonString);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2500);
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
     } catch {
       addToast({
         type: 'error',
-        title: 'Erro ao copiar',
-        message: 'Não foi possível copiar o JSON para a área de transferência.',
+        title: 'Falha ao copiar',
+        message: 'Baixe o JSON para guardar os dados.',
       });
     }
   };
-
-  const handleDownloadJson = () => {
-    if (!rawJsonString) return;
-    const blob = new Blob([rawJsonString], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+  const downloadJson = () => {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));
     const link = document.createElement('a');
-    const nfNumber = extractedData?.numeroNotaFiscal
-      ? `_${extractedData.numeroNotaFiscal.replace(/[^\w-]/g, '')}`
-      : '';
     link.href = url;
-    link.download = `nota_fiscal${nfNumber}_extraida.json`;
-    document.body.appendChild(link);
+    link.download = 'nota-fiscal-revisada.json';
     link.click();
-    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-
-  const parcelas = Array.isArray(extractedData?.parcelas) ? extractedData.parcelas : [];
-  const produtos = Array.isArray(extractedData?.descricaoProdutos)
-    ? extractedData.descricaoProdutos
-    : [];
-  const classificacoes = Array.isArray(extractedData?.classificacaoDespesa)
-    ? extractedData.classificacaoDespesa
-    : [];
-
   return (
-    <div className="flex-col" style={{ gap: 'var(--space-6)', paddingBottom: 'var(--space-12)' }}>
-      <div className="page-header" style={{ marginBottom: 0 }}>
+    <div className={styles.page}>
+      <header className="page-header">
         <div className="page-title-group">
-          <div className={styles.badges}>
-            <span className="badge badge--primary">
-              <Sparkles size={12} aria-hidden="true" />
-              Leitura com IA
-            </span>
-            <span className="badge badge--neutral">Atividade N2 · 1ª e 2ª etapas</span>
-          </div>
+          <span className="badge badge--primary">
+            <Sparkles size={13} aria-hidden="true" /> Leitura com IA
+          </span>
           <h1 className="page-title">Leitor de Nota Fiscal</h1>
           <p className="page-subtitle">
-            Envie o PDF da nota (DANFE, NF-e ou NFS-e). O sistema lê o documento, classifica a
-            despesa, consulta fornecedor, faturado e despesa no banco de dados e lança a conta a
-            pagar com suas parcelas.
+            Do PDF ao cadastro. Leia a nota, confira os itens e resolva o que falta em um só lugar.
           </p>
         </div>
-      </div>
-
-      <div className={`grid-2-1 ${styles.layout}`}>
-        <ClayCard>
-          <div className={styles.stack}>
-            <div className="card-header" style={{ marginBottom: 0 }}>
-              <h2 className="card-title">1. Escolha a nota fiscal</h2>
-            </div>
-
-            {selectedFile ? (
-              <div className={styles.fileRow}>
-                <div className={styles.fileIcon}>
-                  <FileText size={20} aria-hidden="true" />
-                </div>
-                <div className={styles.fileMeta}>
-                  <span className={styles.fileName} title={selectedFile.name}>
-                    {selectedFile.name}
-                  </span>
-                  <span className={styles.fileSize}>{formatFileSize(selectedFile.size)}</span>
-                </div>
-                <ClayButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleReset}
-                  disabled={isLoading}
-                  aria-label="Remover arquivo selecionado"
-                >
-                  <RotateCcw size={14} aria-hidden="true" />
-                  Trocar
-                </ClayButton>
-              </div>
-            ) : (
+        <Link href="/atividades/produtos" className="btn btn--outline btn--sm">
+          <Package size={16} aria-hidden="true" /> Catálogo de produtos
+        </Link>
+      </header>
+      <ol className={styles.steps} aria-label="Etapas da importação">
+        {['Enviar nota', 'Conferir e cadastrar', 'Lançar conta a pagar'].map((label, i) => (
+          <li
+            key={label}
+            aria-current={(lancamento ? i === 2 : data ? i === 1 : i === 0) ? 'step' : undefined}
+          >
+            <span>{i + 1}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
+      {!data && (
+        <div className={styles.importGrid}>
+          <ClayCard>
+            <div className={styles.stack}>
+              <h2 className="card-title">Envie sua nota fiscal</h2>
               <label
-                className={`${styles.dropzone} ${isDragging ? styles.dropzoneDragging : ''} ${
-                  isLoading ? styles.dropzoneDisabled : ''
-                }`}
+                className={`${styles.dropzone} ${dragging ? styles.dropzoneDragging : ''}`}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setIsDragging(true);
+                  setDragging(true);
                 }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  selectFile(e.dataTransfer.files[0]);
+                }}
               >
                 <input
-                  ref={fileInputRef}
+                  ref={inputRef}
                   type="file"
                   accept="application/pdf,.pdf"
+                  aria-label="Selecionar PDF da nota fiscal"
                   className={styles.visuallyHidden}
+                  disabled={busy}
                   onChange={(e) => selectFile(e.target.files?.[0])}
-                  disabled={isLoading}
                 />
-                <span className={styles.dropIcon}>
-                  <UploadCloud size={24} aria-hidden="true" />
-                </span>
-                <span className={styles.dropTitle}>Toque para escolher o PDF ou arraste aqui</span>
-                <span className={styles.dropHint}>DANFE, NF-e ou NFS-e em PDF • até 20 MB</span>
+                <UploadCloud size={32} aria-hidden="true" />
+                <strong>{file ? file.name : 'Escolha um PDF ou arraste aqui'}</strong>
+                <span>DANFE, NF-e ou NFS-e · Até 20 MB</span>
               </label>
-            )}
-
-            {error && (
-              <div className={styles.alert} role="alert">
-                <AlertTriangle size={18} className={styles.alertIcon} aria-hidden="true" />
-                <div>
-                  {error.message}
-                  {error.needsLogin && (
-                    <>
-                      {' '}
-                      <Link href="/login?from=/atividades/processador-nf">Entrar novamente</Link>
-                    </>
+              {error && (
+                <div className={styles.alert} role="alert">
+                  {error}
+                  {needsLogin && (
+                    <Link href="/login?from=/atividades/processador-nf">Entrar novamente</Link>
                   )}
                 </div>
-              </div>
-            )}
-
-            {isLoading && (
-              <div className={styles.progress} role="status" aria-live="polite">
-                <Spinner size={16} />
-                <span>
-                  Lendo a nota e classificando a despesa… {elapsedSeconds}s
-                  {elapsedSeconds >= 5 && ' (costuma levar uns 10 segundos)'}
-                </span>
-              </div>
-            )}
-
-            <div className={styles.uploadActions}>
-              <ClayButton
-                variant="primary"
-                size="lg"
-                loading={isLoading}
-                disabled={!selectedFile}
-                onClick={handleProcessPdf}
-              >
-                {!isLoading && <Sparkles size={18} aria-hidden="true" />}
-                {isLoading ? 'Extraindo dados…' : '2. Extrair dados da nota'}
-              </ClayButton>
-              {!selectedFile && (
-                <ClayButton variant="outline" size="lg" onClick={handleUseSample}>
-                  <FlaskConical size={18} aria-hidden="true" />
-                  Usar nota de exemplo
-                </ClayButton>
               )}
-            </div>
-          </div>
-        </ClayCard>
-
-        <ClayCard>
-          <div className="card-header">
-            <h2 className="card-title">O que é extraído</h2>
-          </div>
-          <ul className={styles.guideList}>
-            <li className={styles.guideItem}>
-              <Building size={16} className={styles.guideIcon} aria-hidden="true" />
-              <span>
-                <strong>Fornecedor:</strong> razão social, nome fantasia e CNPJ
-              </span>
-            </li>
-            <li className={styles.guideItem}>
-              <User size={16} className={styles.guideIcon} aria-hidden="true" />
-              <span>
-                <strong>Faturado:</strong> nome completo e CPF
-              </span>
-            </li>
-            <li className={styles.guideItem}>
-              <Calendar size={16} className={styles.guideIcon} aria-hidden="true" />
-              <span>
-                <strong>Datas e parcelas:</strong> emissão, vencimentos e valor de cada parcela
-              </span>
-            </li>
-            <li className={styles.guideItem}>
-              <DollarSign size={16} className={styles.guideIcon} aria-hidden="true" />
-              <span>
-                <strong>Valor total</strong> da nota, já com descontos
-              </span>
-            </li>
-            <li className={styles.guideItem}>
-              <Tag size={16} className={styles.guideIcon} aria-hidden="true" />
-              <span>
-                <strong>Tipo de despesa:</strong> não vem na nota; é deduzido pelos produtos (ex.:
-                óleo diesel → Manutenção e Operação)
-              </span>
-            </li>
-          </ul>
-
-          <details className={`${styles.details} ${styles.section}`}>
-            <summary>Sobre a atividade</summary>
-            <p>
-              1ª etapa: extrair do PDF os campos obrigatórios (fornecedor, faturado, número da NF,
-              data de emissão, produtos, parcelas, vencimento e valor total), classificar a despesa
-              e exibir o resultado em JSON na tela.
-            </p>
-            <p>
-              2ª etapa: consultar no banco se o FORNECEDOR, o FATURADO e a DESPESA existem, criar o
-              que faltar e lançar o movimento a pagar com suas parcelas. Os cadastros ficam em{' '}
-              <Link href="/atividades/pessoas">Pessoas</Link>,{' '}
-              <Link href="/atividades/classificacoes">Classificações</Link> e{' '}
-              <Link href="/atividades/contas-a-pagar">Contas a Pagar</Link>.
-            </p>
-          </details>
-        </ClayCard>
-      </div>
-
-      {extractedData && (
-        <div
-          ref={resultRef}
-          className="flex-col"
-          style={{ gap: 'var(--space-6)', scrollMarginTop: 'var(--space-6)' }}
-        >
-          {review?.required && (
-            <div className={styles.reviewAlert} role="alert">
-              <AlertTriangle size={20} aria-hidden="true" />
-              <div>
-                <strong>Revisão necessária antes de usar estes dados</strong>
-                <ul>
-                  {review.issues.map((issue, index) => (
-                    <li key={`${issue.field}-${index}`}>{issue.message}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-          <ClayCard>
-            <div className={styles.resultHeader}>
-              <div>
-                <h2 className="card-title">
-                  <Database size={18} aria-hidden="true" className={styles.titleIcon} />
-                  3. Consulta no banco de dados
-                </h2>
-                <p className="card-subtitle">
-                  Fornecedor, faturado e despesa procurados nos cadastros.
-                </p>
-              </div>
-              {analise && (
-                <ClayButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => runAnalise(extractedData)}
-                  disabled={isAnalisando || isLancando}
-                >
-                  <RefreshCw size={14} aria-hidden="true" />
-                  Consultar de novo
-                </ClayButton>
-              )}
-            </div>
-
-            {isAnalisando && !analise && (
-              <div className={styles.progress} role="status" aria-live="polite">
-                <Spinner size={16} />
-                <span>Consultando o banco de dados…</span>
-              </div>
-            )}
-
-            {analiseErro && (
-              <div className={`${styles.alert} ${styles.section}`} role="alert">
-                <AlertTriangle size={18} className={styles.alertIcon} aria-hidden="true" />
-                <div>{analiseErro}</div>
-              </div>
-            )}
-
-            {analise && (
-              <>
-                <div className={styles.consultaGrid} aria-live="polite">
-                  <ConsultaBloco
-                    titulo="FORNECEDOR"
-                    entidade={analise.fornecedor}
-                    lancado={lancamento !== null}
-                  />
-                  <ConsultaBloco
-                    titulo="FATURADO"
-                    entidade={analise.faturado}
-                    lancado={lancamento !== null}
-                  />
-                  {analise.despesas.map((despesa) => (
-                    <ConsultaBloco
-                      key={despesa.nome}
-                      titulo="DESPESA"
-                      entidade={despesa}
-                      lancado={lancamento !== null}
-                    />
-                  ))}
+              {processing && (
+                <div className={styles.progress} role="status">
+                  <Spinner size={16} /> Lendo a nota e identificando os itens… {elapsed}s
                 </div>
-
-                {lancamento ? (
-                  <div className={styles.successBox} role="status">
-                    <CheckCircle2 size={24} aria-hidden="true" />
-                    <div className={styles.successBody}>
-                      <strong className={styles.successTitle}>Registro lançado com sucesso!</strong>
-                      <p>
-                        Movimento a pagar <strong>ID {lancamento.movimentoId}</strong> no valor de{' '}
-                        <strong>{formatCurrency(lancamento.valorTotal)}</strong>.
+              )}
+              <div className={styles.actions}>
+                <ClayButton
+                  size="lg"
+                  loading={processing}
+                  disabled={!file || !canManage}
+                  onClick={processPdf}
+                >
+                  <Sparkles size={16} aria-hidden="true" /> Extrair dados da nota
+                </ClayButton>
+                {file && (
+                  <ClayButton variant="ghost" disabled={busy} onClick={reset}>
+                    Remover arquivo
+                  </ClayButton>
+                )}
+                {!file && (
+                  <ClayButton
+                    variant="outline"
+                    disabled={busy}
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/exemplo-danfe.pdf');
+                        if (!response.ok) throw new Error();
+                        selectFile(
+                          new File([await response.blob()], 'exemplo-danfe.pdf', {
+                            type: 'application/pdf',
+                          })
+                        );
+                      } catch {
+                        setError('Não foi possível carregar a nota de exemplo.');
+                      }
+                    }}
+                  >
+                    Usar nota de exemplo
+                  </ClayButton>
+                )}
+              </div>
+              {!canManage && (
+                <p className={styles.muted}>
+                  A leitura de novas notas requer permissão para gerenciar o módulo.
+                </p>
+              )}
+            </div>
+          </ClayCard>
+          <aside className={styles.importGuide}>
+            <span className={styles.eyebrow}>MENOS DIGITAÇÃO, MAIS CONTROLE</span>
+            <h2>Uma nota. Tudo conectado.</h2>
+            <p>
+              <Building2 size={19} aria-hidden="true" /> Identifique se a empresa já está cadastrada
+              pelo CPF/CNPJ.
+            </p>
+            <p>
+              <Package size={19} aria-hidden="true" /> Descubra quais produtos precisam de cadastro.
+            </p>
+            <p>
+              <CheckCircle2 size={19} aria-hidden="true" /> Cadastre os ausentes juntos e confira o
+              pagamento.
+            </p>
+            <small>Você confere e confirma os dados antes de cada gravação.</small>
+          </aside>
+        </div>
+      )}
+      {data && (
+        <div ref={resultRef} className={styles.stack}>
+          <div className={styles.fileRow}>
+            <FileText size={20} aria-hidden="true" />
+            <strong className={styles.fileName}>{file?.name}</strong>
+            <ClayButton variant="ghost" size="sm" disabled={busy} onClick={reset}>
+              <RotateCcw size={14} aria-hidden="true" />{' '}
+              {lancamento ? 'Ler outra nota' : 'Trocar nota'}
+            </ClayButton>
+          </div>
+          {lancamento ? (
+            <ClayCard>
+              <div className={styles.successBox} role="status">
+                <CheckCircle2 size={32} aria-hidden="true" />
+                <div>
+                  <h2>Nota lançada com sucesso</h2>
+                  <p>
+                    Conta a pagar nº {lancamento.movimentoId} ·{' '}
+                    {currency.format(lancamento.valorTotal)}
+                  </p>
+                  <ul>
+                    {lancamento.produtos.map((p) => (
+                      <li key={p.id}>
+                        {p.descricao} · {actionLabel[p.acao]} · ID {p.id}
+                      </li>
+                    ))}
+                  </ul>
+                  <p>{lancamento.parcelas.length} parcela(s) vinculada(s) à nota.</p>
+                  <Link href="/atividades/contas-a-pagar" className="btn btn--primary">
+                    Ver conta a pagar <ArrowRight size={16} aria-hidden="true" />
+                  </Link>
+                </div>
+              </div>
+            </ClayCard>
+          ) : (
+            <div className={styles.reviewGrid}>
+              <ClayCard>
+                <div className={styles.resultHeader}>
+                  <div>
+                    <h2 className="card-title">Confira os dados da nota</h2>
+                    <p className="card-subtitle">
+                      Corrija qualquer campo antes de cadastrar ou lançar.
+                    </p>
+                  </div>
+                  <span className="badge badge--neutral">
+                    NF {data.numeroNotaFiscal || 'sem número'}
+                  </span>
+                </div>
+                {issues.length > 0 && (
+                  <details className={styles.reviewAlert}>
+                    <summary>
+                      <AlertTriangle size={16} aria-hidden="true" /> {issues.length} ponto(s) para
+                      conferir com o PDF
+                    </summary>
+                    <ul>
+                      {issues.map((issue, i) => (
+                        <li key={i}>{issue.message}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                <NotaReviewForm data={data} onChange={editData} disabled={busy || !canManage} />
+              </ClayCard>
+              <aside className={styles.stack}>
+                <ClayCard>
+                  <div className={styles.resultHeader}>
+                    <div>
+                      <span className={styles.eyebrow}>CADASTROS DA NOTA</span>
+                      <h2 className="card-title">O que falta cadastrar?</h2>
+                    </div>
+                  </div>
+                  {analysing && (
+                    <div className={styles.progress} role="status">
+                      <Spinner size={16} /> Consultando empresa e produtos…
+                    </div>
+                  )}
+                  {analysisError && (
+                    <div className={styles.alert} role="alert">
+                      {analysisError}
+                    </div>
+                  )}
+                  {!analise && !analysing && (
+                    <p className={styles.muted}>
+                      {analysisError
+                        ? 'Refaça a consulta para continuar com segurança.'
+                        : 'Os dados foram alterados. Consulte os cadastros para atualizar o resultado.'}
+                    </p>
+                  )}
+                  {analise && (
+                    <>
+                      <p className={styles.cadastroSummary} aria-live="polite">
+                        {missing.length
+                          ? `${missing.length} cadastro(s) para resolver`
+                          : 'Empresa e produtos já cadastrados'}
                       </p>
-                      <dl className={styles.successList}>
-                        <dt>Fornecedor</dt>
-                        <dd>
-                          ID {lancamento.fornecedor.id}
-                          <span className={`badge ${ACAO_BADGE[lancamento.fornecedor.acao]}`}>
-                            {acaoLabel(lancamento.fornecedor.acao)}
-                          </span>
-                        </dd>
-                        <dt>Faturado</dt>
-                        <dd>
-                          ID {lancamento.faturado.id}
-                          <span className={`badge ${ACAO_BADGE[lancamento.faturado.acao]}`}>
-                            {acaoLabel(lancamento.faturado.acao)}
-                          </span>
-                        </dd>
-                        {lancamento.despesas.map((d) => (
-                          <React.Fragment key={d.id}>
-                            <dt>Despesa</dt>
-                            <dd>
-                              {d.descricao} · ID {d.id}
-                              <span className={`badge ${ACAO_BADGE[d.acao]}`}>
-                                {acaoLabel(d.acao, true)}
-                              </span>
-                            </dd>
-                          </React.Fragment>
-                        ))}
-                        {lancamento.parcelas.map((p) => (
-                          <React.Fragment key={p.id}>
-                            <dt>Parcela {p.identificacao}</dt>
-                            <dd>
-                              ID {p.id} · vence {formatDate(p.dataVencimento)} ·{' '}
-                              {formatCurrency(p.valorParcela)}
-                            </dd>
-                          </React.Fragment>
-                        ))}
-                      </dl>
-                      <div className={styles.successActions}>
-                        <Link
-                          href="/atividades/contas-a-pagar"
-                          className="btn btn--primary btn--sm"
-                        >
-                          Ver em Contas a Pagar
-                        </Link>
-                        <ClayButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            handleReset();
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                        >
-                          <FilePlus2 size={14} aria-hidden="true" />
-                          Processar outra nota
-                        </ClayButton>
-                      </div>
-                    </div>
-                  </div>
-                ) : analise.movimentoExistenteId ? (
-                  <div className={`${styles.reviewAlert} ${styles.section}`} role="alert">
-                    <AlertTriangle size={20} aria-hidden="true" />
-                    <div>
-                      <strong>Esta nota já foi lançada</strong> (movimento ID{' '}
-                      {analise.movimentoExistenteId}).{' '}
-                      <Link href="/atividades/contas-a-pagar">Ver em Contas a Pagar</Link>
-                    </div>
-                  </div>
-                ) : analise.pendencias.length > 0 ? (
-                  <div className={`${styles.reviewAlert} ${styles.section}`} role="alert">
-                    <AlertTriangle size={20} aria-hidden="true" />
-                    <div>
-                      <strong>Não é possível lançar com os dados extraídos</strong>
-                      <ul>
-                        {analise.pendencias.map((p) => (
-                          <li key={p}>{p}</li>
+                      <ul className={styles.cadastroList}>
+                        <CadastroItem entidade={analise.fornecedor} tipo="Empresa" />
+                        {analise.produtos.map((p) => (
+                          <CadastroItem key={p.nome} entidade={p} tipo="Produto" />
                         ))}
                       </ul>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={styles.section}>
-                    <h3 className={styles.sectionTitle}>Ao lançar, o sistema irá</h3>
-                    <ul className={styles.planList}>
-                      {!analise.fornecedor.existe && <li>Criar o novo FORNECEDOR</li>}
-                      {analise.fornecedor.status === 'INATIVO' && <li>Reativar o FORNECEDOR</li>}
-                      {!analise.faturado.existe && <li>Criar o novo FATURADO</li>}
-                      {analise.faturado.status === 'INATIVO' && <li>Reativar o FATURADO</li>}
-                      {analise.despesas
-                        .filter((d) => !d.existe)
-                        .map((d) => (
-                          <li key={`nova-${d.nome}`}>Criar a nova DESPESA {d.nome}</li>
-                        ))}
-                      {analise.despesas
-                        .filter((d) => d.status === 'INATIVO')
-                        .map((d) => (
-                          <li key={`reativar-${d.nome}`}>Reativar a DESPESA {d.nome}</li>
-                        ))}
-                      <li>
-                        Criar o registro do movimento a pagar e{' '}
-                        {parcelas.length > 1 ? `suas ${parcelas.length} parcelas` : 'sua parcela'}
-                      </li>
-                    </ul>
-                    {review?.required && (
-                      <label className={styles.confirmCheck}>
-                        <input
-                          type="checkbox"
-                          checked={revisaoConfirmada}
-                          onChange={(e) => setRevisaoConfirmada(e.target.checked)}
-                        />
-                        Conferi com o PDF os campos sinalizados na revisão
-                      </label>
-                    )}
-                    <div className={styles.uploadActions}>
-                      <ClayButton
-                        variant="primary"
-                        size="lg"
-                        loading={isLancando}
-                        disabled={isAnalisando || (review?.required && !revisaoConfirmada)}
-                        onClick={handleLancar}
-                      >
-                        {!isLancando && <Send size={18} aria-hidden="true" />}
-                        {isLancando ? 'Lançando…' : '4. Lançar conta a pagar'}
-                      </ClayButton>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </ClayCard>
-
-          <ClayCard>
-            <div className={styles.resultHeader}>
-              <div>
-                <h2 className="card-title">Dados da nota</h2>
-                <p className="card-subtitle">Confira com o documento antes de lançar.</p>
-              </div>
-              {classificacoes.length > 0 && (
-                <div className={styles.badges} style={{ marginBottom: 0 }}>
-                  {classificacoes.map((c) => (
-                    <span key={c} className="badge badge--accent">
-                      <Tag size={12} aria-hidden="true" />
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className={styles.summaryGrid}>
-              <div className={styles.field}>
-                <span className="label">Valor total</span>
-                <span className={styles.total}>{formatCurrency(extractedData.valorTotal)}</span>
-                <span className={styles.fieldSub}>
-                  Vencimento {formatDate(extractedData.dataVencimento)}
-                </span>
-              </div>
-              <div className={styles.field}>
-                <span className="label">Fornecedor</span>
-                <span className={styles.fieldValue}>
-                  {extractedData.fornecedor?.razaoSocial || '—'}
-                </span>
-                <span className={styles.fieldSub}>
-                  {[
-                    extractedData.fornecedor?.nomeFantasia,
-                    extractedData.fornecedor?.cnpj && `CNPJ ${extractedData.fornecedor.cnpj}`,
-                  ]
-                    .filter(Boolean)
-                    .join(' • ') || '—'}
-                </span>
-              </div>
-              <div className={styles.field}>
-                <span className="label">Faturado</span>
-                <span className={styles.fieldValue}>
-                  {extractedData.faturado?.nomeCompleto || '—'}
-                </span>
-                <span className={styles.fieldSub}>
-                  {extractedData.faturado?.cpf ? `CPF/CNPJ ${extractedData.faturado.cpf}` : '—'}
-                </span>
-              </div>
-              <div className={styles.field}>
-                <span className="label">Nota fiscal</span>
-                <span className={styles.fieldValue}>
-                  Nº {extractedData.numeroNotaFiscal || '—'}
-                </span>
-                <span className={styles.fieldSub}>
-                  Emitida em {formatDate(extractedData.dataEmissao)}
-                </span>
-              </div>
-            </div>
-
-            <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>
-                Parcelas ({extractedData.quantidadeParcelas || parcelas.length})
-              </h3>
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th scope="col">Parcela</th>
-                      <th scope="col">Vencimento</th>
-                      <th scope="col" className={styles.num}>
-                        Valor
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parcelas.map((p, i) => (
-                      <tr key={`${p.numero}-${i}`}>
-                        <td>{p.numero ?? i + 1}</td>
-                        <td>{formatDate(p.dataVencimento)}</td>
-                        <td className={styles.num}>{formatCurrency(p.valor)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {produtos.length > 0 && (
-              <div className={styles.section}>
-                <h3 className={styles.sectionTitle}>Produtos e serviços ({produtos.length})</h3>
-                <ul className={styles.productList}>
-                  {produtos.map((produto, i) => (
-                    <li key={`${produto}-${i}`} className={styles.productItem}>
-                      {produto}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </ClayCard>
-
-          <ClayCard>
-            <div className={styles.resultHeader}>
-              <div>
-                <h2 className="card-title">Resultado em JSON</h2>
-                <p className="card-subtitle">Dados extraídos e alertas de revisão.</p>
-              </div>
-              <div className={styles.actions}>
-                <ClayButton variant="secondary" size="sm" onClick={handleCopyJson}>
-                  {isCopied ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : (
-                    <Copy size={14} aria-hidden="true" />
+                      <details className={styles.details}>
+                        <summary>Destinatário e classificações do lançamento</summary>
+                        <ul>
+                          {[analise.faturado, ...analise.despesas].map((entidade, i) => (
+                            <li key={`${entidade.nome}-${i}`}>
+                              {i === 0 ? 'Destinatário' : 'Classificação'}:{' '}
+                              {entidade.nome || 'Não identificado'} ·{' '}
+                              {!entidade.existe
+                                ? 'Será cadastrado ao lançar'
+                                : entidade.status === 'INATIVO'
+                                  ? 'Será reativado ao lançar'
+                                  : `Já existe · ID ${entidade.id}`}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                      {validation && validation.pendenciasCadastro.length > 0 && (
+                        <ul className={styles.pendingList}>
+                          {validation.pendenciasCadastro.map((p) => (
+                            <li key={p}>{p}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {missing.length > 0 && (
+                        <>
+                          <label className={styles.confirmCheck}>
+                            <input
+                              type="checkbox"
+                              checked={confirmed}
+                              disabled={busy || !canManage}
+                              onChange={(e) => setConfirmed(e.target.checked)}
+                            />{' '}
+                            Conferi os dados com o PDF
+                          </label>
+                          <ClayButton
+                            className={styles.fullButton}
+                            loading={saving === 'cadastros'}
+                            disabled={
+                              !canManage ||
+                              busy ||
+                              !confirmed ||
+                              !!validation?.pendenciasCadastro.length ||
+                              !!analysisError
+                            }
+                            onClick={() => save('cadastros')}
+                          >
+                            <PlusCircle size={16} aria-hidden="true" /> Cadastrar empresa e produtos
+                          </ClayButton>
+                          <p className={styles.muted}>
+                            Somente os ausentes serão criados. Os inativos serão reativados.
+                          </p>
+                        </>
+                      )}
+                    </>
                   )}
-                  <span aria-live="polite">{isCopied ? 'Copiado!' : 'Copiar JSON'}</span>
-                </ClayButton>
-                <ClayButton variant="outline" size="sm" onClick={handleDownloadJson}>
-                  <Download size={14} aria-hidden="true" />
-                  Baixar .json
-                </ClayButton>
-              </div>
+                  {cadastro && (
+                    <div className={styles.savedNotice} role="status">
+                      <CheckCircle2 size={18} aria-hidden="true" /> Empresa e produtos cadastrados
+                      com sucesso.
+                    </div>
+                  )}
+                  <ClayButton
+                    variant="outline"
+                    className={styles.fullButton}
+                    loading={analysing}
+                    disabled={busy}
+                    onClick={() => runAnalysis(data)}
+                  >
+                    <RefreshCw size={15} aria-hidden="true" />{' '}
+                    {analysisError ? 'Tentar consulta novamente' : 'Consultar cadastros'}
+                  </ClayButton>
+                  <Link href="/atividades/produtos" className={styles.catalogLink}>
+                    Abrir catálogo de produtos <ArrowRight size={14} aria-hidden="true" />
+                  </Link>
+                </ClayCard>
+                <ClayCard>
+                  <span className={styles.eyebrow}>PAGAMENTO</span>
+                  <h2 className="card-title">Concluir o lançamento</h2>
+                  <p className={styles.paymentTotal}>
+                    {data.valorTotal == null
+                      ? 'Valor não identificado'
+                      : currency.format(data.valorTotal)}
+                  </p>
+                  {analise?.movimentoExistenteId ? (
+                    <div className={styles.reviewAlert} role="alert">
+                      Esta nota já foi lançada (nº {analise.movimentoExistenteId}).{' '}
+                      <Link href="/atividades/contas-a-pagar">Ver conta a pagar</Link>
+                    </div>
+                  ) : (
+                    <>
+                      {validation && validation.pendencias.length > 0 && (
+                        <details className={styles.details}>
+                          <summary>
+                            Corrija {validation.pendencias.length} pendência(s) para lançar
+                          </summary>
+                          <ul>
+                            {validation.pendencias.map((p) => (
+                              <li key={p}>{p}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                      {analise && (
+                        <p className={styles.muted}>
+                          O lançamento vincula os produtos e cria também o destinatário e as
+                          classificações que faltarem.
+                        </p>
+                      )}
+                      {!missing.length && (
+                        <label className={styles.confirmCheck}>
+                          <input
+                            type="checkbox"
+                            checked={confirmed}
+                            disabled={busy || !canManage}
+                            onChange={(e) => setConfirmed(e.target.checked)}
+                          />{' '}
+                          Conferi os dados com o PDF
+                        </label>
+                      )}
+                      <ClayButton
+                        className={styles.fullButton}
+                        loading={saving === 'lancamento'}
+                        disabled={
+                          !canManage ||
+                          busy ||
+                          analysing ||
+                          !analise ||
+                          !!analysisError ||
+                          !confirmed ||
+                          !!validation?.pendencias.length
+                        }
+                        onClick={() => save('lancamento')}
+                      >
+                        Lançar conta a pagar <ArrowRight size={16} aria-hidden="true" />
+                      </ClayButton>
+                    </>
+                  )}
+                  {!canManage && (
+                    <p className={styles.muted}>
+                      Seu perfil permite consultar. Peça a um responsável para cadastrar ou lançar.
+                    </p>
+                  )}
+                </ClayCard>
+              </aside>
             </div>
-
-            <div className={styles.codeBlock}>
-              <div className={styles.codeHeader}>
-                <span>nota_fiscal.json</span>
-                <span>application/json</span>
-              </div>
-              <pre className={styles.code} tabIndex={0} aria-label="JSON extraído da nota fiscal">
-                <code>{rawJsonString}</code>
-              </pre>
+          )}
+          <details className={styles.jsonDetails}>
+            <summary>Dados técnicos · JSON revisado</summary>
+            <div className={styles.actions}>
+              <ClayButton variant="outline" size="sm" onClick={copyJson}>
+                {copied ? <Check size={14} /> : <Copy size={14} />}{' '}
+                {copied ? 'Copiado' : 'Copiar JSON'}
+              </ClayButton>
+              <ClayButton variant="outline" size="sm" onClick={downloadJson}>
+                <Download size={14} /> Baixar JSON
+              </ClayButton>
             </div>
-          </ClayCard>
+            <pre className={styles.code} tabIndex={0} aria-label="JSON revisado da nota fiscal">
+              {json}
+            </pre>
+          </details>
         </div>
       )}
     </div>

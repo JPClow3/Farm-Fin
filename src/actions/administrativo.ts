@@ -5,8 +5,10 @@ import {
   classificacao,
   movimentoClassificacao,
   movimentoContas,
+  movimentoProduto,
   parcelaContas,
   pessoas,
+  produtos,
 } from '@/db/schema';
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { alias, type AnyPgColumn } from 'drizzle-orm/pg-core';
@@ -21,10 +23,12 @@ import {
   formatDocumento,
   identificacaoParcela,
   normalizeDescricao,
+  normalizeNumeroNota,
   onlyDigits,
   parseSearchTerms,
   roundMoney,
   type CadastroStatus,
+  type CadastroNotaResultado,
   type ClassificacaoRow,
   type ClassificacaoTipo,
   type EntidadeConsulta,
@@ -34,6 +38,7 @@ import {
   type NotaAnalise,
   type PessoaRow,
   type PessoaTipo,
+  type ProdutoRow,
 } from '@/lib/administrativo';
 import {
   alterarStatusSchema,
@@ -42,6 +47,7 @@ import {
   salvarClassificacaoSchema,
   salvarMovimentoSchema,
   salvarPessoaSchema,
+  salvarProdutoSchema,
 } from '@/lib/validations/administrativo.schema';
 
 // Projeto Administrativo-Financeiro (Atividade N2 — 2ª etapa).
@@ -784,6 +790,11 @@ async function consultarMovimentoDuplicado(
   numeroNotaFiscal: string | null
 ) {
   if (!numeroNotaFiscal) return undefined;
+  const numero = normalizeNumeroNota(numeroNotaFiscal);
+  const numeroSalvo = sql`regexp_replace(upper(trim(${movimentoContas.numeroNotaFiscal})), '[.[:space:]]', '', 'g')`;
+  const numeroComparavel = /^\d+$/.test(numero)
+    ? sql`coalesce(nullif(ltrim(${numeroSalvo}, '0'), ''), '0')`
+    : numeroSalvo;
   const [row] = await executor
     .select({ id: movimentoContas.id })
     .from(movimentoContas)
@@ -793,7 +804,7 @@ async function consultarMovimentoDuplicado(
         eq(movimentoContas.tipo, 'APAGAR'),
         eq(movimentoContas.status, 'ATIVO'),
         eq(movimentoContas.pessoaId, pessoaId),
-        eq(movimentoContas.numeroNotaFiscal, numeroNotaFiscal)
+        sql`${numeroComparavel} = ${numero}`
       )
     )
     .limit(1);
@@ -820,10 +831,10 @@ export async function analisarNotaFiscal(nota: unknown): Promise<ActionResult<No
     const session = await requireModuleAccess(MODULE, 'view');
     const parsed = validateActionInput(notaExtraidaSchema, nota);
     if (!parsed.success) return parsed.result;
-    const { payload, pendencias } = buildNotaPayload(parsed.data);
+    const { payload, pendencias, pendenciasCadastro } = buildNotaPayload(parsed.data);
     const orgId = session.organizationId;
 
-    const [fornecedor, faturado, despesas] = await Promise.all([
+    const [fornecedor, faturado, despesas, produtosEncontrados] = await Promise.all([
       consultarPessoa(
         db,
         orgId,
@@ -839,6 +850,7 @@ export async function analisarNotaFiscal(nota: unknown): Promise<ActionResult<No
         payload.faturado.documento
       ),
       consultarClassificacoes(db, orgId, 'DESPESA', payload.despesas),
+      consultarProdutos(db, orgId, payload.produtos),
     ]);
     const duplicado = fornecedor
       ? await consultarMovimentoDuplicado(db, orgId, fornecedor.id, payload.numeroNotaFiscal)
@@ -860,6 +872,14 @@ export async function analisarNotaFiscal(nota: unknown): Promise<ActionResult<No
             despesas.find((d) => d.descricao === descricao)
           )
         ),
+        produtos: payload.produtos.map((descricao) =>
+          toConsulta(
+            descricao,
+            null,
+            produtosEncontrados.find((p) => p.descricao === descricao)
+          )
+        ),
+        pendenciasCadastro,
         movimentoExistenteId: duplicado?.id ?? null,
         pendencias,
       },
@@ -940,8 +960,175 @@ async function garantirDespesas(
   return resultado;
 }
 
+async function consultarProdutos(executor: Tx | typeof db, orgId: string, descricoes: string[]) {
+  if (descricoes.length === 0) return [];
+  return executor
+    .select()
+    .from(produtos)
+    .where(and(eq(produtos.organizationId, orgId), inArray(produtos.descricao, descricoes)));
+}
+
+async function garantirProdutos(
+  tx: Tx,
+  orgId: string,
+  descricoes: string[]
+): Promise<CadastroNotaResultado['produtos']> {
+  const resultado: CadastroNotaResultado['produtos'] = [];
+  // Ordem estável evita deadlocks entre notas com os mesmos produtos.
+  for (const descricao of [...descricoes].sort()) {
+    const [criado] = await tx
+      .insert(produtos)
+      .values({ organizationId: orgId, descricao, status: 'ATIVO' })
+      .onConflictDoNothing()
+      .returning();
+    const atual = criado ?? (await consultarProdutos(tx, orgId, [descricao]))[0];
+    if (!atual) throw new Error('Falha ao cadastrar produto.');
+    if (atual.status !== 'ATIVO') {
+      await tx
+        .update(produtos)
+        .set({ status: 'ATIVO', updatedAt: new Date() })
+        .where(and(eq(produtos.id, atual.id), eq(produtos.organizationId, orgId)));
+    }
+    resultado.push({
+      id: atual.id,
+      descricao,
+      acao: criado ? 'criado' : atual.status === 'ATIVO' ? 'existente' : 'reativado',
+    });
+  }
+  return descricoes.map((descricao) => resultado.find((p) => p.descricao === descricao)!);
+}
+
+/** Cadastra empresa e produtos juntos, sem exigir dados financeiros completos. */
+export async function cadastrarItensNotaFiscal(
+  nota: unknown
+): Promise<ActionResult<CadastroNotaResultado>> {
+  try {
+    const session = await requireModuleAccess(MODULE, 'manage');
+    const parsed = validateActionInput(notaExtraidaSchema, nota);
+    if (!parsed.success) return parsed.result;
+    const { payload, pendenciasCadastro } = buildNotaPayload(parsed.data);
+    if (pendenciasCadastro.length) return { success: false, error: pendenciasCadastro.join(' ') };
+    const resultado = await db.transaction(async (tx) => ({
+      fornecedor: await garantirPessoa(
+        tx,
+        session.organizationId,
+        'FORNECEDOR',
+        payload.fornecedor
+      ),
+      produtos: await garantirProdutos(tx, session.organizationId, payload.produtos),
+    }));
+    await writeAuditLog({
+      action: 'create',
+      entityType: 'produto',
+      details: `Cadastros da NF ${payload.numeroNotaFiscal ?? 's/n'}: fornecedor ${resultado.fornecedor.id}; produtos ${resultado.produtos.map((p) => p.id).join(', ')}`,
+    });
+    return {
+      success: true,
+      data: resultado,
+      message: 'Empresa e produtos cadastrados com sucesso.',
+    };
+  } catch (error) {
+    return falha(error, 'cadastrarItensNotaFiscal');
+  }
+}
+
+export async function buscarProdutos(input: BuscaInput = {}): Promise<ActionResult<ProdutoRow[]>> {
+  try {
+    const session = await requireModuleAccess(MODULE, 'view');
+    const busca = prepararBusca(input, produtos.status);
+    if ('erro' in busca) return busca.erro!;
+    const rows = await db
+      .select()
+      .from(produtos)
+      .where(
+        and(
+          eq(produtos.organizationId, session.organizationId),
+          ...busca.statusFilter,
+          ...searchConditions(busca.terms, (term) => [likeTerm(produtos.descricao, term)])
+        )
+      )
+      .orderBy(asc(produtos.descricao))
+      .limit(MAX_RESULTS);
+    return {
+      success: true,
+      data: rows.map((p) => ({
+        id: p.id,
+        descricao: p.descricao,
+        status: p.status as CadastroStatus,
+      })),
+    };
+  } catch (error) {
+    return falha(error, 'buscarProdutos');
+  }
+}
+
+export async function salvarProduto(input: unknown): Promise<ActionResult<ProdutoRow>> {
+  try {
+    const session = await requireModuleAccess(MODULE, 'manage');
+    const parsed = validateActionInput(salvarProdutoSchema, input);
+    if (!parsed.success) return parsed.result;
+    const { id } = parsed.data;
+    const descricao = normalizeDescricao(parsed.data.descricao);
+    const [row] = id
+      ? await db
+          .update(produtos)
+          .set({ descricao, updatedAt: new Date() })
+          .where(and(eq(produtos.id, id), eq(produtos.organizationId, session.organizationId)))
+          .returning()
+      : await db
+          .insert(produtos)
+          .values({ organizationId: session.organizationId, descricao })
+          .returning();
+    if (!row) return { success: false, error: 'Produto não encontrado.' };
+    await writeAuditLog({
+      action: id ? 'update' : 'create',
+      entityType: 'produto',
+      entityId: String(row.id),
+      details: descricao,
+    });
+    return {
+      success: true,
+      data: { id: row.id, descricao: row.descricao, status: row.status as CadastroStatus },
+      message: 'Produto salvo.',
+    };
+  } catch (error) {
+    return falha(error, 'salvarProduto');
+  }
+}
+
+export async function alterarStatusProduto(
+  id: number,
+  status: CadastroStatus
+): Promise<ActionResult<ProdutoRow>> {
+  try {
+    const session = await requireModuleAccess(MODULE, 'manage');
+    const parsed = validateActionInput(alterarStatusSchema, { id, status });
+    if (!parsed.success) return parsed.result;
+    const [row] = await db
+      .update(produtos)
+      .set({ status: parsed.data.status, updatedAt: new Date() })
+      .where(
+        and(eq(produtos.id, parsed.data.id), eq(produtos.organizationId, session.organizationId))
+      )
+      .returning();
+    if (!row) return { success: false, error: 'Produto não encontrado.' };
+    await writeAuditLog({
+      action: 'update',
+      entityType: 'produto',
+      entityId: String(row.id),
+      details: status,
+    });
+    return {
+      success: true,
+      data: { id: row.id, descricao: row.descricao, status: row.status as CadastroStatus },
+    };
+  } catch (error) {
+    return falha(error, 'alterarStatusProduto');
+  }
+}
+
 /**
- * Cria o que faltar (fornecedor, faturado, despesas) e lança o movimento
+ * Cria o que faltar (fornecedor, produtos, faturado, despesas) e lança o movimento
  * APAGAR com suas parcelas, tudo numa única transação.
  */
 export async function lancarNotaFiscal(nota: unknown): Promise<ActionResult<LancamentoResultado>> {
@@ -959,6 +1146,10 @@ export async function lancarNotaFiscal(nota: unknown): Promise<ActionResult<Lanc
     const orgId = session.organizationId;
 
     const resultado = await db.transaction(async (tx) => {
+      // Serializa confirmações da mesma NF, inclusive quando o fornecedor já existe.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`${orgId}:NF:${payload.fornecedor.documento}:${payload.numeroNotaFiscal}`}, 0))`
+      );
       const fornecedor = await garantirPessoa(tx, orgId, 'FORNECEDOR', payload.fornecedor);
       const duplicado = await consultarMovimentoDuplicado(
         tx,
@@ -973,6 +1164,7 @@ export async function lancarNotaFiscal(nota: unknown): Promise<ActionResult<Lanc
       }
       const faturado = await garantirPessoa(tx, orgId, 'FATURADO', payload.faturado);
       const despesas = await garantirDespesas(tx, orgId, payload.despesas);
+      const produtosNota = await garantirProdutos(tx, orgId, payload.produtos);
 
       const [movimento] = await tx
         .insert(movimentoContas)
@@ -995,6 +1187,9 @@ export async function lancarNotaFiscal(nota: unknown): Promise<ActionResult<Lanc
         despesas.map((d) => d.id)
       );
       const parcelas = await gravarParcelas(tx, movimento.id, payload.parcelas);
+      await tx
+        .insert(movimentoProduto)
+        .values(produtosNota.map((p) => ({ movimentoId: movimento.id, produtoId: p.id })));
 
       return {
         movimentoId: movimento.id,
@@ -1002,6 +1197,7 @@ export async function lancarNotaFiscal(nota: unknown): Promise<ActionResult<Lanc
         fornecedor,
         faturado,
         despesas,
+        produtos: produtosNota,
         parcelas: parcelas.map((p) => ({
           id: p.id,
           identificacao: p.identificacao,

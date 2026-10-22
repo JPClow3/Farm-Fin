@@ -20,6 +20,13 @@ const validInvoice: ExtractedInvoiceData = {
 };
 
 describe('invoice extraction review', () => {
+  it('accepts a supplier identified by a valid CPF', () => {
+    const invoice = structuredClone(validInvoice);
+    invoice.fornecedor.cnpj = '529.982.247-25';
+    expect(evaluateInvoiceQuality(invoice).issues).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'fornecedor.cnpj' })])
+    );
+  });
   it('leaves a consistent invoice without review warnings', () => {
     expect(
       evaluateInvoiceQuality(validInvoice, [{ index: 0, average: 0.95, minimum: 0.88 }])

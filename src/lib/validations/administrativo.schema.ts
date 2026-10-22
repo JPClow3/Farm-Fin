@@ -65,6 +65,11 @@ export const alterarStatusSchema = z.object({
   status: z.enum(['ATIVO', 'INATIVO']),
 });
 
+export const salvarProdutoSchema = z.object({
+  id: z.number().int().positive().optional(),
+  descricao: z.string().trim().min(1, 'Informe o nome do produto.').max(500),
+});
+
 /** JSON extraído da nota (vem do navegador, então é revalidado no servidor) */
 export const notaExtraidaSchema = z.object({
   fornecedor: z.object({
@@ -85,13 +90,13 @@ export const notaExtraidaSchema = z.object({
       z.object({
         numero: z.number().nullable().optional(),
         dataVencimento: z.string().max(20).nullable(),
-        valor: z.number().nullable(),
+        valor: z.number().max(1e12).nullable(),
       })
     )
     .max(120)
     .default([]),
   dataVencimento: z.string().max(20).nullable(),
-  valorTotal: z.number().nullable(),
+  valorTotal: z.number().max(1e12).nullable(),
   tipoDespesa: z.string().max(150).nullable().default(''),
   classificacaoDespesa: z.array(z.string().max(150)).max(20).default([]),
 });

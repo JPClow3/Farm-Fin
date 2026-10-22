@@ -1,6 +1,8 @@
 // Projeto Administrativo-Financeiro (Atividade N2): tipos e regras puras,
 // usados tanto pelas Server Actions quanto pelas telas.
 
+import { validDocument } from './invoiceQuality';
+
 export const PESSOA_TIPOS = ['FORNECEDOR', 'CLIENTE', 'FATURADO'] as const;
 export const CLASSIFICACAO_TIPOS = ['DESPESA', 'RECEITA'] as const;
 export const MOVIMENTO_TIPOS = ['APAGAR', 'ARECEBER'] as const;
@@ -47,6 +49,12 @@ export interface ClassificacaoRow {
   status: CadastroStatus;
 }
 
+export interface ProdutoRow {
+  id: number;
+  descricao: string;
+  status: CadastroStatus;
+}
+
 export interface ParcelaRow {
   id: number;
   identificacao: string;
@@ -83,16 +91,22 @@ export interface NotaAnalise {
   fornecedor: EntidadeConsulta;
   faturado: EntidadeConsulta;
   despesas: EntidadeConsulta[];
+  produtos: EntidadeConsulta[];
+  pendenciasCadastro: string[];
   /** Movimento ativo já lançado para o mesmo fornecedor + número de NF */
   movimentoExistenteId: number | null;
   /** Dados obrigatórios ausentes que impedem o lançamento */
   pendencias: string[];
 }
 
-export interface LancamentoResultado {
+export interface CadastroNotaResultado {
+  fornecedor: { id: number; acao: 'criado' | 'existente' | 'reativado' };
+  produtos: { id: number; descricao: string; acao: 'criado' | 'existente' | 'reativado' }[];
+}
+
+export interface LancamentoResultado extends CadastroNotaResultado {
   movimentoId: number;
   valorTotal: number;
-  fornecedor: { id: number; acao: 'criado' | 'existente' | 'reativado' };
   faturado: { id: number; acao: 'criado' | 'existente' | 'reativado' };
   despesas: { id: number; descricao: string; acao: 'criado' | 'existente' | 'reativado' }[];
   parcelas: { id: number; identificacao: string; dataVencimento: string; valorParcela: number }[];
@@ -118,6 +132,12 @@ export function documentoLabel(value: string | null | undefined): 'CPF' | 'CNPJ'
 /** Descrições de classificação são comparadas e gravadas em maiúsculas */
 export function normalizeDescricao(value: string | null | undefined): string {
   return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('pt-BR');
+}
+
+/** DANFE pode exibir 000.045.892 e o mesmo número ser digitado como 45892. */
+export function normalizeNumeroNota(value: string | null | undefined): string {
+  const numero = (value ?? '').trim().toUpperCase().replace(/[.\s]/g, '');
+  return /^\d+$/.test(numero) ? numero.replace(/^0+(?=\d)/, '') : numero;
 }
 
 /** "Busca por mais de um elemento": cada termo precisa casar com alguma coluna */
@@ -211,6 +231,7 @@ export interface NotaLancamentoPayload {
   numeroNotaFiscal: string | null;
   dataEmissao: string | null;
   descricao: string | null;
+  produtos: string[];
   despesas: string[];
   parcelas: ParcelaInput[];
   valorTotal: number;
@@ -242,6 +263,7 @@ export interface NotaExtraidaLike {
 export function buildNotaPayload(data: NotaExtraidaLike): {
   payload: NotaLancamentoPayload;
   pendencias: string[];
+  pendenciasCadastro: string[];
 } {
   const pendencias: string[] = [];
 
@@ -250,12 +272,24 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
   const faturadoNome = (data.faturado?.nomeCompleto ?? '').trim();
   const faturadoDoc = onlyDigits(data.faturado?.cpf);
 
-  if (!fornecedorNome) pendencias.push('Razão social do fornecedor não identificada.');
-  if (fornecedorDoc.length !== 14 && fornecedorDoc.length !== 11)
-    pendencias.push('CNPJ do fornecedor ausente ou incompleto.');
-  if (!faturadoNome) pendencias.push('Nome do faturado não identificado.');
-  if (faturadoDoc.length !== 11 && faturadoDoc.length !== 14)
-    pendencias.push('CPF/CNPJ do faturado ausente ou incompleto.');
+  const produtos = [
+    ...new Set(
+      (Array.isArray(data.descricaoProdutos) ? data.descricaoProdutos : [])
+        .map(normalizeDescricao)
+        .filter(Boolean)
+    ),
+  ];
+  const pendenciasCadastro: string[] = [];
+  if (fornecedorNome.length < 2) pendenciasCadastro.push('Informe a razão social do fornecedor.');
+  if (!validDocument(fornecedorDoc))
+    pendenciasCadastro.push('Informe um CPF/CNPJ válido para o fornecedor.');
+  if (produtos.length === 0)
+    pendenciasCadastro.push('Informe ao menos um produto ou serviço da nota.');
+  pendencias.push(...pendenciasCadastro);
+  if (!(data.numeroNotaFiscal ?? '').trim()) pendencias.push('Informe o número da nota fiscal.');
+  if (!isIsoDate(data.dataEmissao)) pendencias.push('Informe uma data de emissão válida.');
+  if (faturadoNome.length < 2) pendencias.push('Informe o nome do faturado.');
+  if (!validDocument(faturadoDoc)) pendencias.push('Informe um CPF/CNPJ válido para o faturado.');
 
   const fonteDespesas =
     Array.isArray(data.classificacaoDespesa) && data.classificacaoDespesa.length > 0
@@ -264,22 +298,34 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
   const despesas = [...new Set(fonteDespesas.map(normalizeDescricao).filter(Boolean))];
   if (despesas.length === 0) pendencias.push('Classificação da despesa não identificada.');
 
-  let parcelas: ParcelaInput[] = (Array.isArray(data.parcelas) ? data.parcelas : [])
-    .filter((p) => isIsoDate(p?.dataVencimento) && typeof p?.valor === 'number' && p.valor > 0)
-    .map((p) => ({
-      dataVencimento: p.dataVencimento as string,
-      valor: roundMoney(p.valor as number),
-    }));
+  const fonteParcelas = Array.isArray(data.parcelas) ? data.parcelas : [];
+  const parcelaValida = (p: (typeof fonteParcelas)[number]) =>
+    isIsoDate(p?.dataVencimento) &&
+    typeof p?.valor === 'number' &&
+    Number.isFinite(p.valor) &&
+    roundMoney(p.valor) > 0;
+  if (fonteParcelas.some((p) => !parcelaValida(p)))
+    pendencias.push('Corrija o vencimento e o valor de todas as parcelas.');
+  let parcelas: ParcelaInput[] = fonteParcelas.filter(parcelaValida).map((p) => ({
+    dataVencimento: p.dataVencimento as string,
+    valor: roundMoney(p.valor as number),
+  }));
 
   const valorNota =
-    typeof data.valorTotal === 'number' && data.valorTotal > 0 ? data.valorTotal : 0;
+    typeof data.valorTotal === 'number' &&
+    Number.isFinite(data.valorTotal) &&
+    roundMoney(data.valorTotal) > 0
+      ? roundMoney(data.valorTotal)
+      : 0;
+  if (valorNota === 0) pendencias.push('Informe um valor total maior que zero.');
   if (parcelas.length === 0 && valorNota > 0 && isIsoDate(data.dataVencimento)) {
     parcelas = [{ dataVencimento: data.dataVencimento, valor: roundMoney(valorNota) }];
   }
   if (parcelas.length === 0) pendencias.push('Nenhuma parcela com vencimento e valor válidos.');
 
   const valorTotal = roundMoney(parcelas.reduce((sum, p) => sum + p.valor, 0));
-  const produtos = Array.isArray(data.descricaoProdutos) ? data.descricaoProdutos : [];
+  if (valorNota > 0 && Math.abs(Math.round(valorTotal * 100) - Math.round(valorNota * 100)) > 1)
+    pendencias.push('A soma das parcelas deve ser igual ao valor total da nota.');
 
   return {
     payload: {
@@ -289,13 +335,15 @@ export function buildNotaPayload(data: NotaExtraidaLike): {
         documento: fornecedorDoc,
       },
       faturado: { razaoSocial: faturadoNome, documento: faturadoDoc },
-      numeroNotaFiscal: (data.numeroNotaFiscal ?? '').trim() || null,
+      numeroNotaFiscal: normalizeNumeroNota(data.numeroNotaFiscal) || null,
       dataEmissao: isIsoDate(data.dataEmissao) ? data.dataEmissao : null,
       descricao: produtos.join('; ').slice(0, 2000) || null,
+      produtos,
       despesas,
       parcelas,
       valorTotal,
     },
     pendencias,
+    pendenciasCadastro,
   };
 }

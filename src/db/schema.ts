@@ -672,6 +672,34 @@ export const movimentoClassificacao = pgTable(
   (t) => [primaryKey({ columns: [t.movimentoId, t.classificacaoId] })]
 );
 
+export const produtos = pgTable(
+  'produtos',
+  {
+    id: serial('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id)
+      .notNull(),
+    descricao: varchar('descricao', { length: 500 }).notNull(),
+    status: varchar('status', { length: 10 }).default('ATIVO').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('produtos_org_descricao_uq').on(t.organizationId, t.descricao)]
+);
+
+export const movimentoProduto = pgTable(
+  'movimento_produto',
+  {
+    movimentoId: integer('movimento_id')
+      .references(() => movimentoContas.id, { onDelete: 'cascade' })
+      .notNull(),
+    produtoId: integer('produto_id')
+      .references(() => produtos.id)
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.movimentoId, t.produtoId] })]
+);
+
 export const parcelaContas = pgTable('parcela_contas', {
   id: serial('id').primaryKey(),
   movimentoId: integer('movimento_id')

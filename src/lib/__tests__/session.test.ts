@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCurrentSession, getVerifiedSession, getEffectiveOrganizationId } from '../session';
 import { DEFAULT_ORG_ID, SEED_USERS } from '@/db/seed';
 import { DEMO_SESSION_COOKIE } from '../demoSession';
@@ -32,6 +32,7 @@ vi.mock('../demoSession', async (importOriginal) => {
 });
 
 describe('Session Retrieval & Verification Engine (src/lib/session.ts)', () => {
+  afterEach(() => vi.unstubAllEnvs());
   const mockCookieStore = {
     get: vi.fn(),
   };
@@ -183,6 +184,12 @@ describe('Session Retrieval & Verification Engine (src/lib/session.ts)', () => {
   });
 
   describe('3. getCurrentSession Behavior', () => {
+    it('rejects expired or forged sessions in production instead of using the seed tenant', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      await expect(getCurrentSession()).rejects.toThrow('Sua sessão expirou');
+      mockCookieStore.get.mockReturnValue({ value: 'forged-session' });
+      await expect(getCurrentSession()).rejects.toThrow('Sua sessão expirou');
+    });
     it('returns verified session data (stripping kind and subject) when verified session exists', async () => {
       mockGetSession.mockResolvedValueOnce({
         user: {

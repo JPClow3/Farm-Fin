@@ -35,6 +35,7 @@ export type AuditEntityType =
   | 'dre'
   | 'pessoa'
   | 'classificacao'
+  | 'produto'
   | 'movimento_contas';
 
 interface WriteAuditLogParams {

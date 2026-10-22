@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginScreen } from './LoginScreen';
+import { buildInfo } from '@/lib/buildInfo';
 
 const mocks = vi.hoisted(() => ({
   assign: vi.fn(),
@@ -25,6 +26,13 @@ vi.mock('@/lib/auth-client', () => ({
 const methods = { magicLink: false, google: false, microsoft: false };
 
 describe('LoginScreen', () => {
+  it('shows the package version and the exact build revision in the login footer', () => {
+    render(<LoginScreen methods={methods} />);
+    const footer = screen.getByLabelText('Versão do sistema');
+    expect(footer).toHaveAttribute('data-app-version', buildInfo.version);
+    expect(footer).toHaveAttribute('data-build-commit', buildInfo.commit);
+    expect(footer).toHaveTextContent(`v${buildInfo.version}`);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal(

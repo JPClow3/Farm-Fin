@@ -55,7 +55,7 @@ function validCnpj(digits: string): boolean {
   return true;
 }
 
-function validDocument(value: string): boolean {
+export function validDocument(value: string): boolean {
   const digits = value.replace(/\D/g, '');
   return validCpf(digits) || validCnpj(digits);
 }
@@ -70,7 +70,7 @@ export function evaluateInvoiceQuality(
   if (!data.fornecedor.razaoSocial)
     add('fornecedor.razaoSocial', 'Razão social do fornecedor não identificada.');
   if (!data.fornecedor.cnpj) add('fornecedor.cnpj', 'CNPJ do fornecedor não identificado.');
-  else if (!validCnpj(data.fornecedor.cnpj.replace(/\D/g, '')))
+  else if (!validDocument(data.fornecedor.cnpj))
     add('fornecedor.cnpj', 'CNPJ do fornecedor inválido.');
   if (!data.faturado.nomeCompleto) add('faturado.nomeCompleto', 'Destinatário não identificado.');
   if (!data.faturado.cpf) add('faturado.cpf', 'CPF/CNPJ do destinatário não identificado.');

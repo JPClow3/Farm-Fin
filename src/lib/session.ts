@@ -114,7 +114,11 @@ export async function getCurrentSession(): Promise<SessionContext> {
     return session;
   }
 
-  // Default demo session (Seu Antônio - Produtor)
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Sua sessão expirou. Faça login novamente.');
+  }
+
+  // Local development and unit-test fixtures only.
   const defaultUser = SEED_USERS[0];
   return {
     user: defaultUser,

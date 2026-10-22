@@ -8,6 +8,7 @@ import {
   identificacaoParcela,
   maskDocumento,
   normalizeDescricao,
+  normalizeNumeroNota,
   parseSearchTerms,
 } from '../administrativo';
 import type { ExtractedInvoiceData } from '../mistralInvoiceAgent';
@@ -31,6 +32,11 @@ const nota: ExtractedInvoiceData = {
 };
 
 describe('projeto administrativo-financeiro: regras puras', () => {
+  it('compara a mesma NF independentemente de pontos e zeros à esquerda', () => {
+    expect(normalizeNumeroNota(' 000.045.892 ')).toBe('45892');
+    expect(normalizeNumeroNota('45892')).toBe('45892');
+    expect(normalizeNumeroNota('nf-123')).toBe('NF-123');
+  });
   it('normaliza a nota extraída para gravação', () => {
     const { payload, pendencias } = buildNotaPayload(nota);
     expect(pendencias).toEqual([]);
@@ -60,7 +66,13 @@ describe('projeto administrativo-financeiro: regras puras', () => {
       parcelas: [],
       dataVencimento: null,
     });
-    expect(pendencias).toHaveLength(5);
+    expect(pendencias).toEqual(
+      expect.arrayContaining([
+        'Informe a razão social do fornecedor.',
+        'Informe um CPF/CNPJ válido para o fornecedor.',
+        'Informe um CPF/CNPJ válido para o faturado.',
+      ])
+    );
   });
 
   it('identifica parcela única e numeradas', () => {

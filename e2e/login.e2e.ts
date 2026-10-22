@@ -1,4 +1,21 @@
 import { expect, test } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { version } from '../package.json';
+
+test('login identifies the package version and GitHub build commit', async ({ page }) => {
+  await page.goto('/login');
+  const footer = page.getByLabel('Versão do sistema');
+  const commit =
+    process.env.WORKERS_CI_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  await expect(footer).toHaveAttribute('data-app-version', version);
+  await expect(footer).toHaveAttribute('data-build-commit', commit.toLowerCase());
+  await expect(footer.getByRole('link')).toHaveAttribute(
+    'href',
+    `https://github.com/JPClow3/Farm-Fin/commit/${commit.toLowerCase()}`
+  );
+});
 
 test('login screen has no demo profiles and supports a username identifier', async ({ page }) => {
   await page.goto('/login?from=%2Flogin');
