@@ -26,6 +26,8 @@ O rodapé do login mostra a versão de `package.json` e o commit completo do bui
 
 O deploy usa Next.js 16 com OpenNext e build Webpack (`npm run build`). O middleware permanece no runtime Edge compatível com Cloudflare. A versão do Next.js deve estar entre as versões suportadas pelo adaptador; a verificação de suporte do OpenNext permanece habilitada.
 
+`APP_URL` e `BETTER_AUTH_URL` devem apontar para a origem publicada. A configuração de produção usa o endereço ativo em `workers.dev`; um domínio diferente pode permitir o primeiro login, mas bloquear ações com cookie, como sair da sessão, com `INVALID_ORIGIN`.
+
 ## Validação
 
 `src/actions/__tests__/invoice-catalog.test.ts` usa PostgreSQL embarcado (PGlite), aplica as migrations reais `0006` e `0007` e testa persistência, rollback, reuso, reativação, isolamento por organização, vínculo ao lançamento e duplicidade. Não depende de credenciais ou de um banco de produção.

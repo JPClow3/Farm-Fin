@@ -97,7 +97,9 @@
   // Non-secret config. Secrets must be set via: wrangler secret put <KEY>
   "vars": {
     "APP_ENV": "production",
-    "APP_URL": "https://farm-fin.com",
+    // Cookie-based auth actions must use the same origin as the deployed app.
+    "APP_URL": "https://farm-fin.joaopaulo-grv4.workers.dev",
+    "BETTER_AUTH_URL": "https://farm-fin.joaopaulo-grv4.workers.dev",
     "NEXT_PUBLIC_APP_NAME": "Farm-Fin",
     "NEON_AUTH_URL": "https://ep-frosty-scene-acz4585p.neonauth.sa-east-1.aws.neon.tech/neondb/auth"
   },
